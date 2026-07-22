@@ -8,10 +8,6 @@
 [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)](https://python.org) [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com) [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://docker.com) [![Tests](https://img.shields.io/badge/Tests-41%2F42%20Passing-brightgreen)](#)
 ```
 
----
-
-
-
 ## 📖 Overview
 
 KPC loses billions of shillings due to revenue leakage in its Order-to-Cash cycle:
