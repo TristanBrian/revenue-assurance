@@ -1,10 +1,10 @@
- 🚛 KPC Revenue Assurance Platform  
+🚛 KPC Revenue Assurance Platform  
 
 > Enterprise-Grade Reconciliation Engine for Kenya Pipeline Company   
 >
-> Solving Order-to-Cash Leakage & E-Billing Integration
+> Solving Order-to-Cash Leakage) & E-Billing Integration
 
-[Python](https://python.org) [FastAPI](https://fastapi.tiangolo.com) [Docker](https://docker.com) [Tests](#)  
+ [![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)](https://python.org) [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com) [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://docker.com) [![Tests](https://img.shields.io/badge/Tests-41%2F42%20Passing-brightgreen)](#)  
 
 > ---
 
