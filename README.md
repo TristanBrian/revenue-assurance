@@ -247,39 +247,29 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ---
 
+## **API Endpoints (Frontend Team)**
 
 
-## 📚 API Endpoints (Frontend Team)
+| **Method** | **Endpoint**                     | **Description**                                          |
+| ---------- | -------------------------------- | -------------------------------------------------------- |
+| `POST`     | `/api/reconcile`                 | Run reconciliation – returns metrics + anomalies         |
+| `POST`     | `/api/reconcile/upload`          | Upload custom CSVs                                       |
+| `POST`     | `/api/reconcile/sync`            | Sync anomalies to E-Billing                              |
+| `POST`     | `/api/reconcile/update`          | Resolve/update an anomaly                                |
+| `GET`      | `/api/reconcile/export`          | Download Excel report                                    |
+| `GET`      | `/api/reconcile/template/{type}` | Download CSV template                                    |
+| `GET`      | `/api/e-billing/status`          | E-Billing integration status                             |
+| `POST`     | `/api/e-billing/sync`            | Sync invoices to KRA iCMS (synchronous)                  |
+| `POST`     | `/api/e-billing/sync/async`      | Trigger non-blocking background sync (returns `task_id`) |
+| `GET`      | `/api/e-billing/task/{task_id}`  | Poll async task progress and result                      |
+| `POST`     | `/api/e-billing/retry/{id}`      | Retry failed sync                                        |
+| `GET`      | `/api/e-billing/logs`            | View sync audit logs                                     |
+| `GET`      | `/api/e-billing/pending`         | List pending invoices                                    |
+| `POST`     | `/api/e-billing/webhook`         | Simulate KRA webhook callback                            |
+| `GET`      | `/api/e-billing/reconcile`       | E-Billing reconciliation dashboard                       |
+| `GET`      | `/api/e-billing/monitor`         | Failure rate monitoring                                  |
+| `GET`      | `/health`                        | Service health check (DB + API status)                   |
 
-| Method | Endpoint | Description |
-
-| :--- | :--- | :--- |
-
-| `POST` | `/api/reconcile` | Run reconciliation – returns metrics + anomalies |
-
-| `POST` | `/api/reconcile/upload` | Upload custom CSVs |
-
-| `POST` | `/api/reconcile/sync` | Sync anomalies to E-Billing |
-
-| `POST` | `/api/reconcile/update` | Resolve/update an anomaly |
-
-| `GET` | `/api/reconcile/export` | Download Excel report |
-
-| `GET` | `/api/reconcile/template/{type}` | Download CSV template |
-
-| `GET` | `/api/e-billing/status` | E-Billing integration status |
-
-| `POST` | `/api/e-billing/sync` | Sync invoices to KRA iCMS |
-
-| `POST` | `/api/e-billing/retry/{id}` | Retry failed sync |
-
-| `GET` | `/api/e-billing/logs` | View sync audit logs |
-
-| `POST` | `/api/e-billing/webhook` | Simulate KRA webhook callback |
-
-| `GET` | `/api/e-billing/reconcile` | E-Billing reconciliation dashboard |
-
-| `GET` | `/api/e-billing/monitor` | Failure rate monitoring |
 
 **Swagger Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
