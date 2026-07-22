@@ -1,11 +1,11 @@
 """
-Enhanced E-Billing Integration Service (Problem #8)
-Enterprise-grade features:
+Features:
 - Retry with exponential backoff
 - Dead Letter Queue (DLQ)
 - Webhook callbacks
 - Reconciliation dashboard
 - Monitoring & alerting
+- Async background task support
 """
 import sqlite3
 import pandas as pd
@@ -16,6 +16,8 @@ import os
 import json
 import logging
 from functools import wraps
+import uuid
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +28,15 @@ MAX_RETRIES = 3
 BACKOFF_FACTOR = 2
 FAILURE_THRESHOLD = 10  # percentage
 
+# ============================================================================
+# IN-MEMORY TASK STORE (For Async Demo)
+# In production, use Redis or a database table.
+# ============================================================================
+
+task_status: Dict[str, Dict[str, Any]] = {}
 
 # ============================================================================
-# DATABASE INITIALIZATION
+# DATABASE INITIALIZATION (Includes DLQ table)
 # ============================================================================
 
 def init_ebilling_tables():
@@ -36,7 +44,6 @@ def init_ebilling_tables():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Main sync status table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS ebilling_sync (
             invoice_id TEXT PRIMARY KEY,
@@ -48,7 +55,6 @@ def init_ebilling_tables():
         )
     """)
     
-    # Dead Letter Queue table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS ebilling_dlq (
             invoice_id TEXT PRIMARY KEY,
@@ -59,7 +65,6 @@ def init_ebilling_tables():
         )
     """)
     
-    # Webhook log table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS ebilling_webhook_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -104,10 +109,8 @@ def call_kra_api(invoice_id: str, payload: dict) -> dict:
     """
     Simulate calling KRA API with retry logic.
     """
-    # Simulate network delay
     time.sleep(random.uniform(0.2, 0.6))
     
-    # Simulate failure scenarios
     rand = random.random()
     if rand < 0.05:  # 5% timeout
         raise TimeoutError("KRA API connection timeout")
@@ -116,7 +119,6 @@ def call_kra_api(invoice_id: str, payload: dict) -> dict:
     elif rand < 0.10:  # 2% internal server error
         raise RuntimeError("KRA internal server error (500)")
     
-    # Success
     return {
         "status": "success",
         "invoice_id": invoice_id,
@@ -126,7 +128,7 @@ def call_kra_api(invoice_id: str, payload: dict) -> dict:
 
 
 # ============================================================================
-# SYNC INVOICES
+# SYNC INVOICES (with DLQ integration)
 # ============================================================================
 
 def sync_invoices_to_ebilling(invoice_ids: list = None) -> dict:
@@ -151,11 +153,9 @@ def sync_invoices_to_ebilling(invoice_ids: list = None) -> dict:
     conn = sqlite3.connect(DB_PATH)
     
     for inv_id in invoice_ids:
-        # Prepare payload
         payload = {"invoice_id": inv_id, "api_key": KRA_API_KEY}
         
         try:
-            # Call KRA API with retry
             response = call_kra_api(inv_id, payload)
             status = 'synced'
             error = None
@@ -164,7 +164,6 @@ def sync_invoices_to_ebilling(invoice_ids: list = None) -> dict:
             status = 'failed'
             error = str(e)
             failed.append(inv_id)
-            # Add to DLQ
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR REPLACE INTO ebilling_dlq (invoice_id, error_message, last_attempt, status)
@@ -172,7 +171,6 @@ def sync_invoices_to_ebilling(invoice_ids: list = None) -> dict:
             """, (inv_id, error, datetime.now().isoformat(), 'pending'))
             conn.commit()
         
-        # Update main sync table
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         cursor = conn.cursor()
         cursor.execute("""
@@ -196,117 +194,41 @@ def sync_invoices_to_ebilling(invoice_ids: list = None) -> dict:
 
 
 # ============================================================================
-# WEBHOOK HANDLER 
+# ASYNC TASK WRAPPER
 # ============================================================================
 
-def handle_webhook(payload: dict) -> dict:
-    """Process webhook from KRA."""
-    init_ebilling_tables()
-    invoice_id = payload.get('invoice_id')
-    status = payload.get('status')
-    message = payload.get('message', '')
-    
-    if not invoice_id:
-        return {'status': 'error', 'message': 'Missing invoice_id in webhook payload'}
-    
-    # Log the webhook
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO ebilling_webhook_log (invoice_id, payload, received_at)
-        VALUES (?, ?, ?)
-    """, (invoice_id, json.dumps(payload), datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-    
-    # Update sync status if the status is different
-    if status in ['synced', 'failed']:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE ebilling_sync
-            SET status = ?, error_message = ?, sync_date = ?
-            WHERE invoice_id = ?
-        """, (status, message, datetime.now().isoformat(), invoice_id))
-        conn.commit()
-        conn.close()
-    
-    return {
-        'status': 'success',
-        'message': f'Webhook processed for invoice {invoice_id}',
-        'invoice_id': invoice_id,
-        'new_status': status
-    }
-
-
-# ============================================================================
-# RECONCILIATION DASHBOARD
-# ============================================================================
-
-def get_ebilling_reconciliation() -> dict:
-    """Compare local invoices vs synced status."""
-    init_ebilling_tables()
-    conn = sqlite3.connect(DB_PATH)
-    
-    total_invoices = int(pd.read_sql("SELECT COUNT(*) as count FROM invoices", conn).iloc[0]['count'])
-    
-    # Synced count
-    synced = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync WHERE status = 'synced'", conn).iloc[0]['count'])
-    
-    # Pending (invoices not yet synced)
-    pending_query = """
-        SELECT COUNT(*) as count FROM invoices i
-        LEFT JOIN ebilling_sync e ON i.invoice_id = e.invoice_id
-        WHERE e.status IS NULL OR e.status != 'synced'
+def run_sync_task(task_id: str, invoice_ids: list = None):
     """
-    pending = int(pd.read_sql(pending_query, conn).iloc[0]['count'])
-    
-    # Failed
-    failed = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync WHERE status = 'failed'", conn).iloc[0]['count'])
-    
-    # DLQ count
-    dlq = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_dlq", conn).iloc[0]['count'])
-    
-    # Reconciliation rate
-    sync_rate = round((synced / total_invoices * 100), 2) if total_invoices > 0 else 0
-    
-    conn.close()
-    
-    return {
-        'total_invoices': total_invoices,
-        'synced': synced,
-        'pending': pending,
-        'failed': failed,
-        'dlq_count': dlq,
-        'reconciliation_rate': sync_rate,
-        'status': 'healthy' if sync_rate >= 90 else 'warning' if sync_rate >= 70 else 'critical'
+    Background task wrapper for sync_invoices_to_ebilling.
+    Updates task_status with progress/result.
+    """
+    task_status[task_id] = {
+        "status": "running",
+        "progress": 0,
+        "result": None,
+        "error": None,
+        "started_at": datetime.now().isoformat()
     }
+    
+    try:
+        result = sync_invoices_to_ebilling(invoice_ids)
+        task_status[task_id].update({
+            "status": "completed",
+            "progress": 100,
+            "result": result,
+            "completed_at": datetime.now().isoformat()
+        })
+    except Exception as e:
+        task_status[task_id].update({
+            "status": "failed",
+            "error": str(e),
+            "completed_at": datetime.now().isoformat()
+        })
 
 
-# ============================================================================
-# MONITORING: FAILURE RATE ALERT
-# ============================================================================
-
-def check_failure_rate() -> dict:
-    """Check if failure rate exceeds threshold."""
-    init_ebilling_tables()
-    conn = sqlite3.connect(DB_PATH)
-    
-    total = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync", conn).iloc[0]['count'])
-    failed = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync WHERE status = 'failed'", conn).iloc[0]['count'])
-    conn.close()
-    
-    if total == 0:
-        return {'failure_rate': 0, 'alert': False, 'message': 'No sync attempts recorded'}
-    
-    rate = round((failed / total) * 100, 2)
-    alert = rate > FAILURE_THRESHOLD
-    return {
-        'failure_rate': rate,
-        'alert': alert,
-        'threshold': FAILURE_THRESHOLD,
-        'message': f'Failure rate {rate}% - {"⚠️ ALERT" if alert else "✅ Normal"}'
-    }
+def get_task_status(task_id: str) -> dict:
+    """Retrieve the status of a background task."""
+    return task_status.get(task_id, {"status": "not_found"})
 
 
 # ============================================================================
@@ -314,14 +236,11 @@ def check_failure_rate() -> dict:
 # ============================================================================
 
 def sync_anomalies_to_ebilling(anomalies: list) -> dict:
-    """Legacy: sync anomalies (list of dicts) to E-Billing."""
-    # Reuse the new function for invoice sync
     invoice_ids = [a.get('invoice_id') for a in anomalies if a.get('invoice_id')]
     return sync_invoices_to_ebilling(invoice_ids)
 
 
 def update_anomaly_status(dispatch_id: str, status: str, notes: str = '') -> dict:
-    """Legacy: update anomaly status."""
     return {
         'status': 'success',
         'message': f'Anomaly {dispatch_id} updated to {status}',
@@ -417,7 +336,6 @@ def retry_failed_sync(invoice_id: str) -> dict:
         conn.close()
         return {'status': 'warning', 'message': f'Invoice {invoice_id} is not in failed state (current: {status}).'}
     
-    # Use the sync function with retry
     result = sync_invoices_to_ebilling([invoice_id])
     conn.close()
     
@@ -428,4 +346,86 @@ def retry_failed_sync(invoice_id: str) -> dict:
         'new_status': 'synced' if result['synced'] == 1 else 'failed',
         'retry_count': retry_count + 1,
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+
+
+def handle_webhook(payload: dict) -> dict:
+    init_ebilling_tables()
+    invoice_id = payload.get('invoice_id')
+    status = payload.get('status')
+    message = payload.get('message', '')
+    
+    if not invoice_id:
+        return {'status': 'error', 'message': 'Missing invoice_id in webhook payload'}
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO ebilling_webhook_log (invoice_id, payload, received_at)
+        VALUES (?, ?, ?)
+    """, (invoice_id, json.dumps(payload), datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+    
+    if status in ['synced', 'failed']:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE ebilling_sync
+            SET status = ?, error_message = ?, sync_date = ?
+            WHERE invoice_id = ?
+        """, (status, message, datetime.now().isoformat(), invoice_id))
+        conn.commit()
+        conn.close()
+    
+    return {
+        'status': 'success',
+        'message': f'Webhook processed for invoice {invoice_id}',
+        'invoice_id': invoice_id,
+        'new_status': status
+    }
+
+
+def get_ebilling_reconciliation() -> dict:
+    init_ebilling_tables()
+    conn = sqlite3.connect(DB_PATH)
+    total_invoices = int(pd.read_sql("SELECT COUNT(*) as count FROM invoices", conn).iloc[0]['count'])
+    synced = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync WHERE status = 'synced'", conn).iloc[0]['count'])
+    pending_query = """
+        SELECT COUNT(*) as count FROM invoices i
+        LEFT JOIN ebilling_sync e ON i.invoice_id = e.invoice_id
+        WHERE e.status IS NULL OR e.status != 'synced'
+    """
+    pending = int(pd.read_sql(pending_query, conn).iloc[0]['count'])
+    failed = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync WHERE status = 'failed'", conn).iloc[0]['count'])
+    dlq = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_dlq", conn).iloc[0]['count'])
+    sync_rate = round((synced / total_invoices * 100), 2) if total_invoices > 0 else 0
+    conn.close()
+    
+    return {
+        'total_invoices': total_invoices,
+        'synced': synced,
+        'pending': pending,
+        'failed': failed,
+        'dlq_count': dlq,
+        'reconciliation_rate': sync_rate,
+        'status': 'healthy' if sync_rate >= 90 else 'warning' if sync_rate >= 70 else 'critical'
+    }
+
+
+def check_failure_rate() -> dict:
+    init_ebilling_tables()
+    conn = sqlite3.connect(DB_PATH)
+    total = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync", conn).iloc[0]['count'])
+    failed = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync WHERE status = 'failed'", conn).iloc[0]['count'])
+    conn.close()
+    if total == 0:
+        return {'failure_rate': 0, 'alert': False, 'message': 'No sync attempts recorded'}
+    rate = round((failed / total) * 100, 2)
+    alert = rate > FAILURE_THRESHOLD
+    return {
+        'failure_rate': rate,
+        'alert': alert,
+        'threshold': FAILURE_THRESHOLD,
+        'message': f'Failure rate {rate}% - {"⚠️ ALERT" if alert else "✅ Normal"}'
     }
