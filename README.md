@@ -473,4 +473,4 @@ MIT – Built for the Inuka Hackathon 2026.
 
 ---
 
-**Built with ❤️ by Team Inuka – Closing the gap between fuel and cash. 🚛💰**
+**Built with ❤️ by Null Terminators – Closing the gap between fuel and cash. 🚛💰**
