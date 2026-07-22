@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import reconcile, e_billing
+from app.routes import reconcile, e_billing, feed, heatmap  # <-- ADDED feed, heatmap
 import sqlite3
 import os
+import time
 
 app = FastAPI(
     title="KPC Revenue Assurance API",
@@ -10,6 +11,7 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "https://*.vercel.app", "https://*.railway.app"],
@@ -18,9 +20,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# Include Routers
 app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
 app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
+app.include_router(feed.router, prefix="/api", tags=["Live Feed"])      # <-- NEW
+app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
 
 
 @app.get("/")
@@ -46,6 +50,8 @@ async def root():
             "POST /api/e-billing/webhook - KRA webhook callback",
             "GET /api/e-billing/reconcile - E-Billing reconciliation dashboard",
             "GET /api/e-billing/monitor - Failure rate monitoring",
+            "GET /api/feed - Live anomaly feed",          # <-- NEW
+            "GET /api/heatmap - Leakage heatmap (OMC × Product)",  # <-- NEW
             "GET /health - Health check"
         ]
     }
@@ -55,11 +61,10 @@ async def root():
 async def health_check():
     """
     Health check endpoint for monitoring and cloud deployments.
-    Checks DB connectivity and API status.
     """
     db_status = "disconnected"
+    start_time = time.time()
     try:
-        # Use the absolute path to the DB file in the backend folder
         db_path = os.path.join(os.path.dirname(__file__), '..', 'kpc.db')
         if not os.path.exists(db_path):
             db_status = "file_not_found"
@@ -77,7 +82,8 @@ async def health_check():
         "status": "healthy" if db_status == "connected" else "unhealthy",
         "database": db_status,
         "version": "2.0.0",
-        "service": "kpc-revenue-assurance"
+        "service": "kpc-revenue-assurance",
+        "uptime": round(time.time() - start_time, 2)
     }
 
 
