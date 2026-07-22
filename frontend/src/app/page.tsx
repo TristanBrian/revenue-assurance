@@ -5,13 +5,18 @@ import { ApiError, reconcile } from "@/lib/api";
 import type { ReconcileResult } from "@/lib/types";
 import MetricCards from "@/components/MetricCards";
 import AnomalyTable from "@/components/AnomalyTable";
+import CsvUploadPanel from "@/components/CsvUploadPanel";
 
 const DEFAULT_MATERIALITY = 100000;
+
+type DataSource = "database" | "upload";
 
 export default function Home() {
   const [materialityInput, setMaterialityInput] = useState(String(DEFAULT_MATERIALITY));
   const [materiality, setMateriality] = useState(DEFAULT_MATERIALITY);
+  const [reloadToken, setReloadToken] = useState(0);
   const [result, setResult] = useState<ReconcileResult | null>(null);
+  const [source, setSource] = useState<DataSource>("database");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,12 +30,27 @@ export default function Home() {
     }
   }
 
+  function handleReloadFromDatabase() {
+    setLoading(true);
+    setError(null);
+    setReloadToken((t) => t + 1);
+  }
+
+  function handleUploaded(data: ReconcileResult) {
+    setResult(data);
+    setError(null);
+    setSource("upload");
+  }
+
   useEffect(() => {
     let cancelled = false;
 
     reconcile(materiality)
       .then((data) => {
-        if (!cancelled) setResult(data);
+        if (!cancelled) {
+          setResult(data);
+          setSource("database");
+        }
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -47,7 +67,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [materiality]);
+  }, [materiality, reloadToken]);
 
   return (
     <div className="min-h-full bg-zinc-50 dark:bg-black">
@@ -101,10 +121,29 @@ export default function Home() {
 
         {result && !loading && (
           <>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Showing:{" "}
+                <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                  {source === "database" ? "live database" : "uploaded CSVs"}
+                </span>
+              </p>
+              {source === "upload" && (
+                <button
+                  type="button"
+                  onClick={handleReloadFromDatabase}
+                  className="text-xs text-zinc-500 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                >
+                  Switch back to live database
+                </button>
+              )}
+            </div>
             <MetricCards metrics={result.metrics} />
             <AnomalyTable anomalies={result.anomalies} />
           </>
         )}
+
+        <CsvUploadPanel materiality={materiality} onUploaded={handleUploaded} />
       </main>
     </div>
   );
