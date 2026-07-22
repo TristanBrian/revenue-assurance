@@ -1,8 +1,18 @@
+```markdown
+
 # 🚛 KPC Revenue Assurance Platform
 
->  **Reconciliation Engine for Kenya Pipeline Company**  
+> **Reconciliation Engine for Kenya Pipeline Company**  
 
-> *Solving Order-to-Cash Leakage problem & E-Billing Integration*
+> *Solving Order-to-Cash Leakage) & E-Billing Integration)*
+
+[![Python]([https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org)](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org))
+
+[![FastAPI]([https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)](https://fastapi.tiangolo.com)](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)](https://fastapi.tiangolo.com))
+
+[![Docker]([https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://docker.com)](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://docker.com))
+
+[![Tests]([https://img.shields.io/badge/Tests-41%2F42%20Passing-brightgreen)](#)](https://img.shields.io/badge/Tests-41%2F42%20Passing-brightgreen)](#))
 
 ---
 
@@ -11,10 +21,12 @@
 KPC loses billions of shillings due to revenue leakage in its Order-to-Cash cycle:
 
 - **Missing Invoices** – Fuel dispatched, no bill sent.
+
 - **Missing Payments** – Bills sent, never paid.
+
 - **Underpayments** – Paid less than invoiced.
 
-**Our solution** reconciles Dispatches → Invoices → Payments, detects these leaks, and exposes everything via a REST API with automatic Swagger/OpenAPI docs.
+**Our solution** reconciles Dispatches → Invoices → Payments, detects these leaks, and exposes everything via a REST API with automatic Swagger/OpenAPI docs. The platform also includes an **enterprise-grade E-Billing integration** with retry logic, Dead Letter Queues, webhook callbacks, and real-time monitoring.
 
 ---
 
@@ -66,7 +78,7 @@ graph TD
 
         API["🚀 FastAPI"]
 
-        Routes["/reconcile<br>/upload<br>/sync<br>/status<br>/export"]
+        Routes["/reconcile<br>/upload<br>/sync<br>/status<br>/export<br>/webhook"]
 
     end
 
@@ -86,6 +98,8 @@ graph TD
 
         Graph["🕸️ Fraud Graph"]
 
+        EBillUI["🔌 E-Billing Status"]
+
     end
 
     %% =============================================
@@ -96,7 +110,7 @@ graph TD
 
     CSV -->|Load| ETL
 
-    ETL -->|Clean & Aggregage| DB
+    ETL -->|Clean & Aggregate| DB
 
     DB -->|Query| Recon
 
@@ -124,6 +138,8 @@ graph TD
 
     Dashboard --> Graph
 
+    Dashboard --> EBillUI
+
     %% =============================================
 
     %% STYLING
@@ -146,15 +162,45 @@ graph TD
 
     class API,Routes api
 
-    class Dashboard,Cards,Table,Graph ui
+    class Dashboard,Cards,Table,Graph,EBillUI ui
 
 ```
 
-
-
 ---
 
+## ✨ Key Features
 
+| Feature | Description |
+
+| :--- | :--- |
+
+| **Three-Way Reconciliation** | Matches Dispatches → Invoices → Payments to detect Missing Invoices, Missing Payments, and Underpayments. |
+
+| **E-Billing Integration** | Syncs invoices to KRA iCMS with retry logic (3 attempts, exponential backoff). |
+
+| **Dead Letter Queue** | Failed invoices are stored for later reprocessing – nothing is ever lost. |
+
+| **Webhook Callback** | Simulates KRA's asynchronous confirmation of invoice processing. |
+
+| **Reconciliation Dashboard** | Full visibility into sync health: synced/pending/failed counts, reconciliation rate. |
+
+| **Failure Monitoring** | Alerts when failure rate exceeds 10% threshold. |
+
+| **Materiality Threshold** | Configurable filter to focus on significant losses. |
+
+| **Duplicate Detection** | Flags duplicate invoices to prevent double payments. |
+
+| **OMC Risk Profiling** | Aggregates leakage per OMC and assigns High/Medium/Low risk. |
+
+| **Data Quality Scoring** | 0–100% quality score based on nulls, zeros, invalid customers. |
+
+| **CSV Upload & Templates** | Upload custom CSVs or download templates for correct formatting. |
+
+| **Excel Export** | Boardroom-ready reports with multi-sheet workbooks. |
+
+| **Audit Trail** | Full logs of all sync attempts, retries, and user actions. |
+
+---
 
 ## 🛠️ Tech Stack
 
@@ -170,24 +216,21 @@ graph TD
 
 | **Database** | SQLite (Dev) / PostgreSQL (Prod) |
 
-| **Testing** | Pytest (20+ tests) |
+| **Testing** | Pytest (41 tests, 86% coverage) |
 
 | **Deployment** | Docker, Docker Compose |
 
+| **API Docs** | Swagger UI, ReDoc |
+
 ---
 
-
-
 ## 🚀 Quick Start
-
-
 
 ### Prerequisites
 
 - Docker & Docker Compose
+
 - OR Python 3.11+ (Local development)
-
-
 
 ### With Docker (Recommended)
 
@@ -208,8 +251,6 @@ docker compose up --build
 # Swagger Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ```
-
-
 
 ### Local Development
 
@@ -241,8 +282,6 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ---
 
-
-
 ## 📚 API Endpoints (Frontend Team)
 
 | Method | Endpoint | Description |
@@ -269,11 +308,15 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 | `GET` | `/api/e-billing/logs` | View sync audit logs |
 
+| `POST` | `/api/e-billing/webhook` | Simulate KRA webhook callback |
+
+| `GET` | `/api/e-billing/reconcile` | E-Billing reconciliation dashboard |
+
+| `GET` | `/api/e-billing/monitor` | Failure rate monitoring |
+
 **Swagger Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
-
-
 
 ## 📂 Project Structure (Team Roles)
 
@@ -317,7 +360,15 @@ kpc-revenue-assurance/
 
 │   ├── data/                         # 🟡 Person C – CSVs (gitignored)
 
-│   ├── tests/                        # 🔵 Person B – 20 tests
+│   ├── tests/                        # 🔵 Person B – 41 tests
+
+│   │   ├── test_[reconciliation.py](http://reconciliation.py)
+
+│   │   ├── test_[ebilling.py](http://ebilling.py)
+
+│   │   ├── test_data_[quality.py](http://quality.py)
+
+│   │   └── test_[etl.py](http://etl.py)
 
 │   └── requirements.txt
 
@@ -345,17 +396,15 @@ kpc-revenue-assurance/
 
 ---
 
-
-
 ## 👥 Team Role Breakdown
 
 | Role | Person | What You Own |
 
 | :--- | :--- | :--- |
 
-| **Backend Core & API** | 🟢 Person A | `main.py`, `routes/`, `models/`, 
+| **Backend Core & API** | 🟢 Person A | `main.py`, `routes/`, `models/`, deployment |
 
-| **Business Logic** | 🔵 Person B | `services/reconciliation.py`, `tests/` 
+| **Business Logic** | 🔵 Person B | `services/reconciliation.py`, `tests/` |
 
 | **Data Engineering** | 🟡 Person C | `scripts/`, `data/`, `utils/`, ETL |
 
@@ -365,8 +414,6 @@ kpc-revenue-assurance/
 
 ---
 
-
-
 ## 🧪 Testing
 
 ```bash
@@ -375,15 +422,25 @@ kpc-revenue-assurance/
 
 docker compose exec backend pytest tests/ -v
 
-# Expected: 20/20 passing
+# Expected: 41 passed, 1 skipped
+
+```
+
+### Test Coverage
+
+```bash
+
+docker compose exec backend pytest tests/ --cov=[app.services](http://app.services) --cov-report=term
+
+# Coverage: 86%
 
 ```
 
 ---
 
-
-
 ## 📊 Sample Response
+
+### Reconciliation Response
 
 ```json
 
@@ -411,9 +468,31 @@ docker compose exec backend pytest tests/ -v
 
 ```
 
+### E-Billing Sync Response
+
+```json
+
+{
+
+  "status": "success",
+
+  "message": "Successfully synced 998 invoices, 110 failed.",
+
+  "synced": 998,
+
+  "failed": 110,
+
+  "total_processed": 1108,
+
+  "failed_ids": ["INV-1001", ...],
+
+  "sync_time": "2026-07-22 08:15:00"
+
+}
+
+```
+
 ---
-
-
 
 ## 🏆 Key Metrics
 
@@ -429,13 +508,13 @@ docker compose exec backend pytest tests/ -v
 
 | **Data Quality Score** | 100% |
 
-| **Tests Passing** | 20/20 |
+| **Tests Passing** | 41/42 |
 
 | **Processing Time** | < 1s |
 
+| **E-Billing Sync Rate** | ~90% |
+
 ---
-
-
 
 ## 📝 Environment Variables
 
@@ -451,21 +530,25 @@ CORS_ORIGINS=[http://localhost:3000](http://localhost:3000)
 
 MATERIALITY_THRESHOLD=100000
 
+KRA_ICMS_ENDPOINT=[https://api.kra.go.ke/icms/v2/invoices](https://api.kra.go.ke/icms/v2/invoices)
+
+KRA_ICMS_API_KEY=test-api-key-12345
+
+LOG_LEVEL=INFO
+
 ```
 
 ---
 
-
-
 ## 🔗 Links
 
 - **Swagger Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+
 - **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
 - **OpenAPI JSON:** [http://localhost:8000/openapi.json](http://localhost:8000/openapi.json)
 
 ---
-
-
 
 ## 📜 License
 
@@ -474,3 +557,6 @@ MIT – Built for the Inuka Hackathon 2026.
 ---
 
 **Built with ❤️ by Null Terminators – Closing the gap between fuel and cash. 🚛💰**
+
+```
+
