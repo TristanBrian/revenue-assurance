@@ -1,10 +1,13 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body
 from app.services.e_billing import (
     sync_invoices_to_ebilling,
     get_ebilling_status,
     get_ebilling_sync_logs,
     retry_failed_sync,
-    get_pending_invoices
+    get_pending_invoices,
+    handle_webhook,
+    get_ebilling_reconciliation,
+    check_failure_rate
 )
 import logging
 
@@ -80,4 +83,50 @@ async def ebilling_pending():
         }
     except Exception as e:
         logger.error(f"E-Billing pending error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/e-billing/webhook")
+async def kra_webhook(payload: dict = Body(...)):
+    """
+    Simulate KRA's webhook callback.
+    Expects: {"invoice_id": "INV-123", "status": "synced", "message": "..."}
+    """
+    try:
+        result = handle_webhook(payload)
+        return result
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/e-billing/reconcile")
+async def ebilling_reconcile():
+    """
+    Get reconciliation dashboard summary.
+    """
+    try:
+        data = get_ebilling_reconciliation()
+        return {
+            'status': 'success',
+            'data': data
+        }
+    except Exception as e:
+        logger.error(f"Reconciliation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/e-billing/monitor")
+async def ebilling_monitor():
+    """
+    Get failure rate alert status.
+    """
+    try:
+        data = check_failure_rate()
+        return {
+            'status': 'success',
+            'monitoring': data
+        }
+    except Exception as e:
+        logger.error(f"Monitor error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
