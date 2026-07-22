@@ -3,8 +3,6 @@
 >  **Reconciliation Engine for Kenya Pipeline Company**  
 
 > *Solving Order-to-Cash Leakage problem & E-Billing Integration*
->
->
 
 ---
 
@@ -19,8 +17,6 @@ KPC loses billions of shillings due to revenue leakage in its Order-to-Cash cycl
 **Our solution** reconciles Dispatches → Invoices → Payments, detects these leaks, and exposes everything via a REST API with automatic Swagger/OpenAPI docs.
 
 ---
-
-
 
 ## 🏗️ Architecture
 
@@ -357,9 +353,9 @@ kpc-revenue-assurance/
 
 | :--- | :--- | :--- |
 
-| **Backend Core & API** | 🟢 Person A | `main.py`, `routes/`, `models/`, deployment |
+| **Backend Core & API** | 🟢 Person A | `main.py`, `routes/`, `models/`, 
 
-| **Business Logic** | 🔵 Person B | `services/reconciliation.py`, `tests/` |
+| **Business Logic** | 🔵 Person B | `services/reconciliation.py`, `tests/` 
 
 | **Data Engineering** | 🟡 Person C | `scripts/`, `data/`, `utils/`, ETL |
 
