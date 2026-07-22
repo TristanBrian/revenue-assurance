@@ -1,6 +1,6 @@
 # Frontend ↔ Backend Wiring Progress
 
-**Current phase:** Phase 1 — Reconciliation Dashboard (done, pending commit) → next up: Phase 2 (CSV Upload)
+**Current phase:** Phase 2 — CSV Upload (done) → next up: Phase 3 (E-Billing Panel)
 **Branch:** `feat/reconciliation-dashboard`
 
 Update this file as the last step of each phase/step below, before moving to the next one. It's the source of truth for "where are we" across sessions.
@@ -18,10 +18,11 @@ Update this file as the last step of each phase/step below, before moving to the
 - [x] `page.tsx` wired to real data (loading/error states, materiality input)
 - [x] Manual end-to-end verification (backend + frontend dev servers, browser check) + `npm run lint` + `tsc --noEmit` — all clean
 
-## Phase 2 — CSV Upload (not started)
-- [ ] Upload form → `/api/reconcile/upload`
-- [ ] Template downloads → `/api/reconcile/template/{type}`
-- [ ] Reuse `MetricCards`/`AnomalyTable` for upload results
+## Phase 2 — CSV Upload
+- [x] `reconcileUpload()` + `templateUrl()` added to `frontend/src/lib/api.ts`
+- [x] `CsvUploadPanel` component (3 file inputs, per-file template links)
+- [x] Wired into `page.tsx` with a data-source indicator (database vs. upload) and a way back to live data
+- [x] Manual end-to-end verification: downloaded real templates via curl, uploaded through the browser, confirmed metrics/table update and "switch back to live database" works + `npm run lint` + `tsc --noEmit` — all clean
 
 ## Phase 3 — E-Billing Panel (not started)
 - [ ] Status cards → `/api/e-billing/status`
