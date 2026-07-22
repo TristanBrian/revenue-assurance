@@ -1,292 +1,238 @@
 # 🚛 KPC Revenue Assurance Platform
 
-> **Order-to-Cash Reconciliation Engine** – Inuka Hackathon 2026  
+>  **Reconciliation Engine for Kenya Pipeline Company**  
 
-> *Solving revenue leakage*
+> *Solving Problems #7 (Order-to-Cash Leakage) & #8 (E-Billing Integration)*
 
-[Python](https://python.org)](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)]([https://python.org](https://python.org)))
+[![Python]([https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org)](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org))
 
-[FastAPI](https://fastapi.tiangolo.com)](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)]([https://fastapi.tiangolo.com](https://fastapi.tiangolo.com)))
+[![FastAPI]([https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)](https://fastapi.tiangolo.com)](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)](https://fastapi.tiangolo.com))
 
-[Docker](https://docker.com)](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)]([https://docker.com](https://docker.com)))
+[![Docker]([https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://docker.com)](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://docker.com))
 
-[Tests](#)](https://img.shields.io/badge/Tests-20%2F20%20Passing-brightgreen)](#))
+[![Tests]([https://img.shields.io/badge/Tests-20%2F20%20Passing-brightgreen)](#)](https://img.shields.io/badge/Tests-20%2F20%20Passing-brightgreen)](#))
 
 ---
 
-
-
-## 🔍 Overview
+## 📖 Overview
 
 KPC loses billions of shillings due to revenue leakage in its Order-to-Cash cycle:
 
 - **Missing Invoices** – Fuel dispatched, no bill sent.
+
 - **Missing Payments** – Bills sent, never paid.
+
 - **Underpayments** – Paid less than invoiced.
 
 **Our solution** reconciles Dispatches → Invoices → Payments, detects these leaks, and exposes everything via a REST API with automatic Swagger/OpenAPI docs.
 
 ---
 
-
-
 ## 🏗️ Architecture
 
 ```mermaid
 
-graph LR
+graph TD
 
-    CSV[(Raw CSVs)] --> ETL[ETL Pipeline]
+    %% =============================================
 
-    ETL --> DB[(SQLite DB)]
+    %% LAYER 1: DATA SOURCES
 
-    DB --> Recon[Reconciliation Engine]
+    %% =============================================
 
-    Recon --> API[FastAPI]
+    subgraph Data_Layer["📁 DATA LAYER"]
 
-    API --> Frontend[Next.js UI]
+        CSV[("📄 Raw CSVs")]
 
-    Recon --> EBill[E-Billing Sync]
+        DB[("🗄️ SQLite DB")]
+
+    end
+
+    %% =============================================
+
+    %% LAYER 2: BACKEND SERVICES
+
+    %% =============================================
+
+    subgraph Service_Layer["⚙️ BACKEND SERVICES"]
+
+        ETL["🔄 ETL Pipeline"]
+
+        Recon["🔍 Reconciliation"]
+
+        Fraud["🕸️ Fraud Detection"]
+
+        EBill["📤 E-Billing"]
+
+    end
+
+    %% =============================================
+
+    %% LAYER 3: API ENDPOINTS
+
+    %% =============================================
+
+    subgraph API_Layer["🌐 API LAYER"]
+
+        API["🚀 FastAPI"]
+
+        Routes["/reconcile<br>/upload<br>/sync<br>/status<br>/export"]
+
+    end
+
+    %% =============================================
+
+    %% LAYER 4: FRONTEND UI
+
+    %% =============================================
+
+    subgraph UI_Layer["🖥️ FRONTEND"]
+
+        Dashboard["📊 Dashboard"]
+
+        Cards["💳 Metric Cards"]
+
+        Table["📋 Anomaly Table"]
+
+        Graph["🕸️ Fraud Graph"]
+
+    end
+
+    %% =============================================
+
+    %% DATA FLOW
+
+    %% =============================================
+
+    CSV -->|Load| ETL
+
+    ETL -->|Clean & Aggregage| DB
+
+    DB -->|Query| Recon
+
+    DB -->|Query| Fraud
+
+    DB -->|Query| EBill
+
+    
+
+    Recon -->|JSON| API
+
+    Fraud -->|JSON| API
+
+    EBill -->|JSON| API
+
+    API --> Routes
+
+    
+
+    Routes -->|JSON| Dashboard
+
+    Dashboard --> Cards
+
+    Dashboard --> Table
+
+    Dashboard --> Graph
+
+    %% =============================================
+
+    %% STYLING
+
+    %% =============================================
+
+    classDef data fill:#e8daef,stroke:#8e44ad,stroke-width:2px,color:#000
+
+    classDef service fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px,color:#000
+
+    classDef api fill:#fff2cc,stroke:#d6b656,stroke-width:2px,color:#000
+
+    classDef ui fill:#f8cecc,stroke:#b85450,stroke-width:2px,color:#000
+
+    
+
+    class CSV,DB data
+
+    class ETL,Recon,Fraud,EBill service
+
+    class API,Routes api
+
+    class Dashboard,Cards,Table,Graph ui
 
 ```
 
-
-
 ---
-
-
 
 ## 🛠️ Tech Stack
 
-| Backend | Database | Frontend |
-
-| :--- | :--- | :--- |
-
-| FastAPI + Uvicorn | SQLite (Dev) / PostgreSQL (Prod) | Next.js 14 |
-
-| Pandas + NumPy | SQLAlchemy | Tailwind CSS |
-
-| Pytest (20 tests) | Faker (Data Gen) | Recharts |
-
----
-
-
-
-## 📚 API Documentation
-
-**FastAPI auto-generates Swagger UI – Python's equivalent to Spring Boot's** `springdoc`**!**
-
-| Feature | URL |
+| Layer | Technology |
 
 | :--- | :--- |
 
-| 📖 **Swagger UI** (Interactive) | `http://localhost:8000/docs` |
+| **Backend** | Python 3.11, FastAPI, Uvicorn |
 
-| 📖 **ReDoc** (Clean Docs) | `http://localhost:8000/redoc` |
+| **Data Processing** | Pandas, NumPy, SQLAlchemy |
 
-| 📄 **OpenAPI Schema** (TypeScript generator) | `http://localhost:8000/openapi.json` |
+| **Fraud Detection** | NetworkX |
 
-### Endpoints
+| **Database** | SQLite (Dev) / PostgreSQL (Prod) |
 
-| Method | Endpoint | Description |
+| **Testing** | Pytest (20+ tests) |
 
-| :--- | :--- | :--- |
-
-| `POST` | `/api/reconcile` | Run reconciliation – returns metrics + anomalies + data quality |
-
-| `POST` | `/api/reconcile/sync` | Sync pending anomalies to E-Billing (KRA iCMS sim) |
-
-| `POST` | `/api/reconcile/update` | Manually resolve/review an anomaly |
-
-| `GET` | `/api/e-billing/status` | E-Billing connection health |
-
-| `GET` | `/` | Health check |
+| **Deployment** | Docker, Docker Compose |
 
 ---
-
-
-
-## 🖥️ Frontend Consumption (How to Call the API)
-
-
-
-### 1. API Client Setup
-
-```typescript
-
-// frontend/src/lib/api-client.ts
-
-import axios from 'axios';
-
-const API_BASE = [process.env.NEXT](http://process.env.NEXT)_PUBLIC_API_URL || '[http://localhost:8000/api](http://localhost:8000/api)';
-
-export const api = axios.create({ baseURL: API_BASE });
-
-export const fetchReconciliation = async () => {
-
-  const res = await [api.post](http://api.post)('/reconcile');
-
-  return [res.data](http://res.data);
-
-};
-
-export const syncToEBilling = async () => {
-
-  const res = await [api.post](http://api.post)('/reconcile/sync');
-
-  return [res.data](http://res.data);
-
-};
-
-```
-
-
-
-### 2. Dashboard Data Fetch
-
-```tsx
-
-// frontend/src/app/page.tsx
-
-'use client';
-
-import { useEffect, useState } from 'react';
-
-import { fetchReconciliation } from '@/lib/api-client';
-
-export default function Dashboard() {
-
-  const [metrics, setMetrics] = useState(null);
-
-  useEffect(() => {
-
-    fetchReconciliation().then(data => setMetrics([data.data](http://data.data).metrics));
-
-  }, []);
-
-  return (
-
-    <div className="grid grid-cols-4 gap-4">
-
-      <Card title="Total Leakage" value={metrics?.total_leakage_kes} />
-
-      <Card title="Recon Rate" value={metrics?.reconciliation_rate + '%'} />
-
-      <Card title="Anomalies" value={metrics?.anomaly_count} />
-
-      <Card title="Critical" value={metrics?.critical_count} />
-
-    </div>
-
-  );
-
-}
-
-```
-
-
-
-### 3. TypeScript Types (Auto-Generated)
-
-```bash
-
-npx @openapitools/openapi-generator-cli generate \
-
-  -i [http://localhost:8000/openapi.json](http://localhost:8000/openapi.json) \
-
-  -g typescript-axios \
-
-  -o ./src/generated
-
-```
-
----
-
-
-
-## 🧪 Endpoint Testing (Python vs Spring Boot)
-
-| Spring Boot | FastAPI (Python) |
-
-| :--- | :--- |
-
-| `@SpringBootTest` + `MockMvc` | `pytest` + `TestClient` |
-
-| `mockMvc.perform(get("/api/..."))` | `client.get("/api/...")` |
-
-| `andExpect(status().isOk())` | `assert response.status_code == 200` |
-
-### Example Test
-
-```python
-
-# tests/test_[api.py](http://api.py)
-
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
-
-def test_reconcile():
-
-    response = [client.post](http://client.post)("/api/reconcile")
-
-    assert response.status_code == 200
-
-    assert "metrics" in response.json()["data"]
-
-```
-
-**Run tests:**
-
-```bash
-
-pytest tests/ -v   # 20/20 passing
-
-```
-
----
-
-
 
 ## 🚀 Quick Start
 
+### Prerequisites
 
+- Docker & Docker Compose
+
+- OR Python 3.11+ (Local development)
 
 ### With Docker (Recommended)
 
 ```bash
 
-git clone [https://github.com/TristanBrian/kpc-revenue-assurance.git](https://github.com/yourteam/kpc-revenue-assurance.git)
+# Clone the repo
 
-cd kpc-revenue-assurance
+git clone [https://github.com/TristanBrian/revenue-assurance.git](https://github.com/TristanBrian/revenue-assurance.git)
+
+cd revenue-assurance
+
+# Start the entire stack
 
 docker compose up --build
 
 # Backend: [http://localhost:8000](http://localhost:8000)
 
-# Swagger: [http://localhost:8000/docs](http://localhost:8000/docs)
+# Swagger Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ```
-
-
 
 ### Local Development
 
 ```bash
 
+# Backend
+
 cd backend
 
 python -m venv venv
 
-source venv/bin/activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
 pip install -r requirements.txt
 
+# Generate data
+
 python scripts/generate_kpc_[data.py](http://data.py)
 
+# Run ETL
+
 python scripts/etl_[pipeline.py](http://pipeline.py)
+
+# Start server
 
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
@@ -294,69 +240,139 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ---
 
+## 📚 API Endpoints (Frontend Team)
 
+| Method | Endpoint | Description |
 
-## 📂 Project Structure
+| :--- | :--- | :--- |
+
+| `POST` | `/api/reconcile` | Run reconciliation – returns metrics + anomalies |
+
+| `POST` | `/api/reconcile/upload` | Upload custom CSVs |
+
+| `POST` | `/api/reconcile/sync` | Sync anomalies to E-Billing |
+
+| `POST` | `/api/reconcile/update` | Resolve/update an anomaly |
+
+| `GET` | `/api/reconcile/export` | Download Excel report |
+
+| `GET` | `/api/reconcile/template/{type}` | Download CSV template |
+
+| `GET` | `/api/e-billing/status` | E-Billing integration status |
+
+| `POST` | `/api/e-billing/sync` | Sync invoices to KRA iCMS |
+
+| `POST` | `/api/e-billing/retry/{id}` | Retry failed sync |
+
+| `GET` | `/api/e-billing/logs` | View sync audit logs |
+
+**Swagger Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+
+---
+
+## 📂 Project Structure (Team Roles)
 
 ```
 
-backend/
+kpc-revenue-assurance/
 
-├── app/
+│
 
-│   ├── [main.py](http://main.py)          # FastAPI + Swagger
+├── backend/                          # 🟢 Person A, B, C
 
-│   ├── routes/          # API endpoints
+│   ├── app/
 
-│   ├── services/        # Reconciliation logic
+│   │   ├── [main.py](http://main.py)                   # 🟢 Person A – FastAPI entry
 
-│   └── models/          # Pydantic schemas
+│   │   ├── routes/                   # 🟢 Person A – API endpoints
 
-├── data/                # CSVs + SQLite DB
+│   │   │   ├── [reconcile.py](http://reconcile.py)          # Reconciliation routes
 
-├── scripts/             # Data generator + ETL
+│   │   │   └── e_[billing.py](http://billing.py)          # E-Billing routes
 
-├── tests/               # 20 pytest cases
+│   │   ├── services/                 # 🔵 Person B – Business logic
 
-├── requirements.txt
+│   │   │   ├── [reconciliation.py](http://reconciliation.py)     # 3-way match engine
 
-└── Dockerfile
+│   │   │   └── e_[billing.py](http://billing.py)          # KRA iCMS simulation
 
-frontend/                # Next.js
+│   │   ├── models/                   # 🟢 Person A – Pydantic schemas
+
+│   │   └── utils/                    # 🟡 Person C – Helpers
+
+│   │
+
+│   ├── scripts/                      # 🟡 Person C – Data + ETL
+
+│   │   ├── generate_kpc_[data.py](http://data.py)
+
+│   │   └── etl_[pipeline.py](http://pipeline.py)
+
+│   │
+
+│   ├── data/                         # 🟡 Person C – CSVs (gitignored)
+
+│   ├── tests/                        # 🔵 Person B – 20 tests
+
+│   └── requirements.txt
+
+│
+
+├── frontend/                         # 🟣 Person D & 🟠 Person E
+
+│   ├── src/
+
+│   │   ├── app/                      # 🟣 Person D – Pages
+
+│   │   ├── components/               # 🟠 Person E – UI
+
+│   │   └── lib/                      # 🟣 Person D – API client
+
+│   └── package.json
+
+│
+
+├── docker-compose.yml                # 🟢 Person A
+
+└── [README.md](http://README.md)                         # Everyone
 
 ```
 
 ---
 
+## 👥 Team Role Breakdown
 
+| Role | Person | What You Own |
 
-## ✅ Test Suite
+| :--- | :--- | :--- |
+
+| **Backend Core & API** | 🟢 Person A | `main.py`, `routes/`, `models/`, deployment |
+
+| **Business Logic** | 🔵 Person B | `services/reconciliation.py`, `tests/` |
+
+| **Data Engineering** | 🟡 Person C | `scripts/`, `data/`, `utils/`, ETL |
+
+| **Frontend Lead** | 🟣 Person D | `app/`, `lib/`, API client, layout |
+
+| **Frontend Visuals** | 🟠 Person E | `components/`, charts, graph |
+
+---
+
+## 🧪 Testing
 
 ```bash
 
+# Run all tests
+
 docker compose exec backend pytest tests/ -v
 
-```
-
-```text
-
-✅ 20/20 passed in 1.5s
-
-✅ 100% core logic coverage
-
-✅ Data Quality: 5/5
-
-✅ Reconciliation: 10/10
-
-✅ E-Billing: 2/2
+# Expected: 20/20 passing
 
 ```
 
 ---
 
-
-
-## 📊 Sample API Response
+## 📊 Sample Response
 
 ```json
 
@@ -364,23 +380,21 @@ docker compose exec backend pytest tests/ -v
 
   "metrics": {
 
-    "total_dispatched_kes": 150,932,276,
+    "total_dispatched_kes": 150932276,
 
-    "total_leakage_kes": 22,173,205,
+    "total_leakage_kes": 22173205,
 
     "reconciliation_rate": 85.31,
 
     "anomaly_count": 296,
 
-    "critical_count": 272,
-
-    "pending_count": 13
+    "critical_count": 272
 
   },
 
-  "data_quality": { "quality_score": 96.5 },
+  "anomalies": [...],
 
-  "performance": { "processing_time_seconds": 0.42 }
+  "omc_risk_profile": [...]
 
 }
 
@@ -388,41 +402,58 @@ docker compose exec backend pytest tests/ -v
 
 ---
 
+## 🏆 Key Metrics
 
+| Metric | Value |
 
-## 🚀 Deployment
+| :--- | :--- |
 
-- **Backend:** Railway / Render (Docker)
-- **Frontend:** Vercel
+| **Leakage Detected** | KSh 22.17M |
 
-```bash
+| **Reconciliation Rate** | 85.31% |
 
-# Set CORS origins in [main.py](http://main.py)
+| **Anomalies Found** | 296 |
 
-allow_origins = ["[https://your-frontend.vercel.app](https://your-frontend.vercel.app)"]
+| **Data Quality Score** | 100% |
+
+| **Tests Passing** | 20/20 |
+
+| **Processing Time** | < 1s |
+
+---
+
+## 📝 Environment Variables
+
+Create a `.env` file in the root:
+
+```env
+
+API_HOST=0.0.0.0
+
+API_PORT=8000
+
+CORS_ORIGINS=[http://localhost:3000](http://localhost:3000)
+
+MATERIALITY_THRESHOLD=100000
 
 ```
 
 ---
 
+## 🔗 Links
 
+- **Swagger Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
-## 👥 Team
+- **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-| Role | Person |
-
-| :--- | :--- |
-
-| Backend Core & API | Person A |
-
-| Reconciliation Logic | Person B |
-
-| Data Engineering & ETL | Person C |
-
-| Frontend Lead | Person D |
-
-| Frontend Visuals | Person E |
+- **OpenAPI JSON:** [http://localhost:8000/openapi.json](http://localhost:8000/openapi.json)
 
 ---
 
- **Built with ❤️ by Team Null Terminators – Closing the gap between fuel and cash. 🚛💰**
+## 📜 License
+
+MIT – Built for the Inuka Hackathon 2026.
+
+---
+
+**Built with ❤️ by Team Inuka – Closing the gap between fuel and cash. 🚛💰**
