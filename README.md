@@ -70,44 +70,98 @@ graph TD
     class Dashboard,Cards,Table,Graph,EBillUI ui
 ```
 
+
+
 `Fraud` and the `Fraud Graph` UI represent planned work — the backend service and route are currently stubs (see [Project Status](#project-status)).
 
 ## Key Features
 
-| Feature | Description |
-| :--- | :--- |
+
+| Feature                  | Description                                                                                                    |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------- |
 | Three-way reconciliation | Matches Dispatches → Invoices → Payments to detect missing invoices, missing payments, and under/overpayments. |
-| E-Billing integration | Syncs invoices to KRA iCMS with retry logic (3 attempts, exponential backoff). |
-| Dead letter queue | Failed invoices are stored for reprocessing rather than dropped. |
-| Webhook callback | Simulates KRA's asynchronous confirmation of invoice processing. |
-| E-Billing dashboard | Sync health: synced/pending/failed counts, reconciliation rate. |
-| Failure monitoring | Alerts when the sync failure rate exceeds a configurable threshold. |
-| Materiality threshold | Configurable filter to focus on significant leaks. |
-| Duplicate detection | Flags duplicate invoices/dispatches. |
-| OMC risk profiling | Aggregates leakage per OMC and assigns a High/Medium/Low risk level. |
-| Data quality scoring | 0-100% score based on nulls, zeros, and invalid customer references. |
-| CSV upload & templates | Reconcile ad hoc CSVs without touching the database, or download templates for the expected format. |
-| Excel export | Multi-sheet workbook report (summary, anomalies, data quality, risk profile). |
+| E-Billing integration    | Syncs invoices to KRA iCMS with retry logic (3 attempts, exponential backoff).                                 |
+| Dead letter queue        | Failed invoices are stored for reprocessing rather than dropped.                                               |
+| Webhook callback         | Simulates KRA's asynchronous confirmation of invoice processing.                                               |
+| E-Billing dashboard      | Sync health: synced/pending/failed counts, reconciliation rate.                                                |
+| Failure monitoring       | Alerts when the sync failure rate exceeds a configurable threshold.                                            |
+| Materiality threshold    | Configurable filter to focus on significant leaks.                                                             |
+| Duplicate detection      | Flags duplicate invoices/dispatches.                                                                           |
+| OMC risk profiling       | Aggregates leakage per OMC and assigns a High/Medium/Low risk level.                                           |
+| Data quality scoring     | 0-100% score based on nulls, zeros, and invalid customer references.                                           |
+| CSV upload & templates   | Reconcile ad hoc CSVs without touching the database, or download templates for the expected format.            |
+| Excel export             | Multi-sheet workbook report (summary, anomalies, data quality, risk profile).                                  |
+
+
+
 
 ## Tech Stack
 
-| Layer | Technology |
-| :--- | :--- |
-| Backend | Python 3.11, FastAPI, Uvicorn |
-| Data processing | Pandas, NumPy, SQLAlchemy |
-| Fraud detection (planned) | NetworkX, python-louvain |
-| Database | SQLite (dev) / PostgreSQL (prod) |
-| Testing | Pytest |
-| Frontend | Next.js (App Router), React, TypeScript, Tailwind CSS |
-| Deployment | Docker, Docker Compose |
-| API docs | Swagger UI, ReDoc |
+
+| Layer                     | Technology                                            |
+| ------------------------- | ----------------------------------------------------- |
+| Backend                   | Python 3.11, FastAPI, Uvicorn                         |
+| Data processing           | Pandas, NumPy, SQLAlchemy                             |
+| Fraud detection (planned) | NetworkX, python-louvain                              |
+| Database                  | SQLite (dev) / PostgreSQL (prod)                      |
+| Testing                   | Pytest                                                |
+| Frontend                  | Next.js (App Router), React, TypeScript, Tailwind CSS |
+| Deployment                | Docker, Docker Compose                                |
+| API docs                  | Swagger UI, ReDoc                                     |
+
+
+
+
+## 👥 User Roles
+
+| Role | Description | Key Features |
+
+| :--- | :--- | :--- |
+
+| **Depot Supervisor** | Operations Lead – manages daily depot activities. | Live Feed, Upload CSV, Dashboard Metrics |
+
+| **Manager** | Strategic Decision Maker – oversees regional operations. | Heatmap, OMC Risk Profile, Executive Summary, Export Reports |
+
+| **Revenue Assurance** | Financial Analyst – investigates and resolves anomalies. | Anomaly Table, Resolve/Review/Assign, Audit Trail, E-Billing Sync, Sync Logs |
+
+### Permission Mapping
+
+| Feature | Depot Supervisor | Manager | Revenue Assurance |
+
+| :--- | :--- | :--- | :--- |
+
+| Live Feed | ✅ | ✅ | ✅ |
+
+| Upload CSV | ✅ | ❌ | ✅ |
+
+| Heatmap | ❌ | ✅ | ✅ |
+
+| OMC Risk Profile | ❌ | ✅ | ✅ |
+
+| Executive Metrics | ✅ | ✅ | ✅ |
+
+| Anomaly Table | ❌ | ✅ | ✅ |
+
+| Resolve/Review/Assign | ❌ | ❌ | ✅ |
+
+| E-Billing Sync | ❌ | ❌ | ✅ |
+
+| Audit Trail | ❌ | ✅ | ✅ |
+
+| Export Reports | ❌ | ✅ | ✅ |
+
+| Templates | ✅ | ❌ | ✅ |
 
 ## Quick Start
+
+
 
 ### Prerequisites
 
 - Docker and Docker Compose, or
 - Python 3.11+ and Node.js 20+ for local development
+
+
 
 ### With Docker
 
@@ -117,7 +171,7 @@ cd revenue-assurance
 docker compose up --build
 ```
 
-Backend: http://localhost:8000 · Swagger docs: http://localhost:8000/docs
+Backend: [http://localhost:8000](http://localhost:8000) · Swagger docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ### Local development
 
@@ -144,31 +198,33 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-Frontend: http://localhost:3000
+Frontend: [http://localhost:3000](http://localhost:3000)
 
 ## API Endpoints
 
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| POST | `/api/reconcile` | Run reconciliation against the database — returns metrics + anomalies |
-| POST | `/api/reconcile/upload` | Run reconciliation against uploaded CSVs |
-| POST | `/api/reconcile/sync` | Sync anomalies to E-Billing |
-| POST | `/api/reconcile/update` | Resolve/update an anomaly |
-| GET | `/api/reconcile/export` | Download an Excel report |
-| GET | `/api/reconcile/template/{type}` | Download a CSV template |
-| GET | `/api/e-billing/status` | E-Billing integration status |
-| POST | `/api/e-billing/sync` | Sync invoices to KRA iCMS (synchronous) |
-| POST | `/api/e-billing/sync/async` | Trigger a non-blocking background sync (returns `task_id`) |
-| GET | `/api/e-billing/task/{task_id}` | Poll async task progress and result |
-| POST | `/api/e-billing/retry/{id}` | Retry a failed sync |
-| GET | `/api/e-billing/logs` | View sync audit logs |
-| GET | `/api/e-billing/pending` | List pending invoices |
-| POST | `/api/e-billing/webhook` | Simulate a KRA webhook callback |
-| GET | `/api/e-billing/reconcile` | E-Billing reconciliation dashboard |
-| GET | `/api/e-billing/monitor` | Failure rate monitoring |
-| GET | `/health` | Service health check (DB + API status) |
 
-Full interactive docs: http://localhost:8000/docs (Swagger) and http://localhost:8000/redoc (ReDoc).
+| Method | Endpoint                         | Description                                                           |
+| ------ | -------------------------------- | --------------------------------------------------------------------- |
+| POST   | `/api/reconcile`                 | Run reconciliation against the database — returns metrics + anomalies |
+| POST   | `/api/reconcile/upload`          | Run reconciliation against uploaded CSVs                              |
+| POST   | `/api/reconcile/sync`            | Sync anomalies to E-Billing                                           |
+| POST   | `/api/reconcile/update`          | Resolve/update an anomaly                                             |
+| GET    | `/api/reconcile/export`          | Download an Excel report                                              |
+| GET    | `/api/reconcile/template/{type}` | Download a CSV template                                               |
+| GET    | `/api/e-billing/status`          | E-Billing integration status                                          |
+| POST   | `/api/e-billing/sync`            | Sync invoices to KRA iCMS (synchronous)                               |
+| POST   | `/api/e-billing/sync/async`      | Trigger a non-blocking background sync (returns `task_id`)            |
+| GET    | `/api/e-billing/task/{task_id}`  | Poll async task progress and result                                   |
+| POST   | `/api/e-billing/retry/{id}`      | Retry a failed sync                                                   |
+| GET    | `/api/e-billing/logs`            | View sync audit logs                                                  |
+| GET    | `/api/e-billing/pending`         | List pending invoices                                                 |
+| POST   | `/api/e-billing/webhook`         | Simulate a KRA webhook callback                                       |
+| GET    | `/api/e-billing/reconcile`       | E-Billing reconciliation dashboard                                    |
+| GET    | `/api/e-billing/monitor`         | Failure rate monitoring                                               |
+| GET    | `/health`                        | Service health check (DB + API status)                                |
+
+
+Full interactive docs: [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger) and [http://localhost:8000/redoc](http://localhost:8000/redoc) (ReDoc).
 
 ## Project Structure
 
@@ -197,12 +253,16 @@ revenue-assurance/
 
 Team ownership by area:
 
-| Area | Owns |
-| :--- | :--- |
+
+| Area               | Owns                                        |
+| ------------------ | ------------------------------------------- |
 | Backend core & API | `main.py`, `routes/`, `models/`, deployment |
-| Business logic | `services/reconciliation.py`, `tests/` |
-| Data engineering | `scripts/`, `data/`, `utils/`, ETL |
-| Frontend | `app/`, `lib/`, `components/` |
+| Business logic     | `services/reconciliation.py`, `tests/`      |
+| Data engineering   | `scripts/`, `data/`, `utils/`, ETL          |
+| Frontend           | `app/`, `lib/`, `components/`               |
+
+
+
 
 ## Testing
 
@@ -210,6 +270,8 @@ Team ownership by area:
 docker compose exec backend pytest tests/ -v
 docker compose exec backend pytest tests/ --cov=app.services --cov-report=term
 ```
+
+
 
 ## Sample Response
 
@@ -245,6 +307,8 @@ E-Billing sync response:
   "sync_time": "2026-07-22 08:15:00"
 }
 ```
+
+
 
 ## Environment Variables
 
