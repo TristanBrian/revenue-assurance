@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+.env
+.env.local
+.env.*.local
+*.db
+*.sqlite3
+*.sqlite
+
+# Docker
+docker-compose.override.yml
+*.pid
+*.pid.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Data (Generated CSVs – Keep only templates if needed)
+backend/data/raw/*.csv
+backend/data/clean/*.csv
+!backend/data/raw/.gitkeep
+!backend/data/clean/.gitkeep
+
+# Reports (Generated Excel files)
+*.xlsx
+*.xls
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.cover
+
+# Misc
+get-docker.sh
+*.tmp

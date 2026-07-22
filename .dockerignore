@@ -1,0 +1,25 @@
+# .dockerignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+venv
+env
+.env
+*.db
+*.sqlite3
+data/raw/*.csv
+data/clean/*.csv
+.git
+.gitignore
+README.md
+.dockerignore
+node_modules
+.next
+.vercel

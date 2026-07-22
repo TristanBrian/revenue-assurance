@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kpc-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./backend/data:/app/data
+      - /app/__pycache__  # Ignore cache
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=sqlite:///./app/kpc.db
+    command: >
+      sh -c "python scripts/generate_kpc_data.py &&
+             python scripts/etl_pipeline.py &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    stdin_open: true
+    tty: true
+
+  # Optional: Add frontend later
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: kpc-frontend
+  #   ports:
+  #     - "3000:3000"
+  #   volumes:
+  #     - ./frontend:/app
+  #   depends_on:
+  #     - backend
