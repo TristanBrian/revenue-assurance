@@ -2,15 +2,9 @@
 
 >  **Reconciliation Engine for Kenya Pipeline Company**  
 
-> *Solving Problems #7 (Order-to-Cash Leakage) & #8 (E-Billing Integration)*
-
-[![Python]([https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org)](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org))
-
-[![FastAPI]([https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)](https://fastapi.tiangolo.com)](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)](https://fastapi.tiangolo.com))
-
-[![Docker]([https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://docker.com)](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://docker.com))
-
-[![Tests]([https://img.shields.io/badge/Tests-20%2F20%20Passing-brightgreen)](#)](https://img.shields.io/badge/Tests-20%2F20%20Passing-brightgreen)](#))
+> *Solving Order-to-Cash Leakage problem & E-Billing Integration*
+>
+>
 
 ---
 
@@ -19,14 +13,14 @@
 KPC loses billions of shillings due to revenue leakage in its Order-to-Cash cycle:
 
 - **Missing Invoices** – Fuel dispatched, no bill sent.
-
 - **Missing Payments** – Bills sent, never paid.
-
 - **Underpayments** – Paid less than invoiced.
 
 **Our solution** reconciles Dispatches → Invoices → Payments, detects these leaks, and exposes everything via a REST API with automatic Swagger/OpenAPI docs.
 
 ---
+
+
 
 ## 🏗️ Architecture
 
@@ -160,7 +154,11 @@ graph TD
 
 ```
 
+
+
 ---
+
+
 
 ## 🛠️ Tech Stack
 
@@ -182,13 +180,18 @@ graph TD
 
 ---
 
+
+
 ## 🚀 Quick Start
+
+
 
 ### Prerequisites
 
 - Docker & Docker Compose
-
 - OR Python 3.11+ (Local development)
+
+
 
 ### With Docker (Recommended)
 
@@ -209,6 +212,8 @@ docker compose up --build
 # Swagger Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ```
+
+
 
 ### Local Development
 
@@ -240,6 +245,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ---
 
+
+
 ## 📚 API Endpoints (Frontend Team)
 
 | Method | Endpoint | Description |
@@ -269,6 +276,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 **Swagger Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
+
+
 
 ## 📂 Project Structure (Team Roles)
 
@@ -340,6 +349,8 @@ kpc-revenue-assurance/
 
 ---
 
+
+
 ## 👥 Team Role Breakdown
 
 | Role | Person | What You Own |
@@ -358,6 +369,8 @@ kpc-revenue-assurance/
 
 ---
 
+
+
 ## 🧪 Testing
 
 ```bash
@@ -371,6 +384,8 @@ docker compose exec backend pytest tests/ -v
 ```
 
 ---
+
+
 
 ## 📊 Sample Response
 
@@ -402,6 +417,8 @@ docker compose exec backend pytest tests/ -v
 
 ---
 
+
+
 ## 🏆 Key Metrics
 
 | Metric | Value |
@@ -422,6 +439,8 @@ docker compose exec backend pytest tests/ -v
 
 ---
 
+
+
 ## 📝 Environment Variables
 
 Create a `.env` file in the root:
@@ -440,15 +459,17 @@ MATERIALITY_THRESHOLD=100000
 
 ---
 
+
+
 ## 🔗 Links
 
 - **Swagger Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
-
 - **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
-
 - **OpenAPI JSON:** [http://localhost:8000/openapi.json](http://localhost:8000/openapi.json)
 
 ---
+
+
 
 ## 📜 License
 
