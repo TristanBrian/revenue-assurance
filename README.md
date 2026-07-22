@@ -3,17 +3,18 @@
 > **Enterprise-Grade Reconciliation Engine for Kenya Pipeline Company**  
 
 > *Solving Order-to-Cash Leakage & E-Billing Integration*
-
-```
-[<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white" alt="Python 3.11+">
-  <img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white" alt="FastAPI 0.115">
-  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white" alt="Docker Ready">
-  <img src="https://img.shields.io/badge/Tests-41%2F42%20Passing-brightgreen" alt="Tests Passing">
-</p>
-```
-
-
+>
+> <p align="center">
+>
+>   <img src="[https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)" alt="Python 3.11+">
+>
+>   <img src="[https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)" alt="FastAPI 0.115">
+>
+>   <img src="[https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)" alt="Docker Ready">
+>
+>   <img src="[https://img.shields.io/badge/Tests-41%2F42%20Passing-brightgreen](https://img.shields.io/badge/Tests-41%2F42%20Passing-brightgreen)" alt="Tests Passing">
+>
+> </p>
 
 ## 📖 Overview
 
