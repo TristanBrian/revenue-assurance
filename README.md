@@ -1,16 +1,14 @@
-```markdown
+🚛 KPC Revenue Assurance Platform
 
-# 🚛 KPC Revenue Assurance Platform
+> **Enterprise-Grade Reconciliation Engine for Kenya Pipeline Company**  
 
-> **Reconciliation Engine for Kenya Pipeline Company**  
+> *Solving Problems #7 (Order-to-Cash Leakage) & #8 (E-Billing Integration)*
 
-> *Solving Order-to-Cash Leakage) & E-Billing Integration)*
+[![Python]([https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)](https://python.org)](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)](https://python.org))
 
-[![Python]([https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org)](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org))
+[![FastAPI]([https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com))
 
-[![FastAPI]([https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)](https://fastapi.tiangolo.com)](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)](https://fastapi.tiangolo.com))
-
-[![Docker]([https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://docker.com)](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker)](https://docker.com))
+[![Docker]([https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://docker.com)](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://docker.com))
 
 [![Tests]([https://img.shields.io/badge/Tests-41%2F42%20Passing-brightgreen)](#)](https://img.shields.io/badge/Tests-41%2F42%20Passing-brightgreen)](#))
 
@@ -36,12 +34,6 @@ KPC loses billions of shillings due to revenue leakage in its Order-to-Cash cycl
 
 graph TD
 
-    %% =============================================
-
-    %% LAYER 1: DATA SOURCES
-
-    %% =============================================
-
     subgraph Data_Layer["📁 DATA LAYER"]
 
         CSV[("📄 Raw CSVs")]
@@ -49,12 +41,6 @@ graph TD
         DB[("🗄️ SQLite DB")]
 
     end
-
-    %% =============================================
-
-    %% LAYER 2: BACKEND SERVICES
-
-    %% =============================================
 
     subgraph Service_Layer["⚙️ BACKEND SERVICES"]
 
@@ -68,12 +54,6 @@ graph TD
 
     end
 
-    %% =============================================
-
-    %% LAYER 3: API ENDPOINTS
-
-    %% =============================================
-
     subgraph API_Layer["🌐 API LAYER"]
 
         API["🚀 FastAPI"]
@@ -81,12 +61,6 @@ graph TD
         Routes["/reconcile<br>/upload<br>/sync<br>/status<br>/export<br>/webhook"]
 
     end
-
-    %% =============================================
-
-    %% LAYER 4: FRONTEND UI
-
-    %% =============================================
 
     subgraph UI_Layer["🖥️ FRONTEND"]
 
@@ -101,12 +75,6 @@ graph TD
         EBillUI["🔌 E-Billing Status"]
 
     end
-
-    %% =============================================
-
-    %% DATA FLOW
-
-    %% =============================================
 
     CSV -->|Load| ETL
 
@@ -139,12 +107,6 @@ graph TD
     Dashboard --> Graph
 
     Dashboard --> EBillUI
-
-    %% =============================================
-
-    %% STYLING
-
-    %% =============================================
 
     classDef data fill:#e8daef,stroke:#8e44ad,stroke-width:2px,color:#000
 
@@ -557,6 +519,3 @@ MIT – Built for the Inuka Hackathon 2026.
 ---
 
 **Built with ❤️ by Null Terminators – Closing the gap between fuel and cash. 🚛💰**
-
-```
-
