@@ -35,3 +35,37 @@ export async function reconcile(materiality = 100000): Promise<ReconcileResult> 
   const body: ReconcileResponse = await res.json();
   return body.data;
 }
+
+interface ReconcileUploadFiles {
+  dispatches: File;
+  invoices: File;
+  payments: File;
+}
+
+export async function reconcileUpload(
+  files: ReconcileUploadFiles,
+  materiality = 100000,
+): Promise<ReconcileResult> {
+  const url = new URL("/api/reconcile/upload", API_URL);
+  url.searchParams.set("materiality", String(materiality));
+
+  const formData = new FormData();
+  formData.append("dispatches_file", files.dispatches);
+  formData.append("invoices_file", files.invoices);
+  formData.append("payments_file", files.payments);
+
+  const res = await fetch(url, { method: "POST", body: formData });
+
+  if (!res.ok) {
+    throw new ApiError(await parseErrorDetail(res), res.status);
+  }
+
+  const body: ReconcileResponse = await res.json();
+  return body.data;
+}
+
+export type TemplateType = "dispatches" | "invoices" | "payments";
+
+export function templateUrl(fileType: TemplateType): string {
+  return new URL(`/api/reconcile/template/${fileType}`, API_URL).toString();
+}
