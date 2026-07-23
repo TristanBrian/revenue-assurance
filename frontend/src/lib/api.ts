@@ -2,6 +2,7 @@ import type {
   EbillingIntegrationStatus,
   EbillingLogEntry,
   FailureRateMonitor,
+  FraudGraphData,
   ReconcileResponse,
   ReconcileResult,
   RetrySyncResult,
@@ -78,6 +79,12 @@ export function templateUrl(fileType: TemplateType): string {
   return new URL(`/api/reconcile/template/${fileType}`, API_URL).toString();
 }
 
+export function exportUrl(materiality = 100000): string {
+  const url = new URL("/api/reconcile/export", API_URL);
+  url.searchParams.set("materiality", String(materiality));
+  return url.toString();
+}
+
 export async function getEbillingStatus(): Promise<EbillingIntegrationStatus> {
   const res = await fetch(new URL("/api/e-billing/status", API_URL));
   if (!res.ok) throw new ApiError(await parseErrorDetail(res), res.status);
@@ -119,4 +126,16 @@ export async function retryEbillingSync(invoiceId: string): Promise<RetrySyncRes
   });
   if (!res.ok) throw new ApiError(await parseErrorDetail(res), res.status);
   return res.json();
+}
+
+export async function getFraudGraph(materiality = 0): Promise<FraudGraphData> {
+  const url = new URL("/api/graph", API_URL);
+  url.searchParams.set("materiality", String(materiality));
+  const res = await fetch(url);
+  if (!res.ok) throw new ApiError(await parseErrorDetail(res), res.status);
+  const body: { status: string; data: FraudGraphData; message?: string } = await res.json();
+  if (body.status === "error") {
+    throw new ApiError(body.message ?? "Fraud graph request failed", 500);
+  }
+  return body.data;
 }

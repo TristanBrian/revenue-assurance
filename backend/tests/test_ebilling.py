@@ -31,11 +31,15 @@ DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'test_kpc.db'
 @pytest.fixture
 def test_db():
     """Create a test database with sample invoices."""
-    # Override DB_PATH for testing
+    # Point the service module's engine at a throwaway SQLite file instead of
+    # the real kpc.db (DB_PATH no longer exists — services/e_billing.py talks
+    # to the DB via get_engine() since the SQLAlchemy migration).
     import app.services.e_billing
-    original_path = app.services.e_billing.DB_PATH
-    app.services.e_billing.DB_PATH = DB_PATH
-    
+    from sqlalchemy import create_engine
+    test_engine = create_engine(f'sqlite:///{DB_PATH}')
+    original_get_engine = app.services.e_billing.get_engine
+    app.services.e_billing.get_engine = lambda: test_engine
+
     # Create test tables
     conn = sqlite3.connect(DB_PATH)
     conn.execute("DROP TABLE IF EXISTS invoices")
@@ -74,9 +78,10 @@ def test_db():
     conn.close()
     
     yield DB_PATH
-    
+
     # Cleanup
-    app.services.e_billing.DB_PATH = original_path
+    app.services.e_billing.get_engine = original_get_engine
+    test_engine.dispose()
     if os.path.exists(DB_PATH):
         os.remove(DB_PATH)
 

@@ -25,15 +25,25 @@ services:
     stdin_open: true
     tty: true
 
-  # Optional: Add frontend later
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   container_name: kpc-frontend
-  #   ports:
-  #     - "3000:3000"
-  #   volumes:
-  #     - ./frontend:/app
-  #   depends_on:
-  #     - backend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kpc-frontend
+    # Same host-networking rationale as the backend service: the backend
+    # also uses network_mode: host, which means it doesn't get a
+    # container-internal "backend" DNS name, so NEXT_PUBLIC_API_URL has to
+    # reach it via localhost — only possible if frontend is on host
+    # networking too. `ports:` is a no-op under host networking, so it's
+    # dropped (matches the backend service above).
+    network_mode: host
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  # don't overwrite container's node_modules with host's
+      - /app/.next
+    env_file:
+      - .env
+    depends_on:
+      - backend
+    stdin_open: true
+    tty: true

@@ -72,7 +72,7 @@ graph TD
 
 
 
-`Fraud` and the `Fraud Graph` UI represent planned work — the backend service and route are currently stubs (see [Project Status](#project-status)).
+`Fraud` and the `Fraud Graph` UI: `GET /api/graph` builds an OMC↔depot leakage graph and runs Louvain community detection to surface correlated-leakage clusters (see [Project Status](#project-status)).
 
 ## Key Features
 
@@ -328,7 +328,7 @@ Note: `MATERIALITY_THRESHOLD`, `CRITICAL_AGE_DAYS`, and the KRA endpoint/key are
 
 ## Project Status
 
-See [PROGRESS.md](./PROGRESS.md) for the current state of frontend/backend integration. In short: the reconciliation API and E-Billing simulation are functional and tested; the reconciliation dashboard is wired to live data; CSV upload, the E-Billing panel, export, and the fraud-detection graph (backend and frontend) are still in progress or not yet started.
+See [PROGRESS.md](./PROGRESS.md) for the current state of frontend/backend integration. In short: all 5 phases are complete — reconciliation dashboard, CSV upload, the E-Billing panel, Excel export, and the fraud graph (backend + frontend) are all wired to live data and manually verified end-to-end. CI (GitHub Actions) runs backend tests and frontend lint/typecheck/build on every push/PR to `main`.
 
 ## License
 

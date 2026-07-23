@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ApiError, reconcile } from "@/lib/api";
+import { ApiError, exportUrl, reconcile } from "@/lib/api";
 import type { ReconcileResult } from "@/lib/types";
 import MetricCards from "@/components/MetricCards";
 import AnomalyTable from "@/components/AnomalyTable";
 import CsvUploadPanel from "@/components/CsvUploadPanel";
 import EbillingPanel from "@/components/EbillingPanel";
+import FraudGraph from "@/components/FraudGraph";
 
 const DEFAULT_MATERIALITY = 100000;
 
@@ -129,15 +130,25 @@ export default function Home() {
                   {source === "database" ? "live database" : "uploaded CSVs"}
                 </span>
               </p>
-              {source === "upload" && (
-                <button
-                  type="button"
-                  onClick={handleReloadFromDatabase}
-                  className="text-xs text-zinc-500 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-                >
-                  Switch back to live database
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {source === "database" && (
+                  <a
+                    href={exportUrl(materiality)}
+                    className="text-xs text-zinc-500 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                  >
+                    Export Excel report
+                  </a>
+                )}
+                {source === "upload" && (
+                  <button
+                    type="button"
+                    onClick={handleReloadFromDatabase}
+                    className="text-xs text-zinc-500 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                  >
+                    Switch back to live database
+                  </button>
+                )}
+              </div>
             </div>
             <MetricCards metrics={result.metrics} />
             <AnomalyTable anomalies={result.anomalies} />
@@ -149,6 +160,10 @@ export default function Home() {
         <hr className="border-zinc-200 dark:border-zinc-800" />
 
         <EbillingPanel />
+
+        <hr className="border-zinc-200 dark:border-zinc-800" />
+
+        <FraudGraph />
       </main>
     </div>
   );
