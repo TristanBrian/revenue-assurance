@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin  # <-- ADDED feed, heatmap, auth, detective, graph, admin
-# import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
+from app.middleware.audit import AuditMiddleware
+from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
 from contextlib import asynccontextmanager
@@ -14,8 +14,74 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger("kpc.startup")
 
 
+# ============================================================================
+# CREATE AUDIT TABLE ON STARTUP (AUTOMATIC!)
+# ============================================================================
+def create_audit_table_if_not_exists():
+    """Create the audit_logs table if it doesn't exist.
+
+    Raw SQL rather than an Alembic migration, matching how this table
+    shipped upstream — flagged as worth migrating to Alembic later for
+    consistency with every other table in this app, not changed here.
+    """
+    engine = get_engine()
+    try:
+        with engine.connect() as conn:
+            # Check if table exists (SQLite/PostgreSQL compatible)
+            if engine.dialect.name == "sqlite":
+                result = conn.execute(text(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='audit_logs'"
+                ))
+                exists = result.fetchone() is not None
+            else:  # PostgreSQL
+                result = conn.execute(text(
+                    "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='audit_logs')"
+                ))
+                exists = result.fetchone()[0]
+
+            if not exists:
+                logger.info("📋 Creating audit_logs table...")
+                conn.execute(text("""
+                    CREATE TABLE audit_logs (
+                        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id         INTEGER,
+                        user_username   TEXT,
+                        action          TEXT NOT NULL,
+                        resource        TEXT,
+                        resource_id     TEXT,
+                        method          TEXT,
+                        endpoint        TEXT,
+                        ip_address      TEXT,
+                        user_agent      TEXT,
+                        status_code     INTEGER,
+                        success         INTEGER DEFAULT 1,
+                        error_message   TEXT,
+                        details         TEXT,
+                        previous_state  TEXT,
+                        new_state       TEXT,
+                        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_audit_user_id ON audit_logs (user_id)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs (action)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs (created_at)"))
+                conn.commit()
+                logger.info("✅ audit_logs table created successfully!")
+            else:
+                logger.info("✅ audit_logs table already exists.")
+    except Exception as e:
+        logger.error(f"❌ Failed to create audit_logs table: {e}")
+
+
+# ============================================================================
+# LIFESPAN (Runs on startup)
+# ============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Create audit table on startup
+    create_audit_table_if_not_exists()
+
+    # Check database connection
     engine = get_engine()
     safe_url = engine.url.render_as_string(hide_password=True)
     try:
@@ -24,9 +90,13 @@ async def lifespan(app: FastAPI):
         logger.info(f"✅ Database connected successfully ({safe_url})")
     except Exception as e:
         logger.error(f"❌ Database connection failed ({safe_url}): {e}")
+
     yield
 
 
+# ============================================================================
+# FASTAPI APP
+# ============================================================================
 app = FastAPI(
     title="KPC Revenue Assurance API",
     description="Order-to-Cash Leakage Detection & E-Billing Integration",
@@ -35,10 +105,12 @@ app = FastAPI(
 )
 
 # Standardized {Success, Message, Data, Timestamp} response envelope for
-# every route. Added before CORSMiddleware so CORS ends up outermost in
-# the middleware stack and still applies its headers to the wrapped
-# response (and to error responses from this middleware itself).
+# every route, plus the audit-logging middleware — both added before
+# CORSMiddleware so CORS ends up outermost in the middleware stack and
+# still applies its headers to the wrapped/audited response (and to error
+# responses from either middleware itself).
 app.add_middleware(ResponseEnvelopeMiddleware)
+app.add_middleware(AuditMiddleware)
 
 # CORS
 app.add_middleware(
@@ -52,12 +124,13 @@ app.add_middleware(
 # Include Routers
 app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
 app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
-app.include_router(feed.router, prefix="/api", tags=["Live Feed"])      # <-- NEW
-app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
-app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])  # <-- ADDED auth router
-app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
-app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])  # <-- NEW
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
+app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
+app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])
+app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(audit.router, prefix="/api", tags=["Audit"])
 
 
 @app.get("/")
@@ -85,8 +158,8 @@ async def root():
             "POST /api/e-billing/webhook - KRA webhook callback",
             "GET /api/e-billing/reconcile - E-Billing reconciliation dashboard",
             "GET /api/e-billing/monitor - Failure rate monitoring",
-            "GET /api/feed - Live anomaly feed",          # <-- NEW
-            "GET /api/heatmap - Leakage heatmap (OMC × Product)",  # <-- NEW
+            "GET /api/feed - Live anomaly feed",
+            "GET /api/heatmap - Leakage heatmap (OMC × Product)",
             "GET /api/detective/risk-features - OMC risk features (all OMCs)",
             "GET /api/detective/risk-features/{omc_id} - OMC risk features (single OMC)",
             "GET /api/detective/risk-features/export - Download risk features as CSV",
@@ -97,12 +170,13 @@ async def root():
             "GET /api/admin/users - List all users",
             "PATCH /api/admin/users/{user_id} - Edit a user (email/name/role/password/is_active)",
             "DELETE /api/admin/users/{user_id} - Delete a user",
+            "GET /api/audit/logs - Paginated audit log (view_audit)",
+            "GET /api/audit/summary - Audit summary for the last N days (view_audit)",
             "GET /health - Health check"
         ]
     }
 
 
-# 🆕 VERSION ENDPOINT
 @app.get("/version")
 async def version():
     """
@@ -123,7 +197,7 @@ async def health_check():
     """
     db_status = "disconnected"
     start_time = time.time()
-    
+
     try:
         engine = get_engine()
         with engine.connect() as conn:
@@ -131,7 +205,7 @@ async def health_check():
         db_status = "connected"
     except Exception as e:
         db_status = f"error: {str(e)}"
-    
+
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
         "database": db_status,

@@ -8,6 +8,7 @@ Enterprise-grade features:
 - Monitoring & alerting
 - Async background task support
 - Optimized pagination with caching
+- Granular progress tracking for frontend
 - Production-ready for 40,000+ rows
 """
 import pandas as pd
@@ -261,31 +262,97 @@ def sync_invoices_to_ebilling(invoice_ids: Optional[List[str]] = None) -> dict:
 
 
 # ============================================================================
-# ASYNC TASK WRAPPER
+# ASYNC TASK WRAPPER (with Granular Progress)
 # ============================================================================
 
 def run_sync_task(task_id: str, invoice_ids: Optional[List[str]] = None):
     """
     Background task wrapper for sync_invoices_to_ebilling.
-    Updates task_status with progress/result.
+    Updates task_status with granular progress for frontend.
     """
+    # Get all pending invoices if none provided
+    if invoice_ids is None:
+        invoice_ids = get_pending_invoices()
+    
+    total = len(invoice_ids)
+    
     task_status[task_id] = {
         "status": "running",
         "progress": 0,
         "result": None,
         "error": None,
-        "started_at": datetime.now().isoformat()
+        "started_at": datetime.now().isoformat(),
+        "total": total,
+        "synced_so_far": 0,
+        "failed_so_far": 0
     }
 
-    try:
-        result = sync_invoices_to_ebilling(invoice_ids)
+    if total == 0:
         task_status[task_id].update({
             "status": "completed",
             "progress": 100,
-            "result": result,
+            "result": {
+                'status': 'warning',
+                'message': 'No pending invoices to sync.',
+                'synced': 0,
+                'failed': 0,
+                'total_processed': 0,
+                'failed_ids': [],
+                'sync_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            },
             "completed_at": datetime.now().isoformat()
         })
+        return
+
+    try:
+        # Process in batches for progress updates
+        batch_size = 50
+        all_synced = []
+        all_failed = []
+        
+        for i in range(0, total, batch_size):
+            batch = invoice_ids[i:i+batch_size]
+            result = sync_invoices_to_ebilling(batch)
+            
+            # Track progress
+            batch_failed = result.get('failed_ids', [])
+            batch_synced = [inv for inv in batch if inv not in batch_failed]
+            
+            all_synced.extend(batch_synced)
+            all_failed.extend(batch_failed)
+            
+            # Update progress
+            processed = min(total, i + len(batch))
+            progress = int((processed / total) * 100)
+            
+            task_status[task_id].update({
+                "progress": progress,
+                "synced_so_far": len(all_synced),
+                "failed_so_far": len(all_failed)
+            })
+            
+            logger.info(f"Task {task_id}: {progress}% complete ({len(all_synced)} synced, {len(all_failed)} failed)")
+        
+        # Final result
+        final_result = {
+            'status': 'success' if all_synced else 'error' if all_failed else 'warning',
+            'message': f'Successfully synced {len(all_synced)} invoices, {len(all_failed)} failed.',
+            'synced': len(all_synced),
+            'failed': len(all_failed),
+            'total_processed': total,
+            'failed_ids': all_failed,
+            'sync_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        task_status[task_id].update({
+            "status": "completed",
+            "progress": 100,
+            "result": final_result,
+            "completed_at": datetime.now().isoformat()
+        })
+        
     except Exception as e:
+        logger.error(f"Task {task_id} failed: {e}")
         task_status[task_id].update({
             "status": "failed",
             "error": str(e),

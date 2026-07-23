@@ -20,6 +20,7 @@ from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.models.depot_ledger import DepotLedger
 from app.models.anomaly_resolution import AnomalyResolution
+from app.models.audit_log import AuditLog
 
 __all__ = [
     "User",
@@ -34,4 +35,5 @@ __all__ = [
     "Payment",
     "DepotLedger",
     "AnomalyResolution",
+    "AuditLog",
 ]
