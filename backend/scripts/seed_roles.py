@@ -14,7 +14,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.models.user import Permission, Role
+from app.models.permission import Permission
+from app.models.role import Role
 from app.utils.db_connection import SessionLocal
 
 PERMISSIONS = [
@@ -24,7 +25,8 @@ PERMISSIONS = [
     ("view_audit", "View audit trail"),
     ("manage_ebilling", "Trigger/retry e-billing sync"),
     ("export_reports", "Export Excel/CSV reports"),
-    ("view_fraud_graph", "View fraud/graph detection view"),
+    ("view_fraud_graph", "View fraud/graph detection view (structural/network analysis)"),
+    ("view_risk_analytics", "View OMC risk features (statistical/EDA analysis, no graph concept)"),
     ("manage_users", "Create, edit, deactivate users and assign roles to them"),
     ("manage_permissions", "Create/edit permissions and assign them to roles"),
 ]
@@ -44,6 +46,7 @@ ROLE_PERMISSIONS = {
         "manage_ebilling",
         "export_reports",
         "view_fraud_graph",
+        "view_risk_analytics",
     ],
 }
 
