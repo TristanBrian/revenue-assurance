@@ -72,11 +72,13 @@ def engine():
     )
 
     # INV-1 (OMC-A) and INV-5 (OMC-C) get paid; INV-3 (OMC-A) and INV-4
-    # (OMC-B) are unmatched.
+    # (OMC-B) are unmatched. Raw per-installment shape (value_kes, not
+    # total_paid_kes) — matches the real ETL, which loads payments
+    # unaggregated; detective_service._load_tables() aggregates itself.
     payments = pd.DataFrame(
         {
             "invoice_id": ["INV-1", "INV-5"],
-            "total_paid_kes": [1490000, 1080000],
+            "value_kes": [1490000, 1080000],
             "date": ["2026-01-20", "2026-01-19"],  # both ~8 days after their invoice -> aging bucket 0
         }
     )

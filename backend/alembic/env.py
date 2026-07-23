@@ -34,22 +34,35 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Tables owned by mechanisms other than Alembic — do not let autogenerate
-# try to manage these here. omcs/depots/products/dispatches/invoices/
-# payments/depot_ledger are drop-and-recreated by scripts/etl_pipeline.py's
-# pandas .to_sql(if_exists='replace') every run; ebilling_sync/ebilling_dlq/
+# try to manage these here. products/depots/tariffs/omcs/depot_loading_logs/
+# dispatches/invoices/payments/depot_daily_inventory/quarantine_audit_log are
+# drop-and-recreated by scripts/etl_pipeline.py's pandas
+# .to_sql(if_exists='replace') every run; ebilling_sync/ebilling_dlq/
 # ebilling_webhook_log are created idempotently by
 # app/services/e_billing.py's init_ebilling_tables(). Bringing either set
-# under Alembic would fight with those existing, working mechanisms.
+# under Alembic would fight with those existing, working mechanisms — and
+# for the ETL-owned ones specifically, leaving one out of this set is worse
+# than just "unmanaged": since none of them have an ORM model, autogenerate
+# would see them as tables that exist in the DB but not in target_metadata
+# and generate a migration to DROP them.
 # Remove a table from this set only once you've deliberately decided
-# Alembic (not that other mechanism) now owns its schema.
+# Alembic (not that other mechanism) now owns its schema — and, for the
+# ETL-owned ones, added a matching ORM model.
+#
+# depot_ledger (the old depot_daily_inventory equivalent) no longer exists
+# at all as of the tariffs/loading-logs rewrite — scripts/etl_pipeline.py
+# doesn't create it anymore, replaced by depot_daily_inventory below.
 NOT_ALEMBIC_MANAGED_TABLES = {
-    "omcs",
-    "depots",
     "products",
+    "depots",
+    "tariffs",
+    "omcs",
+    "depot_loading_logs",
     "dispatches",
     "invoices",
     "payments",
-    "depot_ledger",
+    "depot_daily_inventory",
+    "quarantine_audit_log",
     "ebilling_sync",
     "ebilling_dlq",
     "ebilling_webhook_log",

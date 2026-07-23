@@ -27,8 +27,27 @@ def _load_tables(engine):
     invoices = pd.read_sql(
         "SELECT invoice_id, dispatch_id, omc_id, product, date, value_kes FROM invoices", engine
     )
-    payments = pd.read_sql("SELECT invoice_id, total_paid_kes, date FROM payments", engine)
-    quota = pd.read_sql("SELECT omc_id, current_quota_litres, trailing_window_days FROM quota_ledger", engine)
+    # payments is raw, one row per installment (payment_id, invoice_id,
+    # value_kes, date, ...) — no total_paid_kes column, unlike the old ETL
+    # this was originally written against. Aggregate to one row per
+    # invoice_id here (sum of installments, latest payment date), same
+    # shape/semantics services/reconciliation.py's own fallback aggregation
+    # produces, so ghost/aging/z-score logic below is unaffected by this.
+    raw_payments = pd.read_sql("SELECT invoice_id, value_kes, date FROM payments", engine)
+    payments = raw_payments.groupby("invoice_id", as_index=False).agg(
+        total_paid_kes=("value_kes", "sum"),
+        date=("date", "max"),
+    )
+    # quota_ledger is Alembic-managed, not ETL-managed (see alembic/env.py) —
+    # it may not exist at all yet on a DB where migrations haven't been run
+    # (fresh/scratch/test environments). Missing rows within an existing
+    # table already degrade quota_utilization_pct to NaN by design; a
+    # missing table entirely must degrade the same way, not crash every
+    # other feature in this function.
+    try:
+        quota = pd.read_sql("SELECT omc_id, current_quota_litres, trailing_window_days FROM quota_ledger", engine)
+    except Exception:
+        quota = pd.DataFrame(columns=["omc_id", "current_quota_litres", "trailing_window_days"])
 
     dispatches["date"] = pd.to_datetime(dispatches["date"])
     invoices["date"] = pd.to_datetime(invoices["date"])

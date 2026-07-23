@@ -221,7 +221,7 @@ def engine():
     pd.DataFrame(columns=["invoice_id", "dispatch_id", "omc_id", "product", "date", "value_kes"]).to_sql(
         "invoices", eng, index=False
     )
-    pd.DataFrame(columns=["invoice_id", "total_paid_kes", "date"]).to_sql("payments", eng, index=False)
+    pd.DataFrame(columns=["invoice_id", "value_kes", "date"]).to_sql("payments", eng, index=False)
     pd.DataFrame(columns=["omc_id", "current_quota_litres", "trailing_window_days"]).to_sql(
         "quota_ledger", eng, index=False
     )
