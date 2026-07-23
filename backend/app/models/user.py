@@ -1,48 +1,17 @@
 """
-User / Role / Permission models.
-
-Design:
-- User <-> Role is many-to-many (a user can hold more than one role,
-  e.g. someone who is both a Manager and Revenue Assurance).
-- Role <-> Permission is many-to-many (a permission like "resolve_anomaly"
-  can be granted to more than one role).
-- Effective permissions for a user = union of permissions across all
-  their roles. See core/dependencies.py for how this is checked.
+User model. See role.py / permission.py for the other two, and
+associations.py for the user_roles / role_permissions join tables.
 """
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    ForeignKey,
-    String,
-    Table,
-)
+from sqlalchemy import Boolean, Column, DateTime, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.utils.db_connection import Base  # adjust import to match your existing Base
+from app.models.associations import user_roles
+from app.utils.db_connection import Base
 
-# --- association tables -----------------------------------------------------
-
-user_roles = Table(
-    "user_roles",
-    Base.metadata,
-    Column("user_id", UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-    Column("role_id", UUID(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
-)
-
-role_permissions = Table(
-    "role_permissions",
-    Base.metadata,
-    Column("role_id", UUID(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
-    Column("permission_id", UUID(as_uuid=True), ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True),
-)
-
-
-# --- core tables -------------------------------------------------------------
 
 class User(Base):
     __tablename__ = "users"
@@ -61,24 +30,3 @@ class User(Base):
 
     def permission_codes(self) -> set[str]:
         return {p.code for role in self.roles for p in role.permissions}
-
-
-class Role(Base):
-    __tablename__ = "roles"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    name = Column(String(100), unique=True, nullable=False)  # e.g. "depot_supervisor"
-    description = Column(String(255), nullable=True)
-
-    users = relationship("User", secondary=user_roles, back_populates="roles")
-    permissions = relationship("Permission", secondary=role_permissions, back_populates="roles")
-
-
-class Permission(Base):
-    __tablename__ = "permissions"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    code = Column(String(100), unique=True, nullable=False)  # e.g. "resolve_anomaly"
-    description = Column(String(255), nullable=True)
-
-    roles = relationship("Role", secondary=role_permissions, back_populates="permissions")
