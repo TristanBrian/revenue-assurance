@@ -41,9 +41,17 @@ def create_audit_table_if_not_exists():
 
             if not exists:
                 logger.info("📋 Creating audit_logs table...")
-                conn.execute(text("""
+                # AUTOINCREMENT is SQLite-only syntax — invalid on Postgres,
+                # the DB this app requires for auth/RBAC (UUID columns on
+                # users/roles/permissions). Postgres's equivalent is SERIAL.
+                id_column = (
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT"
+                    if engine.dialect.name == "sqlite"
+                    else "id SERIAL PRIMARY KEY"
+                )
+                conn.execute(text(f"""
                     CREATE TABLE audit_logs (
-                        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                        {id_column},
                         user_id         INTEGER,
                         user_username   TEXT,
                         action          TEXT NOT NULL,
