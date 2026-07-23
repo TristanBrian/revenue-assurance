@@ -1,26 +1,73 @@
 """
-Schema stub for app/models/audit.py — that model file is currently EMPTY
-(no SQLAlchemy model defined), and there is no audit route or service
-implementation anywhere in the codebase (routes/audit.py is also an empty
-stub, not mounted in main.py). "Audit Trail" only exists today as a named
-permission-mapped feature in README.md — there's no actual data yet.
-
-AuditLog below is a minimal placeholder inferred only from that feature
-name and the generic concept of an audit log entry (id/user_id/action/
-timestamp) — not from any real model, route, or service, since none exist.
-Treat every field as provisional; replace this once app/models/audit.py
-and its route/service are actually implemented.
+Pydantic schemas for audit logs
 """
+from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
 from datetime import datetime
-from typing import Optional
-
-from pydantic import BaseModel, ConfigDict
 
 
-class AuditLog(BaseModel):
-    id: str
-    user_id: Optional[str] = None
+# --- Request Schemas ---
+class AuditFilter(BaseModel):
+    user_id: Optional[int] = None
+    action: Optional[str] = None
+    resource: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    success: Optional[bool] = None
+    status_code: Optional[int] = None
+
+
+class AuditCreate(BaseModel):
+    user_id: Optional[int] = None
+    user_username: Optional[str] = None
     action: str
-    timestamp: datetime
+    resource: Optional[str] = None
+    resource_id: Optional[str] = None
+    method: Optional[str] = None
+    endpoint: Optional[str] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    status_code: Optional[int] = None
+    success: int = 1
+    error_message: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+    previous_state: Optional[Dict[str, Any]] = None
+    new_state: Optional[Dict[str, Any]] = None
 
-    model_config = ConfigDict(from_attributes=True)
+
+# --- Response Schemas ---
+class AuditLogOut(BaseModel):
+    id: int
+    user_id: Optional[int] = None
+    user_username: Optional[str] = None
+    action: str
+    resource: Optional[str] = None
+    resource_id: Optional[str] = None
+    method: Optional[str] = None
+    endpoint: Optional[str] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    status_code: Optional[int] = None
+    success: int
+    error_message: Optional[str] = None
+    details: Optional[Dict[str, Any]] = None
+    previous_state: Optional[Dict[str, Any]] = None
+    new_state: Optional[Dict[str, Any]] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AuditLogsResponse(BaseModel):
+    status: str
+    logs: List[AuditLogOut]
+    pagination: Dict[str, Any]
+
+
+class AuditSummary(BaseModel):
+    total_actions: int
+    actions_by_type: Dict[str, int]
+    actions_by_user: Dict[str, int]
+    success_rate: float
+    period: Dict[str, str]

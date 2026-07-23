@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap, auth, graph  # <-- ADDED feed, heatmap, auth, graph
+from app.routes import reconcile, e_billing, feed, heatmap, auth, graph
+from app.middleware.audit import AuditMiddleware
+from app.routes import audit
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
 from contextlib import asynccontextmanager
@@ -12,8 +14,69 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger("kpc.startup")
 
 
+# ============================================================================
+# CREATE AUDIT TABLE ON STARTUP (AUTOMATIC!)
+# ============================================================================
+def create_audit_table_if_not_exists():
+    """Create the audit_logs table if it doesn't exist."""
+    engine = get_engine()
+    try:
+        with engine.connect() as conn:
+            # Check if table exists (SQLite/PostgreSQL compatible)
+            if engine.dialect.name == "sqlite":
+                result = conn.execute(text(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='audit_logs'"
+                ))
+                exists = result.fetchone() is not None
+            else:  # PostgreSQL
+                result = conn.execute(text(
+                    "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='audit_logs')"
+                ))
+                exists = result.fetchone()[0]
+            
+            if not exists:
+                logger.info("📋 Creating audit_logs table...")
+                conn.execute(text("""
+                    CREATE TABLE audit_logs (
+                        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id         INTEGER,
+                        user_username   TEXT,
+                        action          TEXT NOT NULL,
+                        resource        TEXT,
+                        resource_id     TEXT,
+                        method          TEXT,
+                        endpoint        TEXT,
+                        ip_address      TEXT,
+                        user_agent      TEXT,
+                        status_code     INTEGER,
+                        success         INTEGER DEFAULT 1,
+                        error_message   TEXT,
+                        details         TEXT,
+                        previous_state  TEXT,
+                        new_state       TEXT,
+                        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_audit_user_id ON audit_logs (user_id)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs (action)"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs (created_at)"))
+                conn.commit()
+                logger.info("✅ audit_logs table created successfully!")
+            else:
+                logger.info("✅ audit_logs table already exists.")
+    except Exception as e:
+        logger.error(f"❌ Failed to create audit_logs table: {e}")
+
+
+# ============================================================================
+# LIFESPAN (Runs on startup)
+# ============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Create audit table on startup
+    create_audit_table_if_not_exists()
+    
+    # Check database connection
     engine = get_engine()
     safe_url = engine.url.render_as_string(hide_password=True)
     try:
@@ -22,9 +85,13 @@ async def lifespan(app: FastAPI):
         logger.info(f"✅ Database connected successfully ({safe_url})")
     except Exception as e:
         logger.error(f"❌ Database connection failed ({safe_url}): {e}")
+    
     yield
 
 
+# ============================================================================
+# FASTAPI APP
+# ============================================================================
 app = FastAPI(
     title="KPC Revenue Assurance API",
     description="Order-to-Cash Leakage Detection & E-Billing Integration",
@@ -41,6 +108,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Audit Middleware (auto-logs all API requests)
+app.add_middleware(AuditMiddleware)
+
 # Include Routers
 app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
 app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
@@ -48,8 +118,12 @@ app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
 app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(graph.router, prefix="/api", tags=["Fraud Graph"])
+app.include_router(audit.router, prefix="/api", tags=["Audit"])
 
 
+# ============================================================================
+# ROOT & HEALTH
+# ============================================================================
 @app.get("/")
 async def root():
     return {
@@ -82,7 +156,6 @@ async def root():
     }
 
 
-# 🆕 VERSION ENDPOINT
 @app.get("/version")
 async def version():
     """
