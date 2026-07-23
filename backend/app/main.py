@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.core.response_envelope import ResponseEnvelopeMiddleware
 from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin  # <-- ADDED feed, heatmap, auth, detective, graph, admin
 # import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
@@ -33,6 +34,12 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan
 )
+
+# Standardized {Success, Message, Data, Timestamp} response envelope for
+# every route. Added before CORSMiddleware so CORS ends up outermost in
+# the middleware stack and still applies its headers to the wrapped
+# response (and to error responses from this middleware itself).
+app.add_middleware(ResponseEnvelopeMiddleware)
 
 # CORS
 app.add_middleware(
