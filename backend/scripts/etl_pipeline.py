@@ -37,8 +37,10 @@ logging.basicConfig(
 logger = logging.getLogger("KPC_ETL")
 
 # Environment DB URIs
-POSTGRES_URI = os.getenv("DATABASE_URL", "postgresql://postgres:Kabarnet%409@localhost:5432/kpc_revenue")
-SQLITE_DB_PATH = "kpc_revenue_assurance.db"
+# kpc.db (not kpc_revenue_assurance.db) — matches app/config.py's default
+# DATABASE_URL, docker-compose.yml, CI, and test_etl.py's hardcoded path check.
+POSTGRES_URI = os.getenv("DATABASE_URL")
+SQLITE_DB_PATH = "kpc.db"
 RAW_DATA_DIR = "data/raw"
 
 # ==========================================
@@ -174,6 +176,9 @@ class DatabaseLoader:
 
     @staticmethod
     def load_to_postgres(dataframes: Dict[str, pd.DataFrame], uri: str = POSTGRES_URI):
+        if not uri or not uri.startswith("postgresql"):
+            logger.info("\n--- Skipping PostgreSQL load (DATABASE_URL not set to a postgresql:// URI) ---")
+            return
         logger.info("\n--- Loading to PostgreSQL Database ---")
         try:
             engine = create_engine(uri)
