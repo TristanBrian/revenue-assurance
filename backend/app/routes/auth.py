@@ -3,14 +3,16 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, get_db
-from app.core.security import create_access_token, hash_password, verify_password
-from app.models.user import Role, User
+from app.core.security import create_access_token, verify_password
+from app.models.user import User
+from app.schemas.user import LoginResponse, RegisterRequest, UserOut
+from app.services.user_service import EmailAlreadyRegisteredError, RoleNotFoundError, register_user
 
 router = APIRouter()  # prefix="/api/auth" and tags=["Auth"] are supplied by main.py's include_router(), matching every other route file
 
 
-@router.post("/register", status_code=status.HTTP_201_CREATED)
-def register(email: str, password: str, full_name: str | None, role_name: str, db: Session = Depends(get_db)):
+@router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     """
     Minimal registration endpoint — currently open (no auth required).
 
@@ -21,26 +23,22 @@ def register(email: str, password: str, full_name: str | None, role_name: str, d
     can create/assign users afterward. Flagging rather than doing it now since
     it changes your bootstrap flow — let me know if you want that swap made.
     """
-    if db.query(User).filter(User.email == email).first():
+    try:
+        user = register_user(
+            db,
+            email=payload.email,
+            password=payload.password,
+            full_name=payload.full_name,
+            role_name=payload.role_name,
+        )
+    except EmailAlreadyRegisteredError:
         raise HTTPException(status_code=400, detail="Email already registered")
-
-    role = db.query(Role).filter(Role.name == role_name).first()
-    if not role:
-        raise HTTPException(status_code=400, detail=f"Unknown role: {role_name}")
-
-    user = User(
-        email=email,
-        full_name=full_name,
-        hashed_password=hash_password(password),
-        roles=[role],
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return {"id": str(user.id), "email": user.email, "roles": [r.name for r in user.roles]}
+    except RoleNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return user
 
 
-@router.post("/login")
+@router.post("/login", response_model=LoginResponse)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """OAuth2 password flow: form fields are 'username' (=email) and 'password'."""
     user = db.query(User).filter(User.email == form_data.username).first()
@@ -57,12 +55,6 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": token, "token_type": "bearer"}
 
 
-@router.get("/me")
+@router.get("/me", response_model=UserOut)
 def read_current_user(user: User = Depends(get_current_user)):
-    return {
-        "id": str(user.id),
-        "email": user.email,
-        "full_name": user.full_name,
-        "roles": [r.name for r in user.roles],
-        "permissions": sorted(user.permission_codes()),
-    }
+    return user
