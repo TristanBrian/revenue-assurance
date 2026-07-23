@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_REPO_ROOT_ENV = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env')
+_REPO_ROOT_ENV = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '.env')
 
 # pydantic-settings (below) only loads .env into its own Settings object, not into
 # real os.environ. Modules that read os.environ directly (e.g. core/security.py's

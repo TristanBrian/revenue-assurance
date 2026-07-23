@@ -3,6 +3,12 @@ from fastapi.responses import StreamingResponse
 from app.services.reconciliation import run_reconciliation, run_reconciliation_on_dataframes
 from app.services.e_billing import sync_anomalies_to_ebilling, update_anomaly_status
 from app.services.feed import update_feed  # <-- NEW IMPORT
+from app.schemas.reconciliation import (
+    ReconciliationResponse,
+    ReconciliationUploadResponse,
+    SyncAnomaliesResponse,
+    UpdateAnomalyResponse,
+)
 import pandas as pd
 import io
 import logging
@@ -15,7 +21,7 @@ router = APIRouter()
 # 1. RECONCILIATION (Database)
 # ============================================================================
 
-@router.post("/reconcile")
+@router.post("/reconcile", response_model=ReconciliationResponse)
 async def reconcile(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)")
 ):
@@ -36,7 +42,7 @@ async def reconcile(
 # 2. UPLOAD (CSV) – WITH SMART VALIDATION
 # ============================================================================
 
-@router.post("/reconcile/upload")
+@router.post("/reconcile/upload", response_model=ReconciliationUploadResponse)
 async def reconcile_upload(
     dispatches_file: UploadFile = File(...),
     invoices_file: UploadFile = File(...),
@@ -164,7 +170,7 @@ async def download_template(file_type: str):
 # 4. SYNC, UPDATE & EXPORT
 # ============================================================================
 
-@router.post("/reconcile/sync")
+@router.post("/reconcile/sync", response_model=SyncAnomaliesResponse)
 async def sync_anomalies():
     try:
         result = run_reconciliation()
@@ -181,7 +187,7 @@ async def sync_anomalies():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/reconcile/update")
+@router.post("/reconcile/update", response_model=UpdateAnomalyResponse)
 async def update_anomaly(
     dispatch_id: str = Query(...),
     status: str = Query(...),

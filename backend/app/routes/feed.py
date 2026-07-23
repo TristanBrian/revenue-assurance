@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Query
 from app.services.feed import get_feed
 from app.services.reconciliation import run_reconciliation
+from app.schemas.feed import FeedResponse
 import logging
 
 logger = logging.getLogger(__name__)
@@ -9,7 +10,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/feed")
+@router.get("/feed", response_model=FeedResponse)
 async def live_feed(limit: int = Query(20, description="Number of recent anomalies to return")):
     """
     Returns the latest anomalies for the live feed.
