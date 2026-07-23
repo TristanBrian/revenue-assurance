@@ -1,10 +1,14 @@
 """
 Seeds the 3 roles named in your README (Depot Supervisor, Manager, Revenue
-Assurance) and a starter permission set.
+Assurance) plus system_admin, and the permission set matching the README's
+Permission Mapping table.
 
-*** The permission-to-role mapping below is a PLACEHOLDER guess based only on
-the role names — I don't have your actual README permission matrix text.
-Edit ROLE_PERMISSIONS to match it before running this against real data. ***
+Rows where every role matches (Live Feed, Executive Metrics) need no
+permission at all — those are just "any logged-in user" in
+app/core/dependencies.py, not gated by require_permission(). Fraud Graph
+isn't in the original README matrix (added after it was written); placed
+at Manager+Revenue Assurance here (same pattern as Heatmap/OMC Risk
+Profile) — revisit if it should be Revenue-Assurance-only instead.
 
 Run with (from backend/, same as etl_pipeline.py):
     python scripts/seed_roles.py
@@ -14,35 +18,47 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.models.user import Permission, Role
+from app.models.role import Role
+from app.models.permission import Permission
 from app.utils.db_connection import SessionLocal
 
 PERMISSIONS = [
-    ("view_dashboard", "View reconciliation dashboard"),
-    ("upload_csv", "Upload dispatch/invoice/payment CSVs"),
-    ("resolve_anomaly", "Resolve/review/assign anomalies"),
+    ("upload_csv", "Upload dispatch/invoice/payment CSVs, download templates"),
+    ("view_heatmap", "View OMC x Product leakage heatmap"),
+    ("view_risk_profile", "View OMC risk profile"),
+    ("view_anomalies", "View the anomaly table (line-item leakage detail)"),
     ("view_audit", "View audit trail"),
-    ("manage_ebilling", "Trigger/retry e-billing sync"),
     ("export_reports", "Export Excel/CSV reports"),
-    ("view_fraud_graph", "View fraud/graph detection view"),
+    ("resolve_anomaly", "Resolve/review/assign anomalies"),
+    ("manage_ebilling", "Trigger/retry e-billing sync, view sync logs"),
+    ("view_fraud_graph", "View the OMC<->depot fraud/leakage graph"),
     ("manage_users", "Create, edit, deactivate users and assign roles to them"),
     ("manage_permissions", "Create/edit permissions and assign them to roles"),
 ]
 
-# PLACEHOLDER — replace with your actual matrix.
-# system_admin is scoped ONLY to user/permission control, not revenue-assurance
-# features — per your instruction that "his work is user control".
+# Matches README.md's Permission Mapping table exactly (grouped by identical
+# role pattern): system_admin is scoped ONLY to user/permission control, not
+# revenue-assurance features.
 ROLE_PERMISSIONS = {
     "system_admin": ["manage_users", "manage_permissions"],
-    "depot_supervisor": ["view_dashboard", "upload_csv"],
-    "manager": ["view_dashboard", "upload_csv", "resolve_anomaly", "export_reports"],
-    "revenue_assurance": [
-        "view_dashboard",
-        "upload_csv",
-        "resolve_anomaly",
+    "depot_supervisor": ["upload_csv"],
+    "manager": [
+        "view_heatmap",
+        "view_risk_profile",
+        "view_anomalies",
         "view_audit",
-        "manage_ebilling",
         "export_reports",
+        "view_fraud_graph",
+    ],
+    "revenue_assurance": [
+        "upload_csv",
+        "view_heatmap",
+        "view_risk_profile",
+        "view_anomalies",
+        "view_audit",
+        "export_reports",
+        "resolve_anomaly",
+        "manage_ebilling",
         "view_fraud_graph",
     ],
 }
