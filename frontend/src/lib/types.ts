@@ -94,3 +94,68 @@ export interface ReconcileResponse {
   status: string;
   data: ReconcileResult;
 }
+
+// Mirrors backend/app/services/e_billing.py response shapes.
+
+export interface EbillingIntegrationStatus {
+  system: string;
+  connected: boolean;
+  last_sync: string | null;
+  total_invoices: number;
+  synced_count: number;
+  pending_count: number;
+  failed_count: number;
+  not_attempted: number;
+  api_endpoint: string;
+  response_time_ms: number;
+}
+
+export type EbillingSyncStatus = "pending" | "synced" | "failed";
+
+export interface EbillingLogEntry {
+  invoice_id: string;
+  status: EbillingSyncStatus;
+  sync_date: string | null;
+  error_message: string | null;
+  retry_count: number;
+  last_attempt: string;
+  customer_name: string | null;
+  value_kes: number | null;
+}
+
+export interface SyncTaskResult {
+  status: "success" | "error" | "warning";
+  message: string;
+  synced: number;
+  failed: number;
+  total_processed: number;
+  failed_ids: string[];
+  sync_time: string;
+}
+
+export type TaskState = "running" | "completed" | "failed" | "not_found";
+
+export interface TaskStatusResponse {
+  status: TaskState;
+  progress?: number;
+  result?: SyncTaskResult | null;
+  error?: string | null;
+  started_at?: string;
+  completed_at?: string;
+}
+
+export interface RetrySyncResult {
+  status: "success" | "failed" | "error" | "warning";
+  message: string;
+  invoice_id?: string;
+  new_status?: string;
+  retry_count?: number;
+  timestamp?: string;
+}
+
+export interface FailureRateMonitor {
+  failure_rate: number;
+  alert: boolean;
+  threshold?: number;
+  message: string;
+}

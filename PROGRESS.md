@@ -1,7 +1,7 @@
 # Frontend ↔ Backend Wiring Progress
 
-**Current phase:** Phase 2 — CSV Upload (done) → next up: Phase 3 (E-Billing Panel)
-**Branch:** `feat/reconciliation-dashboard`
+**Current phase:** Phase 3 — E-Billing Panel (done) → next up: Phase 4 (Export & Polish)
+**Branch:** `feat/e-billing-panel`
 
 Update this file as the last step of each phase/step below, before moving to the next one. It's the source of truth for "where are we" across sessions.
 
@@ -24,12 +24,14 @@ Update this file as the last step of each phase/step below, before moving to the
 - [x] Wired into `page.tsx` with a data-source indicator (database vs. upload) and a way back to live data
 - [x] Manual end-to-end verification: downloaded real templates via curl, uploaded through the browser, confirmed metrics/table update and "switch back to live database" works + `npm run lint` + `tsc --noEmit` — all clean
 
-## Phase 3 — E-Billing Panel (not started)
-- [ ] Status cards → `/api/e-billing/status`
-- [ ] Async sync + polling → `/api/e-billing/sync/async` + `/api/e-billing/task/{id}`
-- [ ] Logs table → `/api/e-billing/logs`
-- [ ] Retry action → `/api/e-billing/retry/{id}`
-- [ ] Failure-rate monitor banner → `/api/e-billing/monitor`
+## Phase 3 — E-Billing Panel
+- [x] Status cards → `/api/e-billing/status` (`EbillingStatusCards`)
+- [x] Async sync + polling → `/api/e-billing/sync/async` + `/api/e-billing/task/{id}` (`EbillingPanel`, 1s poll interval)
+- [x] Logs table → `/api/e-billing/logs` (`EbillingLogsTable`)
+- [x] Retry action → `/api/e-billing/retry/{id}` (retry button on failed rows)
+- [x] Failure-rate monitor banner → `/api/e-billing/monitor` (`EbillingMonitorBanner`)
+- [x] Manual end-to-end verification: triggered sync in the browser, watched task polling → completion banner → status/logs/monitor refresh, retried the one failed invoice + `npm run lint` + `tsc --noEmit` — all clean
+- Note: upstream `main` picked up a backend migration (raw SQLite → SQLAlchemy engine, Postgres-ready) and JWT auth (`/api/auth/*`) while this branch was in progress — merged into this branch before starting Phase 3. Local dev still runs on SQLite by default; `.env` now needs `SECRET_KEY` (see `AUTH_NOTES.md`) or the backend fails to import.
 
 ## Phase 4 — Export & Polish (not started)
 - [ ] Excel export download → `/api/reconcile/export`
