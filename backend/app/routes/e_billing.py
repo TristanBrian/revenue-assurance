@@ -54,11 +54,19 @@ async def ebilling_status(_=Depends(require_permission("manage_ebilling"))):
 
 
 @router.post("/e-billing/sync", response_model=EBillingSyncResult)
-async def sync_ebilling(
+def sync_ebilling(
     invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending."),
     _=Depends(require_permission("manage_ebilling")),
 ):
-    """Trigger synchronous sync of invoices."""
+    """Trigger synchronous sync of invoices.
+
+    Plain def, not async def: sync_invoices_to_ebilling() calls
+    call_kra_api(), which sleeps synchronously (time.sleep, not
+    asyncio.sleep) per invoice plus retry backoff. As async def, that
+    blocks the entire event loop for every concurrent request across
+    every user until this one finishes. FastAPI runs plain def routes in
+    a threadpool automatically, which keeps the event loop free.
+    """
     try:
         result = sync_invoices_to_ebilling(invoice_ids)
         return result
@@ -114,8 +122,16 @@ async def ebilling_logs(
 
 
 @router.post("/e-billing/retry/{invoice_id}", response_model=EBillingRetryResponse)
-async def retry_ebilling(invoice_id: str, _=Depends(require_permission("manage_ebilling"))):
-    """Retry a failed sync for a specific invoice."""
+def retry_ebilling(invoice_id: str, _=Depends(require_permission("manage_ebilling"))):
+    """Retry a failed sync for a specific invoice.
+
+    Plain def, not async def: retry_failed_sync() -> sync_invoices_to_ebilling()
+    calls call_kra_api(), which sleeps synchronously (time.sleep, not
+    asyncio.sleep) plus retry backoff. As async def, that blocks the
+    entire event loop for every concurrent request across every user
+    until this one finishes. FastAPI runs plain def routes in a
+    threadpool automatically, which keeps the event loop free.
+    """
     try:
         result = retry_failed_sync(invoice_id)
         return result

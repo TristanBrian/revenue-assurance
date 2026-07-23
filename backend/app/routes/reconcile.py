@@ -271,7 +271,13 @@ async def download_template(
 # ============================================================================
 
 @router.post("/reconcile/sync", response_model=SyncAnomaliesResponse)
-async def sync_anomalies(_: User = Depends(require_permission("manage_ebilling"))):
+def sync_anomalies(_: User = Depends(require_permission("manage_ebilling"))):
+    # Plain def, not async def: sync_anomalies_to_ebilling() calls
+    # call_kra_api(), which sleeps synchronously (time.sleep, not
+    # asyncio.sleep) per invoice plus retry backoff. As async def, that
+    # blocks the entire event loop for every concurrent request across
+    # every user until this one finishes. FastAPI runs plain def routes
+    # in a threadpool automatically, which keeps the event loop free.
     try:
         result = run_reconciliation()
         anomalies = result.get('anomalies', [])
