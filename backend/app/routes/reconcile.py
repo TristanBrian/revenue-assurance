@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from app.services.reconciliation import run_reconciliation, run_reconciliation_on_dataframes
 from app.services.e_billing import sync_anomalies_to_ebilling, update_anomaly_status
 from app.services.feed import update_feed  # <-- NEW IMPORT
+from app.core.dependencies import get_current_user, require_permission
+from app.models.user import User
 from app.schemas.reconciliation import (
     ReconciliationResponse,
     ReconciliationUploadResponse,
@@ -17,22 +19,40 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+def _scope_to_permissions(result: dict, user: User) -> dict:
+    """
+    /reconcile bundles line-item detail (anomalies, omc_risk_profile,
+    duplicate_anomalies) with aggregate metrics in one payload. Metrics/
+    summary/performance/data_quality are the "Executive Metrics" row in
+    the README's permission matrix — universal, every role sees them.
+    The detail rows are the "Anomaly Table" row — Manager/Revenue
+    Assurance only. There's no separate endpoint for the detail, so we
+    filter it out of the response here rather than in the frontend.
+    """
+    if user.has_permission("view_anomalies"):
+        return result
+    return {**result, 'anomalies': [], 'omc_risk_profile': [], 'duplicate_anomalies': []}
+
+
 # ============================================================================
 # 1. RECONCILIATION (Database)
 # ============================================================================
 
 @router.post("/reconcile", response_model=ReconciliationResponse)
 async def reconcile(
-    materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)")
+    materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
+    user: User = Depends(get_current_user),
 ):
     """
     Run reconciliation using the default database.
     """
     try:
         result = run_reconciliation(materiality=materiality)
-        # 🚀 UPDATE THE LIVE FEED CACHE
+        # 🚀 UPDATE THE LIVE FEED CACHE (unfiltered — the feed cache is shared,
+        # not scoped to the requesting user's permissions)
         update_feed(result.get('anomalies', []))
-        return {'status': 'success', 'data': result}
+        return {'status': 'success', 'data': _scope_to_permissions(result, user)}
     except Exception as e:
         logger.error(f"Reconciliation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -47,7 +67,8 @@ async def reconcile_upload(
     dispatches_file: UploadFile = File(...),
     invoices_file: UploadFile = File(...),
     payments_file: UploadFile = File(...),
-    materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)")
+    materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
+    user: User = Depends(require_permission("upload_csv")),
 ):
     """
     Upload custom CSVs to test reconciliation instantly.
@@ -90,13 +111,14 @@ async def reconcile_upload(
 
         # --- 3. Run Reconciliation ---
         result = run_reconciliation_on_dataframes(dispatches_df, invoices_df, payments_df, materiality)
-        
-        # 🚀 UPDATE THE LIVE FEED CACHE (for uploads too!)
+
+        # 🚀 UPDATE THE LIVE FEED CACHE (for uploads too!) — unfiltered, same
+        # reasoning as the /reconcile handler above.
         update_feed(result.get('anomalies', []))
 
         return {
             'status': 'success',
-            'data': result,
+            'data': _scope_to_permissions(result, user),
             'message': f'Processed {len(dispatches_df)} dispatches from uploaded CSVs'
         }
 
@@ -116,7 +138,10 @@ async def reconcile_upload(
 # ============================================================================
 
 @router.get("/reconcile/template/{file_type}")
-async def download_template(file_type: str):
+async def download_template(
+    file_type: str,
+    _user: User = Depends(require_permission("upload_csv")),
+):
     """
     Download a CSV template for Dispatches, Invoices, or Payments.
     """
@@ -171,7 +196,7 @@ async def download_template(file_type: str):
 # ============================================================================
 
 @router.post("/reconcile/sync", response_model=SyncAnomaliesResponse)
-async def sync_anomalies():
+async def sync_anomalies(_user: User = Depends(require_permission("manage_ebilling"))):
     try:
         result = run_reconciliation()
         anomalies = result.get('anomalies', [])
@@ -191,7 +216,8 @@ async def sync_anomalies():
 async def update_anomaly(
     dispatch_id: str = Query(...),
     status: str = Query(...),
-    notes: str = Query('')
+    notes: str = Query(''),
+    _user: User = Depends(require_permission("resolve_anomaly")),
 ):
     try:
         result = update_anomaly_status(dispatch_id, status, notes)
@@ -203,7 +229,8 @@ async def update_anomaly(
 
 @router.get("/reconcile/export")
 async def export_report(
-    materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)")
+    materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
+    _user: User = Depends(require_permission("export_reports")),
 ):
     try:
         result = run_reconciliation(materiality=materiality)
