@@ -22,6 +22,14 @@ from datetime import datetime
 from typing import Dict
 import pandas as pd
 from sqlalchemy import create_engine
+from dotenv import load_dotenv
+
+# This script (like generate_kpc_data.py) is run standalone, not through
+# app.config — os.getenv("DATABASE_URL") alone only sees real exported
+# shell env vars, never the repo-root .env file. Without this, DATABASE_URL
+# silently falls through to None here even when .env has it set correctly,
+# and the Postgres load below gets skipped with no obvious reason why.
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '.env'))
 
 # ==========================================
 # 1. LOGGING & CONFIGURATION
