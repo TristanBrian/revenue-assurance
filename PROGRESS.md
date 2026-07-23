@@ -1,7 +1,7 @@
 # Frontend ↔ Backend Wiring Progress
 
-**Current phase:** Phase 3 — E-Billing Panel (done) → next up: Phase 4 (Export & Polish)
-**Branch:** `feat/e-billing-panel`
+**Current phase:** Phase 5 — Fraud Graph (done). All 5 phases complete.
+**Branch:** `feat/graph-export-devops`
 
 Update this file as the last step of each phase/step below, before moving to the next one. It's the source of truth for "where are we" across sessions.
 
@@ -33,9 +33,20 @@ Update this file as the last step of each phase/step below, before moving to the
 - [x] Manual end-to-end verification: triggered sync in the browser, watched task polling → completion banner → status/logs/monitor refresh, retried the one failed invoice + `npm run lint` + `tsc --noEmit` — all clean
 - Note: upstream `main` picked up a backend migration (raw SQLite → SQLAlchemy engine, Postgres-ready) and JWT auth (`/api/auth/*`) while this branch was in progress — merged into this branch before starting Phase 3. Local dev still runs on SQLite by default; `.env` now needs `SECRET_KEY` (see `AUTH_NOTES.md`) or the backend fails to import.
 
-## Phase 4 — Export & Polish (not started)
-- [ ] Excel export download → `/api/reconcile/export`
-- [ ] Empty-state / error polish
+## Phase 4 — Export & Polish
+- [x] Excel export download → `/api/reconcile/export` (link next to the materiality input, only shown when viewing live-database data so the download always matches what's on screen)
+- [x] Empty-state / error polish — audited existing loading/error/empty states (page.tsx, AnomalyTable, EbillingLogsTable, CsvUploadPanel, EbillingPanel) and found them already consistent; gave the new FraudGraph section the same treatment rather than inventing busywork
+- [x] `npm run lint` + `tsc --noEmit` + `npm run build` — all clean
 
-## Phase 5 — Fraud Graph (blocked)
-- Blocked on backend: `app/services/graph_engine.py` and `app/routes/graph.py` are empty stubs, not mounted in `main.py`. No frontend work until that exists.
+## Phase 5 — Fraud Graph
+- [x] Backend: `app/services/graph_engine.py` — OMC↔depot leakage graph + Louvain community detection (`python-louvain`, already a dependency), pure-function core unit-tested in `tests/test_graph.py`
+- [x] Backend: `app/routes/graph.py` (`GET /api/graph`), `app/schemas/graph.py`, mounted in `main.py`
+- [x] Frontend: `FraudGraph` component — dependency-free SVG radial graph (risk-colored/shaped nodes, leakage-weighted edges, hover tooltip, click-to-pin detail panel) + companion risk-communities table
+- [x] Manual end-to-end verification: browser-checked node colors/shapes, hover tooltip, click-to-select detail panel, communities table, no console errors + `npm run lint` + `tsc --noEmit` — all clean
+- Note: this was previously blocked on the backend stub — built the backend piece too rather than waiting, per explicit instruction.
+
+## DevOps
+- [x] CI (`.github/workflows/ci.yml`): backend (generate data + ETL + pytest w/ coverage) and frontend (lint + typecheck + build) jobs on push/PR to `main`
+- [x] Fixed the backend test suite, which was broken before this work started (24/42 tests erroring — two fixtures still patched a `DB_PATH` module constant removed by an earlier SQLAlchemy migration)
+- [x] Local full-stack Docker Compose — `frontend/Dockerfile` + completed the `frontend` service in `docker-compose.yml` (was a commented-out stub)
+- [x] Inert deployment templates (`render.yaml`, `frontend/vercel.json`) matching the platforms named in `PROBLEM_FRAMING_AND_ARCHITECTURE.md` — do nothing until connected to a real account; no account was created or secret provisioned
