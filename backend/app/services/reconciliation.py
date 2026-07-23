@@ -302,6 +302,26 @@ def run_reconciliation_on_dataframes(
         'review_count': len(anomalies_df[anomalies_df['status'] == 'Review Required'])
     }
 
+    # Load persisted resolution overlay (app/models/anomaly_resolution.py).
+    # This never changes what counts as an anomaly or its computed
+    # break_type/status — it's purely an annotation layer added on top, so
+    # a dispatch flagged "Resolved" still reappears here every run (the
+    # underlying dispatch/invoice/payment data hasn't changed), just now
+    # carrying its resolution info. Missing table (e.g. migration not yet
+    # applied) degrades to "no resolutions" rather than failing the whole
+    # reconciliation run.
+    resolutions = {}
+    try:
+        resolutions_df = pd.read_sql(
+            "SELECT dispatch_id, status, notes, updated_at FROM anomaly_resolutions",
+            get_engine()
+        )
+        resolutions = {
+            row['dispatch_id']: row for row in resolutions_df.to_dict(orient='records')
+        }
+    except Exception as e:
+        logger.warning(f"⚠️ Could not load anomaly_resolutions overlay (table may not exist yet): {e}")
+
     # Build anomalies
     anomalies = []
     if not anomalies_df.empty:
@@ -337,6 +357,8 @@ def run_reconciliation_on_dataframes(
             else:
                 created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+            resolution = resolutions.get(row['dispatch_id'])
+
             anomalies.append({
                 'dispatch_id': row['dispatch_id'],
                 'invoice_id': row['invoice_id'] if not pd.isna(row['invoice_id']) else None,
@@ -351,7 +373,13 @@ def run_reconciliation_on_dataframes(
                 'ebilling_status': 'Pending',
                 'ebilling_sync_date': None,
                 'age_days': int(age_val),
-                'created_at': created_at
+                'created_at': created_at,
+                'resolution_status': resolution['status'] if resolution else None,
+                'resolution_notes': resolution['notes'] if resolution else None,
+                'resolution_updated_at': (
+                    pd.to_datetime(resolution['updated_at']).strftime('%Y-%m-%d %H:%M:%S')
+                    if resolution and pd.notna(resolution['updated_at']) else None
+                )
             })
 
     anomalies = sorted(anomalies, key=lambda x: x['leakage_kes'], reverse=True)
