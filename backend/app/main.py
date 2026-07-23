@@ -1,12 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import reconcile, e_billing, feed, heatmap, auth, graph  # <-- ADDED feed, heatmap, auth, graph
-# import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
 from contextlib import asynccontextmanager
 import logging
-import os
 import time
 
 
@@ -46,10 +44,10 @@ app.add_middleware(
 # Include Routers
 app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
 app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
-app.include_router(feed.router, prefix="/api", tags=["Live Feed"])      # <-- NEW
-app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
-app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])  # <-- ADDED auth router
-app.include_router(graph.router, prefix="/api", tags=["Fraud Graph"])  # <-- NEW
+app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
+app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(graph.router, prefix="/api", tags=["Fraud Graph"])
 
 
 @app.get("/")
@@ -75,11 +73,26 @@ async def root():
             "POST /api/e-billing/webhook - KRA webhook callback",
             "GET /api/e-billing/reconcile - E-Billing reconciliation dashboard",
             "GET /api/e-billing/monitor - Failure rate monitoring",
-            "GET /api/feed - Live anomaly feed",          # <-- NEW
-            "GET /api/heatmap - Leakage heatmap (OMC × Product)",  # <-- NEW
-            "GET /api/graph - Fraud graph (OMC<->Depot leakage, community detection)",  # <-- NEW
+            "GET /api/feed - Live anomaly feed",
+            "GET /api/heatmap - Leakage heatmap (OMC × Product)",
+            "GET /api/graph - Fraud graph (OMC<->Depot leakage, community detection)",
+            "GET /api/version - API version information",
             "GET /health - Health check"
         ]
+    }
+
+
+# 🆕 VERSION ENDPOINT
+@app.get("/version")
+async def version():
+    """
+    Returns API version information for monitoring and CI/CD.
+    """
+    return {
+        "version": "2.0.0",
+        "service": "kpc-revenue-assurance",
+        "status": "production-ready",
+        "endpoints_count": len(app.routes)
     }
 
 
@@ -90,20 +103,7 @@ async def health_check():
     """
     db_status = "disconnected"
     start_time = time.time()
-    # --- Old SQLite-only version (kept for reference) ---
-    # try:
-    #     db_path = os.path.join(os.path.dirname(__file__), '..', 'kpc.db')
-    #     if not os.path.exists(db_path):
-    #         db_status = "file_not_found"
-    #     else:
-    #         conn = sqlite3.connect(db_path)
-    #         cursor = conn.cursor()
-    #         cursor.execute("SELECT 1")
-    #         cursor.fetchone()
-    #         conn.close()
-    #         db_status = "connected"
-    # except Exception as e:
-    #     db_status = f"error: {str(e)}"
+    
     try:
         engine = get_engine()
         with engine.connect() as conn:
