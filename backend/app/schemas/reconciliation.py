@@ -23,6 +23,24 @@ from pydantic import BaseModel
 from app.schemas.e_billing import EBillingSyncResult
 
 
+# ============================================================================
+# PAGINATION SCHEMA
+# ============================================================================
+
+class Pagination(BaseModel):
+    """Pagination metadata for endpoints that return lists."""
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
+
+
+# ============================================================================
+# RECONCILIATION SCHEMAS
+# ============================================================================
+
 class Anomaly(BaseModel):
     dispatch_id: str
     invoice_id: Optional[str] = None
@@ -113,7 +131,7 @@ class OmcRiskProfile(BaseModel):
 
 class ReconciliationData(BaseModel):
     metrics: Metrics
-    anomalies: list[Anomaly]
+    anomalies: list[Anomaly]  # This is now the PAGINATED list
     summary: ReconciliationSummary
     performance: PerformanceStats
     data_quality: DataQuality
@@ -122,16 +140,22 @@ class ReconciliationData(BaseModel):
     omc_risk_profile: list[OmcRiskProfile]
 
 
+# ============================================================================
+# RESPONSE SCHEMAS (WITH PAGINATION)
+# ============================================================================
+
 class ReconciliationResponse(BaseModel):
-    """POST /reconcile"""
+    """POST /reconcile – returns reconciliation data with pagination."""
     status: str
     data: ReconciliationData
+    pagination: Pagination  # <-- Explicitly included
 
 
 class ReconciliationUploadResponse(BaseModel):
-    """POST /reconcile/upload"""
+    """POST /reconcile/upload – returns reconciliation data with pagination."""
     status: str
     data: ReconciliationData
+    pagination: Pagination  # <-- Explicitly included
     message: str
 
 
