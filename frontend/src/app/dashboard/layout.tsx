@@ -13,6 +13,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Overview" },
+  { href: "/dashboard/executive", label: "Executive Summary", anyOf: ["view_risk_profile"] },
   { href: "/dashboard/anomalies", label: "Anomalies", anyOf: ["view_anomalies"] },
   {
     href: "/dashboard/risk",
