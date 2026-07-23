@@ -1,14 +1,37 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap  # <-- ADDED feed, heatmap
-import sqlite3
+from app.routes import reconcile, e_billing, feed, heatmap, auth  # <-- ADDED feed, heatmap, auth
+# import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
+from sqlalchemy import text
+from app.utils.db_connection import get_engine
+from contextlib import asynccontextmanager
+import logging
 import os
 import time
+
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("kpc.startup")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    engine = get_engine()
+    safe_url = engine.url.render_as_string(hide_password=True)
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info(f"✅ Database connected successfully ({safe_url})")
+    except Exception as e:
+        logger.error(f"❌ Database connection failed ({safe_url}): {e}")
+    yield
+
 
 app = FastAPI(
     title="KPC Revenue Assurance API",
     description="Order-to-Cash Leakage Detection & E-Billing Integration",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan
 )
 
 # CORS
@@ -25,6 +48,7 @@ app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
 app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
 app.include_router(feed.router, prefix="/api", tags=["Live Feed"])      # <-- NEW
 app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])  # <-- ADDED auth router
 
 
 @app.get("/")
@@ -64,17 +88,25 @@ async def health_check():
     """
     db_status = "disconnected"
     start_time = time.time()
+    # --- Old SQLite-only version (kept for reference) ---
+    # try:
+    #     db_path = os.path.join(os.path.dirname(__file__), '..', 'kpc.db')
+    #     if not os.path.exists(db_path):
+    #         db_status = "file_not_found"
+    #     else:
+    #         conn = sqlite3.connect(db_path)
+    #         cursor = conn.cursor()
+    #         cursor.execute("SELECT 1")
+    #         cursor.fetchone()
+    #         conn.close()
+    #         db_status = "connected"
+    # except Exception as e:
+    #     db_status = f"error: {str(e)}"
     try:
-        db_path = os.path.join(os.path.dirname(__file__), '..', 'kpc.db')
-        if not os.path.exists(db_path):
-            db_status = "file_not_found"
-        else:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
-            conn.close()
-            db_status = "connected"
+        engine = get_engine()
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        db_status = "connected"
     except Exception as e:
         db_status = f"error: {str(e)}"
     

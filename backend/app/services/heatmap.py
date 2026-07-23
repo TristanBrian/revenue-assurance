@@ -3,11 +3,11 @@
 Heatmap Service – Aggregates leakage by OMC and Product.
 """
 import pandas as pd
-import sqlite3
-import os
+# import sqlite3  # unused – this module delegates to run_reconciliation()
+# import os
 from app.services.reconciliation import run_reconciliation
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'kpc.db')
+# DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'kpc.db')
 
 
 def get_heatmap_data(materiality: float = 0) -> dict:

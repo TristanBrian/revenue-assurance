@@ -12,7 +12,7 @@
 """
 
 import pandas as pd
-import sqlite3
+# import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 import os
 from datetime import datetime
 import numpy as np
@@ -22,6 +22,8 @@ from dataclasses import dataclass
 import time
 from collections import Counter
 import math
+
+from app.utils.db_connection import get_engine
 
 # =============================================================================
 # LOGGING SETUP
@@ -37,7 +39,7 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # =============================================================================
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'kpc.db')
+# DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'kpc.db')  # SQLite-only path, no longer used directly
 UNDERPAYMENT_THRESHOLD = 100       # KSh - ignore tiny rounding errors
 CRITICAL_AGE_DAYS = 60             # Days after which pending becomes critical
 MATERIALITY_THRESHOLD = 100000     # KSh - only flag leaks above this (configurable)
@@ -83,9 +85,10 @@ class DataQualityReport:
     quality_score: float
 
 
-def get_table_columns(conn: sqlite3.Connection, table_name: str) -> List[str]:
-    cursor = conn.execute(f"PRAGMA table_info({table_name})")
-    return [row[1] for row in cursor.fetchall()]
+# def get_table_columns(conn: sqlite3.Connection, table_name: str) -> List[str]:
+#     """SQLite-only helper (PRAGMA table_info). Unused; kept for reference."""
+#     cursor = conn.execute(f"PRAGMA table_info({table_name})")
+#     return [row[1] for row in cursor.fetchall()]
 
 
 def calculate_data_quality(df: pd.DataFrame, customer_col: str, value_col: str) -> DataQualityReport:
@@ -413,11 +416,17 @@ def run_reconciliation_on_dataframes(
 
 def run_reconciliation(materiality: float = MATERIALITY_THRESHOLD) -> Dict:
     try:
-        conn = sqlite3.connect(DB_PATH)
-        dispatches = pd.read_sql("SELECT * FROM dispatches", conn)
-        invoices = pd.read_sql("SELECT * FROM invoices", conn)
-        payments = pd.read_sql("SELECT * FROM payments", conn)
-        conn.close()
+        # --- Old SQLite-only connection (kept for reference) ---
+        # conn = sqlite3.connect(DB_PATH)
+        # dispatches = pd.read_sql("SELECT * FROM dispatches", conn)
+        # invoices = pd.read_sql("SELECT * FROM invoices", conn)
+        # payments = pd.read_sql("SELECT * FROM payments", conn)
+        # conn.close()
+
+        engine = get_engine()
+        dispatches = pd.read_sql("SELECT * FROM dispatches", engine)
+        invoices = pd.read_sql("SELECT * FROM invoices", engine)
+        payments = pd.read_sql("SELECT * FROM payments", engine)
         logger.info(f"📥 Loaded {len(dispatches)} dispatches, {len(invoices)} invoices, {len(payments)} payments from DB")
         return run_reconciliation_on_dataframes(dispatches, invoices, payments, materiality)
     except Exception as e:
