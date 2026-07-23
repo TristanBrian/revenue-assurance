@@ -7,6 +7,7 @@ import MetricCards from "@/components/MetricCards";
 import AnomalyTable from "@/components/AnomalyTable";
 import CsvUploadPanel from "@/components/CsvUploadPanel";
 import EbillingPanel from "@/components/EbillingPanel";
+import FraudGraph from "@/components/FraudGraph";
 
 const DEFAULT_MATERIALITY = 100000;
 
@@ -149,6 +150,10 @@ export default function Home() {
         <hr className="border-zinc-200 dark:border-zinc-800" />
 
         <EbillingPanel />
+
+        <hr className="border-zinc-200 dark:border-zinc-800" />
+
+        <FraudGraph />
       </main>
     </div>
   );

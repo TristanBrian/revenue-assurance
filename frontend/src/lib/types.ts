@@ -159,3 +159,53 @@ export interface FailureRateMonitor {
   threshold?: number;
   message: string;
 }
+
+// Mirrors backend/app/services/graph_engine.py's build_fraud_graph() shape.
+
+export type RiskLevel = "Low" | "Medium" | "High";
+export type GraphNodeType = "omc" | "depot";
+
+export interface GraphNode {
+  id: string;
+  type: GraphNodeType;
+  label: string;
+  leakage_kes: number;
+  anomaly_count: number;
+  community: number;
+  risk_level: RiskLevel;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  weight: number;
+  anomaly_count: number;
+}
+
+export interface GraphCommunity {
+  id: number;
+  node_ids: string[];
+  member_count: number;
+  total_leakage_kes: number;
+  risk_level: RiskLevel;
+}
+
+export interface TopRiskEntity {
+  id: string;
+  label: string;
+  type: GraphNodeType;
+  leakage_kes: number;
+  risk_level: RiskLevel;
+}
+
+export interface FraudGraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  communities: GraphCommunity[];
+  summary: {
+    node_count: number;
+    edge_count: number;
+    community_count: number;
+    top_risk_entities: TopRiskEntity[];
+  };
+}
