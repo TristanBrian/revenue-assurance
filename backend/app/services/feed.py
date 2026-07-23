@@ -5,10 +5,10 @@ Live Feed Service – Caches the latest anomalies for real‑time monitoring.
 import pandas as pd
 from datetime import datetime
 from typing import List, Dict
-import sqlite3
-import os
-
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'kpc.db')
+# import sqlite3  # unused – this module is an in-memory cache only
+# import os
+#
+# DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'kpc.db')
 
 # In‑memory cache for the latest anomalies
 _latest_feed = {

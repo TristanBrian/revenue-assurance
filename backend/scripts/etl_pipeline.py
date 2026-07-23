@@ -3,9 +3,14 @@ ETL Pipeline: Raw CSVs -> Clean SQLite Database
 Handles: Data Cleaning, Installment Aggregation, Quality Gates
 """
 import pandas as pd
-import sqlite3
+# import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 import os
 from datetime import datetime
+from sqlalchemy import text
+
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from app.utils.db_connection import get_engine
 
 def run_etl():
     print(f"[{datetime.now()}] 🚀 Starting ETL Pipeline...")
@@ -70,27 +75,37 @@ def run_etl():
     print(f"[{datetime.now()}] ⚙️ Transformed: Aggregated payments into {len(clean_payments)} clean invoices.")
 
     # 3. LOAD (SQLite Database)
-    db_path = 'kpc.db'
-    if os.path.exists(db_path):
-        os.remove(db_path)  # Fresh start
-    
-    conn = sqlite3.connect(db_path)
-    
-    # Write tables
-    clean_disp_valid.to_sql('dispatches', conn, if_exists='replace', index=False)
-    raw_inv.to_sql('invoices', conn, if_exists='replace', index=False)
-    clean_payments.to_sql('payments', conn, if_exists='replace', index=False)  # Already aggregated!
-    raw_omcs.to_sql('omcs', conn, if_exists='replace', index=False)
-    clean_ledger.to_sql('depot_ledger', conn, if_exists='replace', index=False)
-    
+    # --- Old SQLite-only version (kept for reference) ---
+    # db_path = 'kpc.db'
+    # if os.path.exists(db_path):
+    #     os.remove(db_path)  # Fresh start
+    # conn = sqlite3.connect(db_path)
+    # clean_disp_valid.to_sql('dispatches', conn, if_exists='replace', index=False)
+    # raw_inv.to_sql('invoices', conn, if_exists='replace', index=False)
+    # clean_payments.to_sql('payments', conn, if_exists='replace', index=False)  # Already aggregated!
+    # raw_omcs.to_sql('omcs', conn, if_exists='replace', index=False)
+    # clean_ledger.to_sql('depot_ledger', conn, if_exists='replace', index=False)
+    # conn.execute("CREATE INDEX idx_dispatch_date ON dispatches (date);")
+    # conn.execute("CREATE INDEX idx_invoice_omc ON invoices (omc_id);")
+    # conn.execute("CREATE INDEX idx_payment_invoice ON payments (invoice_id);")
+    # conn.close()
+
+    # 3. LOAD (SQLite dev / PostgreSQL prod, driven by DATABASE_URL)
+    engine = get_engine()
+
+    clean_disp_valid.to_sql('dispatches', engine, if_exists='replace', index=False)
+    raw_inv.to_sql('invoices', engine, if_exists='replace', index=False)
+    clean_payments.to_sql('payments', engine, if_exists='replace', index=False)  # Already aggregated!
+    raw_omcs.to_sql('omcs', engine, if_exists='replace', index=False)
+    clean_ledger.to_sql('depot_ledger', engine, if_exists='replace', index=False)
+
     # Create indexes for performance (Person A will love this)
-    conn.execute("CREATE INDEX idx_dispatch_date ON dispatches (date);")
-    conn.execute("CREATE INDEX idx_invoice_omc ON invoices (omc_id);")
-    conn.execute("CREATE INDEX idx_payment_invoice ON payments (invoice_id);")
-    
-    conn.close()
-    
-    print(f"[{datetime.now()}] 📥 Loaded: Database '{db_path}' created with indexes.")
+    with engine.begin() as conn:
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_dispatch_date ON dispatches (date);"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_invoice_omc ON invoices (omc_id);"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS idx_payment_invoice ON payments (invoice_id);"))
+
+    print(f"[{datetime.now()}] 📥 Loaded: Database '{engine.url}' created with indexes.")
     print(f"[{datetime.now()}] ✅ ETL Pipeline Complete!")
     
     # Print summary for team
