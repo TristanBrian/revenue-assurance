@@ -20,21 +20,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel
 
-from app.schemas.e_billing import EBillingSyncResult
-
-
-# ============================================================================
-# PAGINATION SCHEMA
-# ============================================================================
-
-class Pagination(BaseModel):
-    """Pagination metadata for endpoints that return lists."""
-    page: int
-    page_size: int
-    total: int
-    total_pages: int
-    has_next: bool
-    has_prev: bool
+from app.schemas.e_billing import EBillingSyncResult, Pagination
 
 
 # ============================================================================

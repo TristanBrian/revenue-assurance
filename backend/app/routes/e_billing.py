@@ -14,6 +14,21 @@ from app.services.e_billing import (
     get_pending_invoices_paginated,
     invalidate_total_count_cache
 )
+from app.schemas.e_billing import (
+    EBillingStatusResponse,
+    EBillingSyncResult,
+    EBillingAsyncSyncResponse,
+    EBillingTaskStatus,
+    EBillingLogsResponse,
+    EBillingLogsPaginatedResponse,
+    EBillingRetryResponse,
+    EBillingPendingResponse,
+    EBillingPendingPaginatedResponse,
+    EBillingWebhookResponse,
+    EBillingReconciliationResponse,
+    EBillingMonitorResponse,
+    EBillingCacheRefreshResponse,
+)
 import uuid
 import logging
 
@@ -26,7 +41,7 @@ router = APIRouter()
 # EXISTING ENDPOINTS 
 # ============================================================================
 
-@router.get("/e-billing/status")
+@router.get("/e-billing/status", response_model=EBillingStatusResponse)
 async def ebilling_status():
     """Get E-Billing integration status."""
     try:
@@ -37,7 +52,7 @@ async def ebilling_status():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/e-billing/sync")
+@router.post("/e-billing/sync", response_model=EBillingSyncResult)
 async def sync_ebilling(
     invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending.")
 ):
@@ -50,7 +65,7 @@ async def sync_ebilling(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/e-billing/sync/async")
+@router.post("/e-billing/sync/async", response_model=EBillingAsyncSyncResponse)
 async def sync_ebilling_async(
     background_tasks: BackgroundTasks,
     invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending.")
@@ -72,7 +87,7 @@ async def sync_ebilling_async(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/e-billing/task/{task_id}")
+@router.get("/e-billing/task/{task_id}", response_model=EBillingTaskStatus)
 async def get_task(task_id: str):
     """Get the status of a background sync task."""
     status = get_task_status(task_id)
@@ -81,7 +96,7 @@ async def get_task(task_id: str):
     return status
 
 
-@router.get("/e-billing/logs")
+@router.get("/e-billing/logs", response_model=EBillingLogsResponse)
 async def ebilling_logs(
     limit: int = Query(50, description="Number of log entries to return", ge=1, le=100)
 ):
@@ -94,7 +109,7 @@ async def ebilling_logs(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/e-billing/retry/{invoice_id}")
+@router.post("/e-billing/retry/{invoice_id}", response_model=EBillingRetryResponse)
 async def retry_ebilling(invoice_id: str):
     """Retry a failed sync for a specific invoice."""
     try:
@@ -105,7 +120,7 @@ async def retry_ebilling(invoice_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/e-billing/pending")
+@router.get("/e-billing/pending", response_model=EBillingPendingResponse)
 async def ebilling_pending():
     """Get list of pending invoice IDs (capped at 100 for performance)."""
     try:
@@ -120,7 +135,7 @@ async def ebilling_pending():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/e-billing/webhook")
+@router.post("/e-billing/webhook", response_model=EBillingWebhookResponse)
 async def kra_webhook(payload: dict = Body(...)):
     """Simulate KRA's webhook callback."""
     try:
@@ -131,7 +146,7 @@ async def kra_webhook(payload: dict = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/e-billing/reconcile")
+@router.get("/e-billing/reconcile", response_model=EBillingReconciliationResponse)
 async def ebilling_reconcile():
     """Get E-Billing reconciliation dashboard data."""
     try:
@@ -142,7 +157,7 @@ async def ebilling_reconcile():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/e-billing/monitor")
+@router.get("/e-billing/monitor", response_model=EBillingMonitorResponse)
 async def ebilling_monitor():
     """Get failure rate monitoring."""
     try:
@@ -157,7 +172,7 @@ async def ebilling_monitor():
 # PAGINATED ENDPOINTS (NEW – Production-Ready)
 # ============================================================================
 
-@router.get("/e-billing/logs/paginated")
+@router.get("/e-billing/logs/paginated", response_model=EBillingLogsPaginatedResponse)
 async def ebilling_logs_paginated(
     page: int = Query(1, description="Page number", ge=1),
     page_size: int = Query(20, description="Items per page", ge=1, le=100)
@@ -175,7 +190,7 @@ async def ebilling_logs_paginated(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/e-billing/pending/paginated")
+@router.get("/e-billing/pending/paginated", response_model=EBillingPendingPaginatedResponse)
 async def ebilling_pending_paginated(
     page: int = Query(1, description="Page number", ge=1),
     page_size: int = Query(20, description="Items per page", ge=1, le=100)
@@ -193,7 +208,7 @@ async def ebilling_pending_paginated(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/e-billing/cache/refresh")
+@router.post("/e-billing/cache/refresh", response_model=EBillingCacheRefreshResponse)
 async def refresh_ebilling_cache():
     """
     Manually refresh the total count cache.
