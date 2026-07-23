@@ -18,7 +18,7 @@ class Dispatch(Base):
     month = Column(Integer)
     omc_id = Column(Text, ForeignKey("omcs.omc_id"))
     customer_name = Column(Text)
-    product = Column(Text)
+    product = Column(Text, ForeignKey("products.product_id"))
     depot = Column(Text, ForeignKey("depots.depot_id"))
     volume_liters = Column(Integer)
     distance_km = Column(Integer)
@@ -31,4 +31,5 @@ class Dispatch(Base):
 
     omc = relationship("OMC", back_populates="dispatches")
     depot_ref = relationship("Depot", back_populates="dispatches")
+    product_ref = relationship("Product", back_populates="dispatches")
     invoice = relationship("Invoice", back_populates="dispatch", uselist=False)

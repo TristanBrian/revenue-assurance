@@ -1,5 +1,6 @@
 # backend/app/routes/heatmap.py
 from fastapi import APIRouter, Depends, Query
+from app.core.dependencies import require_permission
 from app.services.heatmap import get_heatmap_data
 from app.schemas.heatmap import HeatmapResponse
 from app.core.dependencies import require_permission
@@ -14,7 +15,7 @@ router = APIRouter()
 @router.get("/heatmap", response_model=HeatmapResponse)
 async def heatmap(
     materiality: float = Query(0, description="Min leakage to include"),
-    _user: User = Depends(require_permission("view_heatmap")),
+    _=Depends(require_permission("view_heatmap")),
 ):
     """
     Returns leakage heatmap data: OMC × Product matrix.

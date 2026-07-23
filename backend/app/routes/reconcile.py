@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
+from app.core.dependencies import require_permission
+from app.models.user import User
 from app.services.reconciliation import run_reconciliation, run_reconciliation_on_dataframes
 from app.services.e_billing import sync_anomalies_to_ebilling, update_anomaly_status
 from app.services.feed import update_feed
-from app.core.dependencies import get_current_user, require_permission
-from app.models.user import User
 from app.schemas.reconciliation import (
-    ReconciliationResponse,
+    MetricsResponse,
+    AnomalyTableResponse,
+    OmcRiskProfileResponse,
     ReconciliationUploadResponse,
     SyncAnomaliesResponse,
     UpdateAnomalyResponse,
@@ -19,79 +21,83 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-
-def _scope_and_paginate(result: dict, user: User, page: int, page_size: int) -> dict:
-    """
-    /reconcile bundles several line-item detail sections with aggregate
-    metrics in one payload. Metrics/summary/performance/data_quality are
-    the "Executive Metrics" row in the README's permission matrix —
-    universal, every role sees them. anomalies/duplicate_anomalies are the
-    "Anomaly Table" row (view_anomalies); omc_risk_profile is its own
-    "OMC Risk Profile" row (view_risk_profile) — a separate permission in
-    the matrix, even though today's seeded roles happen to grant both
-    together. There's no separate endpoint for either, so we filter them
-    out of the response here rather than in the frontend.
-
-    Pagination is applied after permission scoping, so a caller without
-    view_anomalies gets an empty page (total=0) rather than a real total
-    count with nothing behind it.
-    """
-    if user.has_permission("view_anomalies"):
-        all_anomalies = result.get('anomalies', [])
-        duplicate_anomalies = result.get('duplicate_anomalies', [])
-    else:
-        all_anomalies = []
-        duplicate_anomalies = []
-
-    omc_risk_profile = result.get('omc_risk_profile', []) if user.has_permission("view_risk_profile") else []
-
-    total = len(all_anomalies)
-    total_pages = (total + page_size - 1) // page_size if total > 0 else 1
-    offset = (page - 1) * page_size
-    paginated_anomalies = all_anomalies[offset:offset + page_size]
-
-    data = {
-        **result,
-        'anomalies': paginated_anomalies,
-        'omc_risk_profile': omc_risk_profile,
-        'duplicate_anomalies': duplicate_anomalies,
-    }
-    pagination = {
-        'page': page,
-        'page_size': page_size,
-        'total': total,
-        'total_pages': total_pages,
-        'has_next': page * page_size < total,
-        'has_prev': page > 1,
-    }
-    return data, pagination
-
-
 # ============================================================================
-# 1. RECONCILIATION (Database) – WITH PAGINATION
+# 1. RECONCILIATION (Database) – split by feature permission.
+# Each endpoint independently re-runs reconciliation from the DB; there's no
+# shared cache between them, so a full page load that hits all three costs
+# the compute 3x. Acceptable trade-off for keeping each feature's visibility
+# independently gated without a caching layer.
 # ============================================================================
 
-@router.post("/reconcile", response_model=ReconciliationResponse)
-async def reconcile(
+@router.post("/reconcile/metrics", response_model=MetricsResponse)
+async def reconcile_metrics(
+    materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
+    _: User = Depends(require_permission("view_metrics")),
+):
+    """Executive Metrics feature: KPI/summary data only, no raw anomaly rows."""
+    try:
+        result = run_reconciliation(materiality=materiality)
+        update_feed(result.get('anomalies', []))
+        return {
+            'status': 'success',
+            'metrics': result['metrics'],
+            'summary': result['summary'],
+            'performance': result['performance'],
+            'data_quality': result['data_quality'],
+            'ebilling_status': result.get('ebilling_status'),
+            'duplicate_anomalies': result.get('duplicate_anomalies', []),
+        }
+    except Exception as e:
+        logger.error(f"Reconciliation metrics failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/reconcile/anomalies", response_model=AnomalyTableResponse)
+async def reconcile_anomalies(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     page: int = Query(1, description="Page number", ge=1),
     page_size: int = Query(20, description="Items per page", ge=1, le=100),
-    user: User = Depends(get_current_user),
+    _: User = Depends(require_permission("view_anomaly_table")),
 ):
-    """
-    Run reconciliation using the default database.
-    Returns paginated anomalies.
-    """
+    """Anomaly Table feature: paginated raw anomaly rows."""
     try:
         result = run_reconciliation(materiality=materiality)
-        # 🚀 UPDATE THE LIVE FEED CACHE with ALL anomalies (unfiltered and
-        # unpaginated — the feed cache is shared, not scoped to the
-        # requesting user's permissions or this response's page)
-        update_feed(result.get('anomalies', []))
-        data, pagination = _scope_and_paginate(result, user, page, page_size)
-        return {'status': 'success', 'data': data, 'pagination': pagination}
+        all_anomalies = result.get('anomalies', [])
+        total_anomalies = len(all_anomalies)
+        total_pages = (total_anomalies + page_size - 1) // page_size if total_anomalies > 0 else 1
+        offset = (page - 1) * page_size
+        paginated_anomalies = all_anomalies[offset:offset + page_size]
+        return {
+            'status': 'success',
+            'anomalies': paginated_anomalies,
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total': total_anomalies,
+                'total_pages': total_pages,
+                'has_next': page * page_size < total_anomalies,
+                'has_prev': page > 1
+            }
+        }
     except Exception as e:
-        logger.error(f"Reconciliation failed: {e}")
+        logger.error(f"Reconciliation anomalies failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/reconcile/omc-risk-profile", response_model=OmcRiskProfileResponse)
+async def reconcile_omc_risk_profile(
+    materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
+    _: User = Depends(require_permission("view_omc_risk_profile")),
+):
+    """OMC Risk Profile feature."""
+    try:
+        result = run_reconciliation(materiality=materiality)
+        return {
+            'status': 'success',
+            'omc_risk_profile': result.get('omc_risk_profile', [])
+        }
+    except Exception as e:
+        logger.error(f"Reconciliation OMC risk profile failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -110,7 +116,11 @@ async def reconcile_upload(
     user: User = Depends(require_permission("upload_csv")),
 ):
     """
-    Upload custom CSVs with paginated anomalies.
+    Upload custom CSVs with paginated anomalies. The anomaly table and OMC
+    risk profile within the response are additionally stripped to empty
+    lists if the caller lacks view_anomaly_table / view_omc_risk_profile
+    respectively — upload_csv alone doesn't imply visibility into those
+    (e.g. Depot Supervisor can upload but shouldn't see the anomaly table).
     """
     try:
         # --- 1. Read CSVs ---
@@ -150,16 +160,40 @@ async def reconcile_upload(
 
         # --- 3. Run Reconciliation ---
         result = run_reconciliation_on_dataframes(dispatches_df, invoices_df, payments_df, materiality)
-
-        # 🚀 UPDATE THE LIVE FEED CACHE (for uploads too!) — unfiltered and
-        # unpaginated, same reasoning as the /reconcile handler above.
+        
+        # Update live feed cache with ALL anomalies
         update_feed(result.get('anomalies', []))
-        data, pagination = _scope_and_paginate(result, user, page, page_size)
+        
+        # Paginate anomalies
+        all_anomalies = result.get('anomalies', [])
+        total_anomalies = len(all_anomalies)
+        total_pages = (total_anomalies + page_size - 1) // page_size if total_anomalies > 0 else 1
+        offset = (page - 1) * page_size
+        paginated_anomalies = all_anomalies[offset:offset + page_size] if user.has_permission("view_anomaly_table") else []
+
+        # Reconstruct result with paginated anomalies
+        paginated_result = {
+            'metrics': result['metrics'],
+            'anomalies': paginated_anomalies,
+            'summary': result['summary'],
+            'performance': result['performance'],
+            'data_quality': result['data_quality'],
+            'ebilling_status': result.get('ebilling_status'),
+            'duplicate_anomalies': result.get('duplicate_anomalies', []),
+            'omc_risk_profile': result.get('omc_risk_profile', []) if user.has_permission("view_omc_risk_profile") else []
+        }
 
         return {
             'status': 'success',
-            'data': data,
-            'pagination': pagination,
+            'data': paginated_result,
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total': total_anomalies,
+                'total_pages': total_pages,
+                'has_next': page * page_size < total_anomalies,
+                'has_prev': page > 1
+            },
             'message': f'Processed {len(dispatches_df)} dispatches from uploaded CSVs'
         }
 
@@ -181,7 +215,7 @@ async def reconcile_upload(
 @router.get("/reconcile/template/{file_type}")
 async def download_template(
     file_type: str,
-    _user: User = Depends(require_permission("upload_csv")),
+    _: User = Depends(require_permission("upload_csv")),
 ):
     """
     Download a CSV template for Dispatches, Invoices, or Payments.
@@ -237,7 +271,13 @@ async def download_template(
 # ============================================================================
 
 @router.post("/reconcile/sync", response_model=SyncAnomaliesResponse)
-async def sync_anomalies(_user: User = Depends(require_permission("manage_ebilling"))):
+def sync_anomalies(_: User = Depends(require_permission("manage_ebilling"))):
+    # Plain def, not async def: sync_anomalies_to_ebilling() calls
+    # call_kra_api(), which sleeps synchronously (time.sleep, not
+    # asyncio.sleep) per invoice plus retry backoff. As async def, that
+    # blocks the entire event loop for every concurrent request across
+    # every user until this one finishes. FastAPI runs plain def routes
+    # in a threadpool automatically, which keeps the event loop free.
     try:
         result = run_reconciliation()
         anomalies = result.get('anomalies', [])
@@ -258,7 +298,7 @@ async def update_anomaly(
     dispatch_id: str = Query(...),
     status: str = Query(...),
     notes: str = Query(''),
-    _user: User = Depends(require_permission("resolve_anomaly")),
+    _: User = Depends(require_permission("resolve_anomaly")),
 ):
     try:
         result = update_anomaly_status(dispatch_id, status, notes)
@@ -271,7 +311,7 @@ async def update_anomaly(
 @router.get("/reconcile/export")
 async def export_report(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
-    _user: User = Depends(require_permission("export_reports")),
+    _: User = Depends(require_permission("export_reports")),
 ):
     try:
         result = run_reconciliation(materiality=materiality)

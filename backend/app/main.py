@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap, auth, graph  # <-- ADDED feed, heatmap, auth, graph
+from app.core.response_envelope import ResponseEnvelopeMiddleware
+from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin  # <-- ADDED feed, heatmap, auth, detective, graph, admin
+# import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
 from contextlib import asynccontextmanager
@@ -32,6 +34,12 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Standardized {Success, Message, Data, Timestamp} response envelope for
+# every route. Added before CORSMiddleware so CORS ends up outermost in
+# the middleware stack and still applies its headers to the wrapped
+# response (and to error responses from this middleware itself).
+app.add_middleware(ResponseEnvelopeMiddleware)
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
@@ -44,10 +52,12 @@ app.add_middleware(
 # Include Routers
 app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
 app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
-app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
-app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])
-app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
-app.include_router(graph.router, prefix="/api", tags=["Fraud Graph"])
+app.include_router(feed.router, prefix="/api", tags=["Live Feed"])      # <-- NEW
+app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])  # <-- ADDED auth router
+app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
+app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])  # <-- NEW
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
 
 
 @app.get("/")
@@ -57,7 +67,9 @@ async def root():
         "status": "running",
         "version": "2.0.0",
         "endpoints": [
-            "POST /api/reconcile - Run reconciliation (DB)",
+            "POST /api/reconcile/metrics - Executive metrics (DB)",
+            "GET /api/reconcile/anomalies - Paginated anomaly table (DB)",
+            "GET /api/reconcile/omc-risk-profile - OMC risk profile (DB)",
             "POST /api/reconcile/upload - Run reconciliation (CSV Upload)",
             "POST /api/reconcile/sync - Sync anomalies to E-Billing",
             "POST /api/reconcile/update - Update anomaly status",
@@ -73,10 +85,18 @@ async def root():
             "POST /api/e-billing/webhook - KRA webhook callback",
             "GET /api/e-billing/reconcile - E-Billing reconciliation dashboard",
             "GET /api/e-billing/monitor - Failure rate monitoring",
-            "GET /api/feed - Live anomaly feed",
-            "GET /api/heatmap - Leakage heatmap (OMC × Product)",
-            "GET /api/graph - Fraud graph (OMC<->Depot leakage, community detection)",
-            "GET /api/version - API version information",
+            "GET /api/feed - Live anomaly feed",          # <-- NEW
+            "GET /api/heatmap - Leakage heatmap (OMC × Product)",  # <-- NEW
+            "GET /api/detective/risk-features - OMC risk features (all OMCs)",
+            "GET /api/detective/risk-features/{omc_id} - OMC risk features (single OMC)",
+            "GET /api/detective/risk-features/export - Download risk features as CSV",
+            "GET /api/graph - Anomaly-based fraud graph (OMC<->Depot leakage, Louvain communities)",
+            "GET /api/graph/network - OMC/depot structural network graph",
+            "GET /api/graph/communities - Detected risk communities (structural graph)",
+            "GET /api/graph/omc/{omc_id} - Risk features + community info for one OMC",
+            "GET /api/admin/users - List all users",
+            "PATCH /api/admin/users/{user_id} - Edit a user (email/name/role/password/is_active)",
+            "DELETE /api/admin/users/{user_id} - Delete a user",
             "GET /health - Health check"
         ]
     }

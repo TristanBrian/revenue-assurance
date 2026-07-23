@@ -114,45 +114,36 @@ graph TD
 
 ## 👥 User Roles
 
+Every API route except `POST /api/auth/login`, `POST /api/auth/register` (bootstrap-only), and `POST /api/e-billing/webhook` (an external KRA callback, not a user action) requires a JWT bearer token — obtain one via `POST /api/auth/login` with `{"email": ..., "password": ...}`. Roles and permissions are seeded with `python scripts/seed_roles.py`; the first `system_admin` account is bootstrapped separately with `python scripts/seed_admin.py` (see [Quick Start](#quick-start)).
+
 | Role | Description | Key Features |
-
 | :--- | :--- | :--- |
+| **Depot Supervisor** | Operations Lead – manages daily depot activities. | Live Feed, Upload CSV & Templates, Executive Metrics |
+| **Manager** | Strategic Decision Maker – oversees regional operations. | Live Feed, Heatmap, OMC Risk Profile, Executive Metrics, Anomaly Table, Export Reports |
+| **Revenue Assurance** | Financial Analyst – investigates and resolves anomalies. | All Manager features + Upload CSV/Templates, Resolve/Review/Assign, E-Billing Sync, Fraud Graph, Risk Analytics |
+| **System Admin** | Platform administrator. Scoped only to user management — no access to any revenue-assurance feature below. | Create/list/edit/delete users, assign roles |
 
-| **Depot Supervisor** | Operations Lead – manages daily depot activities. | Live Feed, Upload CSV, Dashboard Metrics |
-
-| **Manager** | Strategic Decision Maker – oversees regional operations. | Heatmap, OMC Risk Profile, Executive Summary, Export Reports |
-
-| **Revenue Assurance** | Financial Analyst – investigates and resolves anomalies. | Anomaly Table, Resolve/Review/Assign, Audit Trail, E-Billing Sync, Sync Logs |
+Role names are matched loosely at registration/edit time rather than requiring an exact string: `"supervisor"`, `"depot"`, `"depo"` all map to `depot_supervisor`; `"man"`, `"manager"`, `"MANAGER"` map to `manager`; anything containing `"revenue"` or `"assurance"` maps to `revenue_assurance`.
 
 ### Permission Mapping
 
-| Feature | Depot Supervisor | Manager | Revenue Assurance |
+| Feature | Permission code | Depot Supervisor | Manager | Revenue Assurance |
+| :--- | :--- | :---: | :---: | :---: |
+| Live Feed | `view_live_feed` | ✅ | ✅ | ✅ |
+| Upload CSV / Templates | `upload_csv` | ✅ | ❌ | ✅ |
+| Heatmap | `view_heatmap` | ❌ | ✅ | ✅ |
+| OMC Risk Profile | `view_omc_risk_profile` | ❌ | ✅ | ✅ |
+| Executive Metrics | `view_metrics` | ✅ | ✅ | ✅ |
+| Anomaly Table | `view_anomaly_table` | ❌ | ✅ | ✅ |
+| Resolve/Review/Assign | `resolve_anomaly` | ❌ | ❌ | ✅ |
+| E-Billing Sync | `manage_ebilling` | ❌ | ❌ | ✅ |
+| Export Reports | `export_reports` | ❌ | ✅ | ✅ |
+| Fraud Graph (structural network) | `view_fraud_graph` | ❌ | ❌ | ✅ |
+| Risk Analytics (statistical/EDA) | `view_risk_analytics` | ❌ | ❌ | ✅ |
 
-| :--- | :--- | :--- | :--- |
+`manage_users` and `manage_permissions` gate user administration (`/api/admin/*`) and are held only by `system_admin` — not shown above since they're not a revenue-assurance feature.
 
-| Live Feed | ✅ | ✅ | ✅ |
-
-| Upload CSV | ✅ | ❌ | ✅ |
-
-| Heatmap | ❌ | ✅ | ✅ |
-
-| OMC Risk Profile | ❌ | ✅ | ✅ |
-
-| Executive Metrics | ✅ | ✅ | ✅ |
-
-| Anomaly Table | ❌ | ✅ | ✅ |
-
-| Resolve/Review/Assign | ❌ | ❌ | ✅ |
-
-| E-Billing Sync | ❌ | ❌ | ✅ |
-
-| Audit Trail | ❌ | ✅ | ✅ |
-
-| Export Reports | ❌ | ✅ | ✅ |
-
-| Templates | ✅ | ❌ | ✅ |
-
-This matrix is enforced on both sides now, not just documented: every backend route requires the matching `require_permission(...)` (see `app/core/dependencies.py`), and `backend/scripts/seed_roles.py` seeds these exact permissions per role. The frontend's dashboard (`frontend/src/app/dashboard/`) reads a logged-in user's `permissions` array from `/api/auth/me` to decide what to show — but that's UX only; the API 403s independently of what the frontend renders.
+> **Note:** Audit Trail is not yet implemented (no backing data model or route) and has been descoped from the matrix above until it exists.
 
 ## Quick Start
 
@@ -227,32 +218,37 @@ Frontend: [http://localhost:3000](http://localhost:3000) — redirects to `/logi
 
 ## API Endpoints
 
+Every row below except `/api/auth/login`, `/api/auth/register`, and `/api/e-billing/webhook` requires `Authorization: Bearer <token>` and is gated by the noted permission (see [Permission Mapping](#permission-mapping)).
 
-| Method | Endpoint                         | Description                                                           |
-| ------ | -------------------------------- | --------------------------------------------------------------------- |
-| POST   | `/api/auth/register`             | Create a user (open, no auth — see the bootstrap note above)          |
-| POST   | `/api/auth/login`                | OAuth2 password flow — form fields `username` (email) + `password`    |
-| GET    | `/api/auth/me`                   | Current user's id/email/roles/permissions                             |
-| GET    | `/api/heatmap`                   | OMC × Product leakage matrix — `view_heatmap`                         |
-| GET    | `/api/graph`                     | OMC↔depot leakage graph + community detection — `view_fraud_graph`    |
-| GET    | `/api/feed`                      | Live anomaly feed (universal — any logged-in user)                    |
-| POST   | `/api/reconcile`                 | Run reconciliation against the database — returns metrics + anomalies (anomaly detail requires `view_anomalies`, everything else is universal) |
-| POST   | `/api/reconcile/upload`          | Run reconciliation against uploaded CSVs                              |
-| POST   | `/api/reconcile/sync`            | Sync anomalies to E-Billing                                           |
-| POST   | `/api/reconcile/update`          | Resolve/update an anomaly                                             |
-| GET    | `/api/reconcile/export`          | Download an Excel report                                              |
-| GET    | `/api/reconcile/template/{type}` | Download a CSV template                                               |
-| GET    | `/api/e-billing/status`          | E-Billing integration status                                          |
-| POST   | `/api/e-billing/sync`            | Sync invoices to KRA iCMS (synchronous)                               |
-| POST   | `/api/e-billing/sync/async`      | Trigger a non-blocking background sync (returns `task_id`)            |
-| GET    | `/api/e-billing/task/{task_id}`  | Poll async task progress and result                                   |
-| POST   | `/api/e-billing/retry/{id}`      | Retry a failed sync                                                   |
-| GET    | `/api/e-billing/logs`            | View sync audit logs                                                  |
-| GET    | `/api/e-billing/pending`         | List pending invoices                                                 |
-| POST   | `/api/e-billing/webhook`         | Simulate a KRA webhook callback                                       |
-| GET    | `/api/e-billing/reconcile`       | E-Billing reconciliation dashboard                                    |
-| GET    | `/api/e-billing/monitor`         | Failure rate monitoring                                               |
-| GET    | `/health`                        | Service health check (DB + API status)                                |
+| Method | Endpoint                          | Permission               | Description                                                  |
+| ------ | ---------------------------------- | ------------------------- | -------------------------------------------------------------- |
+| POST   | `/api/auth/login`                 | —                          | Log in with `{email, password}`, returns a JWT                |
+| POST   | `/api/auth/register`              | `manage_users`             | Create a user and assign a role                                |
+| GET    | `/api/auth/me`                    | *(any authenticated)*      | Current user's profile, roles, permissions                     |
+| GET    | `/api/feed`                       | `view_live_feed`           | Live anomaly feed                                               |
+| POST   | `/api/reconcile/metrics`          | `view_metrics`             | Executive metrics (KPIs/summary, DB-backed)                     |
+| GET    | `/api/reconcile/anomalies`        | `view_anomaly_table`       | Paginated anomaly table (DB-backed)                             |
+| GET    | `/api/reconcile/omc-risk-profile` | `view_omc_risk_profile`    | OMC risk profile (DB-backed)                                    |
+| GET    | `/api/heatmap`                    | `view_heatmap`             | OMC × Product leakage heatmap                                   |
+| POST   | `/api/reconcile/upload`           | `upload_csv`                | Run reconciliation against uploaded CSVs                        |
+| GET    | `/api/reconcile/template/{type}`  | `upload_csv`                | Download a CSV template                                         |
+| POST   | `/api/reconcile/update`           | `resolve_anomaly`           | Resolve/update an anomaly                                       |
+| GET    | `/api/reconcile/export`           | `export_reports`            | Download an Excel report                                        |
+| POST   | `/api/reconcile/sync`             | `manage_ebilling`           | Sync anomalies to E-Billing                                     |
+| GET    | `/api/e-billing/status`           | `manage_ebilling`           | E-Billing integration status                                    |
+| POST   | `/api/e-billing/sync`             | `manage_ebilling`           | Sync invoices to KRA iCMS (synchronous)                         |
+| POST   | `/api/e-billing/sync/async`       | `manage_ebilling`           | Trigger a non-blocking background sync (returns `task_id`)      |
+| GET    | `/api/e-billing/task/{task_id}`   | `manage_ebilling`           | Poll async task progress and result                             |
+| POST   | `/api/e-billing/retry/{id}`       | `manage_ebilling`           | Retry a failed sync                                              |
+| GET    | `/api/e-billing/logs`             | `manage_ebilling`           | View sync audit logs                                             |
+| GET    | `/api/e-billing/pending`          | `manage_ebilling`           | List pending invoices                                            |
+| POST   | `/api/e-billing/webhook`          | —                           | Simulate a KRA webhook callback (external, no user auth)        |
+| GET    | `/api/e-billing/reconcile`        | `manage_ebilling`           | E-Billing reconciliation dashboard                               |
+| GET    | `/api/e-billing/monitor`          | `manage_ebilling`           | Failure rate monitoring                                          |
+| GET    | `/api/admin/users`                | `manage_users`              | List all users                                                    |
+| PATCH  | `/api/admin/users/{user_id}`      | `manage_users`              | Edit a user's email/name/role/password/active status              |
+| DELETE | `/api/admin/users/{user_id}`      | `manage_users`              | Delete a user (blocked for self and the last `system_admin`)     |
+| GET    | `/health`                         | —                           | Service health check (DB + API status)                            |
 
 
 Full interactive docs: [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger) and [http://localhost:8000/redoc](http://localhost:8000/redoc) (ReDoc).
@@ -306,12 +302,15 @@ docker compose exec backend pytest tests/ --cov=app.services --cov-report=term
 
 ## Sample Response
 
-Reconciliation output (values vary by run — data is synthetically generated with randomized fraud injection):
+Every JSON response (success or error) is wrapped in a standard envelope: `Success` is `1` for 2xx responses and `0` otherwise, `Message` is a short human-readable status, `Data` holds the actual payload (or `null` on error), and `Timestamp` is ISO 8601 UTC. CSV/Excel downloads (`/api/reconcile/template/{type}`, `/api/reconcile/export`) are the one exception — those stream raw file bytes, not JSON.
+
+`POST /api/reconcile/metrics` (values vary by run — data is synthetically generated with randomized fraud injection):
 
 ```json
 {
-  "status": "success",
-  "data": {
+  "Success": 1,
+  "Message": "Success",
+  "Data": {
     "metrics": {
       "total_dispatched_kes": 150932276,
       "total_leakage_kes": 16686227,
@@ -319,23 +318,45 @@ Reconciliation output (values vary by run — data is synthetically generated wi
       "anomaly_count": 90,
       "critical_count": 84
     },
-    "anomalies": [ "..." ],
-    "omc_risk_profile": [ "..." ]
-  }
+    "summary": { "...": "..." },
+    "performance": { "...": "..." },
+    "data_quality": { "...": "..." },
+    "ebilling_status": { "...": "..." },
+    "duplicate_anomalies": [ "..." ]
+  },
+  "Timestamp": "2026-07-23T18:21:45Z"
 }
 ```
+
+A permission-denied error looks like:
+
+```json
+{
+  "Success": 0,
+  "Message": "Missing required permission: view_metrics",
+  "Data": null,
+  "Timestamp": "2026-07-23T18:21:45Z"
+}
+```
+
+`GET /api/reconcile/anomalies` and `GET /api/reconcile/omc-risk-profile` return the anomaly table and OMC risk profile respectively (each gated by its own permission — see [Permission Mapping](#permission-mapping)).
 
 E-Billing sync response:
 
 ```json
 {
-  "status": "success",
-  "message": "Successfully synced 998 invoices, 110 failed.",
-  "synced": 998,
-  "failed": 110,
-  "total_processed": 1108,
-  "failed_ids": ["INV-1001"],
-  "sync_time": "2026-07-22 08:15:00"
+  "Success": 1,
+  "Message": "Success",
+  "Data": {
+    "status": "success",
+    "message": "Successfully synced 998 invoices, 110 failed.",
+    "synced": 998,
+    "failed": 110,
+    "total_processed": 1108,
+    "failed_ids": ["INV-1001"],
+    "sync_time": "2026-07-22 08:15:00"
+  },
+  "Timestamp": "2026-07-23T18:21:45Z"
 }
 ```
 
