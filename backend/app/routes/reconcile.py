@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from app.services.reconciliation import run_reconciliation, run_reconciliation_on_dataframes
 from app.services.e_billing import sync_anomalies_to_ebilling, update_anomaly_status
-from app.services.feed import update_feed  # <-- NEW IMPORT
+from app.services.feed import update_feed
 from app.schemas.reconciliation import (
     ReconciliationResponse,
     ReconciliationUploadResponse,
@@ -18,28 +18,63 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # ============================================================================
-# 1. RECONCILIATION (Database)
+# 1. RECONCILIATION (Database) – WITH PAGINATION
 # ============================================================================
 
 @router.post("/reconcile", response_model=ReconciliationResponse)
 async def reconcile(
-    materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)")
+    materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
+    page: int = Query(1, description="Page number", ge=1),
+    page_size: int = Query(20, description="Items per page", ge=1, le=100)
 ):
     """
     Run reconciliation using the default database.
+    Returns paginated anomalies.
     """
     try:
         result = run_reconciliation(materiality=materiality)
-        # 🚀 UPDATE THE LIVE FEED CACHE
+        
+        # Update live feed cache with ALL anomalies (not just paginated)
         update_feed(result.get('anomalies', []))
-        return {'status': 'success', 'data': result}
+        
+        # Paginate anomalies
+        all_anomalies = result.get('anomalies', [])
+        total_anomalies = len(all_anomalies)
+        total_pages = (total_anomalies + page_size - 1) // page_size if total_anomalies > 0 else 1
+        offset = (page - 1) * page_size
+        paginated_anomalies = all_anomalies[offset:offset + page_size]
+        
+        # Reconstruct result with paginated anomalies
+        paginated_result = {
+            'metrics': result['metrics'],
+            'anomalies': paginated_anomalies,
+            'summary': result['summary'],
+            'performance': result['performance'],
+            'data_quality': result['data_quality'],
+            'ebilling_status': result.get('ebilling_status'),
+            'duplicate_anomalies': result.get('duplicate_anomalies', []),
+            'omc_risk_profile': result.get('omc_risk_profile', [])
+        }
+        
+        return {
+            'status': 'success',
+            'data': paginated_result,
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total': total_anomalies,
+                'total_pages': total_pages,
+                'has_next': page * page_size < total_anomalies,
+                'has_prev': page > 1
+            }
+        }
     except Exception as e:
         logger.error(f"Reconciliation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================
-# 2. UPLOAD (CSV) – WITH SMART VALIDATION
+# 2. UPLOAD (CSV) – WITH PAGINATION
 # ============================================================================
 
 @router.post("/reconcile/upload", response_model=ReconciliationUploadResponse)
@@ -47,10 +82,12 @@ async def reconcile_upload(
     dispatches_file: UploadFile = File(...),
     invoices_file: UploadFile = File(...),
     payments_file: UploadFile = File(...),
-    materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)")
+    materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
+    page: int = Query(1, description="Page number", ge=1),
+    page_size: int = Query(20, description="Items per page", ge=1, le=100)
 ):
     """
-    Upload custom CSVs to test reconciliation instantly.
+    Upload custom CSVs with paginated anomalies.
     """
     try:
         # --- 1. Read CSVs ---
@@ -91,12 +128,39 @@ async def reconcile_upload(
         # --- 3. Run Reconciliation ---
         result = run_reconciliation_on_dataframes(dispatches_df, invoices_df, payments_df, materiality)
         
-        # 🚀 UPDATE THE LIVE FEED CACHE (for uploads too!)
+        # Update live feed cache with ALL anomalies
         update_feed(result.get('anomalies', []))
+        
+        # Paginate anomalies
+        all_anomalies = result.get('anomalies', [])
+        total_anomalies = len(all_anomalies)
+        total_pages = (total_anomalies + page_size - 1) // page_size if total_anomalies > 0 else 1
+        offset = (page - 1) * page_size
+        paginated_anomalies = all_anomalies[offset:offset + page_size]
+        
+        # Reconstruct result with paginated anomalies
+        paginated_result = {
+            'metrics': result['metrics'],
+            'anomalies': paginated_anomalies,
+            'summary': result['summary'],
+            'performance': result['performance'],
+            'data_quality': result['data_quality'],
+            'ebilling_status': result.get('ebilling_status'),
+            'duplicate_anomalies': result.get('duplicate_anomalies', []),
+            'omc_risk_profile': result.get('omc_risk_profile', [])
+        }
 
         return {
             'status': 'success',
-            'data': result,
+            'data': paginated_result,
+            'pagination': {
+                'page': page,
+                'page_size': page_size,
+                'total': total_anomalies,
+                'total_pages': total_pages,
+                'has_next': page * page_size < total_anomalies,
+                'has_prev': page > 1
+            },
             'message': f'Processed {len(dispatches_df)} dispatches from uploaded CSVs'
         }
 

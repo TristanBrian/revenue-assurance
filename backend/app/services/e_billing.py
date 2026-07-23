@@ -1,13 +1,15 @@
 """
-Features:
+Enhanced E-Billing Integration Service (Problem #8)
+Enterprise-grade features:
 - Retry with exponential backoff
 - Dead Letter Queue (DLQ)
 - Webhook callbacks
 - Reconciliation dashboard
 - Monitoring & alerting
 - Async background task support
+- Optimized pagination with caching
+- Production-ready for 40,000+ rows
 """
-# import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 import pandas as pd
 import random
 import time
@@ -17,15 +19,13 @@ import json
 import logging
 from functools import wraps
 import uuid
-from typing import Dict, Any
-
+from typing import Dict, Any, Optional, List
 from sqlalchemy import text
 from app.utils.db_connection import get_engine, SessionLocal
 from app.models.anomaly_resolution import AnomalyResolution
 
 logger = logging.getLogger(__name__)
 
-# DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'kpc.db')  # SQLite-only, no longer used
 KRA_API_ENDPOINT = "https://api.kra.go.ke/icms/v2/invoices"
 KRA_API_KEY = "test-api-key-12345"
 MAX_RETRIES = 3
@@ -40,48 +40,57 @@ FAILURE_THRESHOLD = 10  # percentage
 task_status: Dict[str, Dict[str, Any]] = {}
 
 # ============================================================================
-# DATABASE INITIALIZATION (Includes DLQ table)
+# CACHED TOTAL COUNT (Performance Optimization)
+# ============================================================================
+
+_cached_total_count = None
+_cached_total_count_time = None
+CACHE_TTL_SECONDS = 60  # Refresh every 60 seconds
+
+def get_cached_total_count() -> int:
+    """Get cached total count of ebilling_sync records."""
+    global _cached_total_count, _cached_total_count_time
+    
+    now = time.time()
+    if (_cached_total_count is not None and 
+        _cached_total_count_time is not None and 
+        now - _cached_total_count_time < CACHE_TTL_SECONDS):
+        return _cached_total_count
+    
+    # Cache miss – run the query
+    engine = get_engine()
+    try:
+        # Fast count using index
+        query = text("SELECT COUNT(*) as count FROM ebilling_sync")
+        with engine.connect() as conn:
+            result = conn.execute(query).fetchone()
+            _cached_total_count = int(result[0])
+            _cached_total_count_time = now
+            return _cached_total_count
+    except Exception as e:
+        logger.warning(f"Failed to get total count: {e}")
+        # Fallback: try a simpler count
+        query = text("SELECT COUNT(invoice_id) as count FROM ebilling_sync")
+        with engine.connect() as conn:
+            result = conn.execute(query).fetchone()
+            _cached_total_count = int(result[0])
+            _cached_total_count_time = now
+            return _cached_total_count
+
+
+def invalidate_total_count_cache():
+    """Force cache refresh (call after sync operations)."""
+    global _cached_total_count, _cached_total_count_time
+    _cached_total_count = None
+    _cached_total_count_time = None
+
+
+# ============================================================================
+# DATABASE INITIALIZATION
 # ============================================================================
 
 def init_ebilling_tables():
     """Create e-billing tables if they don't exist."""
-    # --- Old SQLite-only version (kept for reference) ---
-    # conn = sqlite3.connect(DB_PATH)
-    # cursor = conn.cursor()
-    #
-    # cursor.execute("""
-    #     CREATE TABLE IF NOT EXISTS ebilling_sync (
-    #         invoice_id TEXT PRIMARY KEY,
-    #         status TEXT DEFAULT 'pending',
-    #         sync_date TEXT,
-    #         error_message TEXT,
-    #         retry_count INTEGER DEFAULT 0,
-    #         last_attempt TEXT
-    #     )
-    # """)
-    #
-    # cursor.execute("""
-    #     CREATE TABLE IF NOT EXISTS ebilling_dlq (
-    #         invoice_id TEXT PRIMARY KEY,
-    #         error_message TEXT,
-    #         last_attempt TEXT,
-    #         retry_count INTEGER DEFAULT 0,
-    #         status TEXT DEFAULT 'pending'
-    #     )
-    # """)
-    #
-    # cursor.execute("""
-    #     CREATE TABLE IF NOT EXISTS ebilling_webhook_log (
-    #         id INTEGER PRIMARY KEY AUTOINCREMENT,
-    #         invoice_id TEXT,
-    #         payload TEXT,
-    #         received_at TEXT
-    #     )
-    # """)
-    #
-    # conn.commit()
-    # conn.close()
-
     engine = get_engine()
     is_postgres = engine.dialect.name == "postgresql"
     id_column = "id SERIAL PRIMARY KEY" if is_postgres else "id INTEGER PRIMARY KEY AUTOINCREMENT"
@@ -171,7 +180,7 @@ def call_kra_api(invoice_id: str, payload: dict) -> dict:
 # SYNC INVOICES (with DLQ integration)
 # ============================================================================
 
-def sync_invoices_to_ebilling(invoice_ids: list = None) -> dict:
+def sync_invoices_to_ebilling(invoice_ids: Optional[List[str]] = None) -> dict:
     """Sync invoices with retry and DLQ for failures."""
     init_ebilling_tables()
     if invoice_ids is None:
@@ -190,42 +199,13 @@ def sync_invoices_to_ebilling(invoice_ids: list = None) -> dict:
 
     synced = []
     failed = []
-
-    # --- Old SQLite-only version (kept for reference) ---
-    # conn = sqlite3.connect(DB_PATH)
-    # for inv_id in invoice_ids:
-    #     payload = {"invoice_id": inv_id, "api_key": KRA_API_KEY}
-    #     try:
-    #         response = call_kra_api(inv_id, payload)
-    #         status = 'synced'
-    #         error = None
-    #         synced.append(inv_id)
-    #     except Exception as e:
-    #         status = 'failed'
-    #         error = str(e)
-    #         failed.append(inv_id)
-    #         cursor = conn.cursor()
-    #         cursor.execute("""
-    #             INSERT OR REPLACE INTO ebilling_dlq (invoice_id, error_message, last_attempt, status)
-    #             VALUES (?, ?, ?, ?)
-    #         """, (inv_id, error, datetime.now().isoformat(), 'pending'))
-    #         conn.commit()
-    #     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    #     cursor = conn.cursor()
-    #     cursor.execute("""
-    #         INSERT OR REPLACE INTO ebilling_sync
-    #         (invoice_id, status, sync_date, error_message, last_attempt)
-    #         VALUES (?, ?, ?, ?, ?)
-    #     """, (inv_id, status, now if status == 'synced' else None, error, now))
-    #     conn.commit()
-    # conn.close()
-
     engine = get_engine()
+
     for inv_id in invoice_ids:
         payload = {"invoice_id": inv_id, "api_key": KRA_API_KEY}
 
         try:
-            response = call_kra_api(inv_id, payload)
+            call_kra_api(inv_id, payload)
             status = 'synced'
             error = None
             synced.append(inv_id)
@@ -266,6 +246,9 @@ def sync_invoices_to_ebilling(invoice_ids: list = None) -> dict:
                 "last_attempt": now
             })
 
+    # Invalidate cache after sync
+    invalidate_total_count_cache()
+
     return {
         'status': 'success' if synced else 'error' if failed else 'warning',
         'message': f'Successfully synced {len(synced)} invoices, {len(failed)} failed.',
@@ -281,7 +264,7 @@ def sync_invoices_to_ebilling(invoice_ids: list = None) -> dict:
 # ASYNC TASK WRAPPER
 # ============================================================================
 
-def run_sync_task(task_id: str, invoice_ids: list = None):
+def run_sync_task(task_id: str, invoice_ids: Optional[List[str]] = None):
     """
     Background task wrapper for sync_invoices_to_ebilling.
     Updates task_status with progress/result.
@@ -360,52 +343,54 @@ def update_anomaly_status(dispatch_id: str, status: str, notes: str = '') -> dic
 # HELPER FUNCTIONS
 # ============================================================================
 
-def get_pending_invoices() -> list:
-    # --- Old SQLite-only version (kept for reference) ---
-    # conn = sqlite3.connect(DB_PATH)
-    # query = """
-    #     SELECT i.invoice_id
-    #     FROM invoices i
-    #     LEFT JOIN ebilling_sync e ON i.invoice_id = e.invoice_id
-    #     WHERE e.status IS NULL OR e.status != 'synced'
-    # """
-    # df = pd.read_sql(query, conn)
-    # conn.close()
-    # return df['invoice_id'].tolist() if not df.empty else []
-
+def get_pending_invoices() -> List[str]:
+    """Get list of pending invoice IDs (capped at 1000 for performance)."""
     engine = get_engine()
-    query = """
+    query = text("""
         SELECT i.invoice_id
         FROM invoices i
         LEFT JOIN ebilling_sync e ON i.invoice_id = e.invoice_id
         WHERE e.status IS NULL OR e.status != 'synced'
-    """
-    df = pd.read_sql(query, engine)
-    return df['invoice_id'].tolist() if not df.empty else []
+        LIMIT 1000
+    """)
+    with engine.connect() as conn:
+        result = conn.execute(query)
+        return [row[0] for row in result]
+
+
+def get_pending_invoices_count() -> int:
+    """Get total count of pending invoices."""
+    engine = get_engine()
+    query = text("""
+        SELECT COUNT(*) as count
+        FROM invoices i
+        LEFT JOIN ebilling_sync e ON i.invoice_id = e.invoice_id
+        WHERE e.status IS NULL OR e.status != 'synced'
+    """)
+    with engine.connect() as conn:
+        return int(conn.execute(query).fetchone()[0])
 
 
 def get_ebilling_status() -> dict:
+    """Get integration status and sync metrics."""
     init_ebilling_tables()
-
-    # --- Old SQLite-only version (kept for reference) ---
-    # conn = sqlite3.connect(DB_PATH)
-    # total_invoices = int(pd.read_sql("SELECT COUNT(*) as count FROM invoices", conn).iloc[0]['count'])
-    # ...
-    # conn.close()
-
     engine = get_engine()
-    total_invoices = int(pd.read_sql("SELECT COUNT(*) as count FROM invoices", engine).iloc[0]['count'])
-    query = "SELECT status, COUNT(*) as count FROM ebilling_sync GROUP BY status"
-    df = pd.read_sql(query, engine)
-    status_counts = {row['status']: int(row['count']) for _, row in df.iterrows()}
+    
+    with engine.connect() as conn:
+        total_invoices = int(conn.execute(text("SELECT COUNT(*) as count FROM invoices")).fetchone()[0])
+        
+        # Get sync status counts
+        status_query = text("SELECT status, COUNT(*) as count FROM ebilling_sync GROUP BY status")
+        status_rows = conn.execute(status_query).fetchall()
+        status_counts = {row[0]: int(row[1]) for row in status_rows}
 
-    pending = int(status_counts.get('pending', 0))
-    synced = int(status_counts.get('synced', 0))
-    failed = int(status_counts.get('failed', 0))
+        pending = int(status_counts.get('pending', 0))
+        synced = int(status_counts.get('synced', 0))
+        failed = int(status_counts.get('failed', 0))
 
-    last_sync_query = "SELECT MAX(sync_date) as last_sync FROM ebilling_sync WHERE status = 'synced'"
-    last_sync_df = pd.read_sql(last_sync_query, engine)
-    last_sync = last_sync_df.iloc[0]['last_sync'] if not last_sync_df.empty else None
+        last_sync = conn.execute(
+            text("SELECT MAX(sync_date) as last_sync FROM ebilling_sync WHERE status = 'synced'")
+        ).fetchone()[0]
 
     not_attempted = int(total_invoices - (pending + synced + failed))
 
@@ -423,22 +408,14 @@ def get_ebilling_status() -> dict:
     }
 
 
-def get_ebilling_sync_logs(limit: int = 50) -> list:
+def get_ebilling_sync_logs(limit: int = 50) -> List[dict]:
+    """Get recent sync logs (capped at 100)."""
     init_ebilling_tables()
-
-    # --- Old SQLite-only version (kept for reference) ---
-    # conn = sqlite3.connect(DB_PATH)
-    # query = """
-    #     SELECT e.*, i.customer_name, i.value_kes
-    #     FROM ebilling_sync e
-    #     LEFT JOIN invoices i ON e.invoice_id = i.invoice_id
-    #     ORDER BY e.last_attempt DESC
-    #     LIMIT ?
-    # """
-    # df = pd.read_sql(query, conn, params=(limit,))
-    # conn.close()
-
     engine = get_engine()
+    
+    if limit > 100:
+        limit = 100  # Cap for performance
+    
     query = text("""
         SELECT e.*, i.customer_name, i.value_kes
         FROM ebilling_sync e
@@ -446,28 +423,166 @@ def get_ebilling_sync_logs(limit: int = 50) -> list:
         ORDER BY e.last_attempt DESC
         LIMIT :limit
     """)
-    df = pd.read_sql(query, engine, params={"limit": limit})
-    if df.empty:
-        return []
-    records = df.to_dict(orient='records')
-    for rec in records:
-        for key, val in rec.items():
-            if isinstance(val, (pd.Int64Dtype, int)):
-                rec[key] = int(val)
-    return records
+    
+    with engine.connect() as conn:
+        result = conn.execute(query, {"limit": limit})
+        records = []
+        for row in result:
+            rec = dict(row._mapping)
+            # Convert any pandas/numpy types
+            for key, val in rec.items():
+                if isinstance(val, (pd.Int64Dtype, int)):
+                    rec[key] = int(val)
+            records.append(rec)
+        return records
 
+
+# ============================================================================
+# PAGINATED FUNCTIONS (OPTIMIZED FOR PRODUCTION)
+# ============================================================================
+
+def get_ebilling_sync_logs_paginated(page: int = 1, page_size: int = 20) -> dict:
+    """
+    Get paginated sync logs – FAST VERSION with cached total count.
+    Production-ready for 40,000+ rows.
+    """
+    init_ebilling_tables()
+    offset = (page - 1) * page_size
+    engine = get_engine()
+
+    # Use cached total count
+    try:
+        total = get_cached_total_count()
+    except Exception as e:
+        logger.error(f"Failed to get total count: {e}")
+        total = 0
+
+    # Optimized query with LIMIT/OFFSET
+    query = text("""
+        SELECT 
+            e.invoice_id,
+            e.status,
+            e.sync_date,
+            e.error_message,
+            e.retry_count,
+            e.last_attempt,
+            i.customer_name,
+            i.value_kes
+        FROM ebilling_sync e
+        LEFT JOIN invoices i ON e.invoice_id = i.invoice_id
+        ORDER BY e.last_attempt DESC
+        LIMIT :page_size OFFSET :offset
+    """)
+    
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(query, {"page_size": page_size, "offset": offset})
+            records = []
+            for row in result:
+                rec = dict(row._mapping)
+                # Convert numpy types to Python native
+                for key, val in rec.items():
+                    if isinstance(val, (pd.Int64Dtype, int, float)):
+                        rec[key] = int(val) if isinstance(val, (int, float)) else val
+                records.append(rec)
+    except Exception as e:
+        logger.error(f"Failed to get paginated logs: {e}")
+        records = []
+
+    # Pagination metadata
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 1
+    
+    return {
+        'data': records,
+        'pagination': {
+            'page': page,
+            'page_size': page_size,
+            'total': total,
+            'total_pages': total_pages,
+            'has_next': page * page_size < total,
+            'has_prev': page > 1
+        }
+    }
+
+
+def get_pending_invoices_paginated(page: int = 1, page_size: int = 20) -> dict:
+    """
+    Get paginated list of pending invoices with details – FAST VERSION.
+    Production-ready for 40,000+ rows.
+    """
+    init_ebilling_tables()
+    offset = (page - 1) * page_size
+    engine = get_engine()
+
+    # Fast count query
+    query_count = text("""
+        SELECT COUNT(*) as count
+        FROM invoices i
+        LEFT JOIN ebilling_sync e ON i.invoice_id = e.invoice_id
+        WHERE e.status IS NULL OR e.status != 'synced'
+    """)
+    
+    try:
+        with engine.connect() as conn:
+            total = int(conn.execute(query_count).fetchone()[0])
+    except Exception as e:
+        logger.error(f"Failed to get pending count: {e}")
+        total = 0
+
+    # Fast paginated query
+    query = text("""
+        SELECT 
+            i.invoice_id, 
+            i.customer_name, 
+            i.value_kes, 
+            i.date,
+            e.status,
+            e.retry_count
+        FROM invoices i
+        LEFT JOIN ebilling_sync e ON i.invoice_id = e.invoice_id
+        WHERE e.status IS NULL OR e.status != 'synced'
+        ORDER BY i.date DESC
+        LIMIT :page_size OFFSET :offset
+    """)
+    
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(query, {"page_size": page_size, "offset": offset})
+            records = []
+            for row in result:
+                rec = dict(row._mapping)
+                for key, val in rec.items():
+                    if isinstance(val, (pd.Int64Dtype, int, float)):
+                        rec[key] = int(val) if isinstance(val, (int, float)) else val
+                records.append(rec)
+    except Exception as e:
+        logger.error(f"Failed to get pending invoices: {e}")
+        records = []
+
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 1
+    
+    return {
+        'data': records,
+        'pagination': {
+            'page': page,
+            'page_size': page_size,
+            'total': total,
+            'total_pages': total_pages,
+            'has_next': page * page_size < total,
+            'has_prev': page > 1
+        }
+    }
+
+
+# ============================================================================
+# RETRY FAILED SYNC
+# ============================================================================
 
 def retry_failed_sync(invoice_id: str) -> dict:
+    """Retry a specific failed invoice sync."""
     init_ebilling_tables()
-
-    # --- Old SQLite-only version (kept for reference) ---
-    # conn = sqlite3.connect(DB_PATH)
-    # cursor = conn.cursor()
-    # cursor.execute("SELECT status, retry_count FROM ebilling_sync WHERE invoice_id = ?", (invoice_id,))
-    # row = cursor.fetchone()
-    # conn.close()
-
     engine = get_engine()
+
     with engine.connect() as conn:
         row = conn.execute(
             text("SELECT status, retry_count FROM ebilling_sync WHERE invoice_id = :invoice_id"),
@@ -476,6 +591,7 @@ def retry_failed_sync(invoice_id: str) -> dict:
 
     if not row:
         return {'status': 'error', 'message': f'Invoice {invoice_id} not found in sync table.'}
+    
     status, retry_count = row
     if status != 'failed':
         return {'status': 'warning', 'message': f'Invoice {invoice_id} is not in failed state (current: {status}).'}
@@ -492,7 +608,12 @@ def retry_failed_sync(invoice_id: str) -> dict:
     }
 
 
+# ============================================================================
+# WEBHOOK HANDLER
+# ============================================================================
+
 def handle_webhook(payload: dict) -> dict:
+    """Process webhook from KRA."""
     init_ebilling_tables()
     invoice_id = payload.get('invoice_id')
     status = payload.get('status')
@@ -500,26 +621,6 @@ def handle_webhook(payload: dict) -> dict:
 
     if not invoice_id:
         return {'status': 'error', 'message': 'Missing invoice_id in webhook payload'}
-
-    # --- Old SQLite-only version (kept for reference) ---
-    # conn = sqlite3.connect(DB_PATH)
-    # cursor = conn.cursor()
-    # cursor.execute("""
-    #     INSERT INTO ebilling_webhook_log (invoice_id, payload, received_at)
-    #     VALUES (?, ?, ?)
-    # """, (invoice_id, json.dumps(payload), datetime.now().isoformat()))
-    # conn.commit()
-    # conn.close()
-    # if status in ['synced', 'failed']:
-    #     conn = sqlite3.connect(DB_PATH)
-    #     cursor = conn.cursor()
-    #     cursor.execute("""
-    #         UPDATE ebilling_sync
-    #         SET status = ?, error_message = ?, sync_date = ?
-    #         WHERE invoice_id = ?
-    #     """, (status, message, datetime.now().isoformat(), invoice_id))
-    #     conn.commit()
-    #     conn.close()
 
     engine = get_engine()
     with engine.begin() as conn:
@@ -553,26 +654,29 @@ def handle_webhook(payload: dict) -> dict:
     }
 
 
+# ============================================================================
+# RECONCILIATION DASHBOARD & MONITORING
+# ============================================================================
+
 def get_ebilling_reconciliation() -> dict:
+    """Get reconciliation dashboard data."""
     init_ebilling_tables()
-
-    # --- Old SQLite-only version (kept for reference) ---
-    # conn = sqlite3.connect(DB_PATH)
-    # total_invoices = int(pd.read_sql("SELECT COUNT(*) as count FROM invoices", conn).iloc[0]['count'])
-    # ...
-    # conn.close()
-
     engine = get_engine()
-    total_invoices = int(pd.read_sql("SELECT COUNT(*) as count FROM invoices", engine).iloc[0]['count'])
-    synced = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync WHERE status = 'synced'", engine).iloc[0]['count'])
-    pending_query = """
-        SELECT COUNT(*) as count FROM invoices i
-        LEFT JOIN ebilling_sync e ON i.invoice_id = e.invoice_id
-        WHERE e.status IS NULL OR e.status != 'synced'
-    """
-    pending = int(pd.read_sql(pending_query, engine).iloc[0]['count'])
-    failed = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync WHERE status = 'failed'", engine).iloc[0]['count'])
-    dlq = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_dlq", engine).iloc[0]['count'])
+    
+    with engine.connect() as conn:
+        total_invoices = int(conn.execute(text("SELECT COUNT(*) as count FROM invoices")).fetchone()[0])
+        synced = int(conn.execute(text("SELECT COUNT(*) as count FROM ebilling_sync WHERE status = 'synced'")).fetchone()[0])
+        
+        pending_query = text("""
+            SELECT COUNT(*) as count FROM invoices i
+            LEFT JOIN ebilling_sync e ON i.invoice_id = e.invoice_id
+            WHERE e.status IS NULL OR e.status != 'synced'
+        """)
+        pending = int(conn.execute(pending_query).fetchone()[0])
+        
+        failed = int(conn.execute(text("SELECT COUNT(*) as count FROM ebilling_sync WHERE status = 'failed'")).fetchone()[0])
+        dlq = int(conn.execute(text("SELECT COUNT(*) as count FROM ebilling_dlq")).fetchone()[0])
+    
     sync_rate = round((synced / total_invoices * 100), 2) if total_invoices > 0 else 0
 
     return {
@@ -587,21 +691,20 @@ def get_ebilling_reconciliation() -> dict:
 
 
 def check_failure_rate() -> dict:
+    """Check failure rate and trigger alert if above threshold."""
     init_ebilling_tables()
-
-    # --- Old SQLite-only version (kept for reference) ---
-    # conn = sqlite3.connect(DB_PATH)
-    # total = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync", conn).iloc[0]['count'])
-    # failed = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync WHERE status = 'failed'", conn).iloc[0]['count'])
-    # conn.close()
-
     engine = get_engine()
-    total = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync", engine).iloc[0]['count'])
-    failed = int(pd.read_sql("SELECT COUNT(*) as count FROM ebilling_sync WHERE status = 'failed'", engine).iloc[0]['count'])
+    
+    with engine.connect() as conn:
+        total = int(conn.execute(text("SELECT COUNT(*) as count FROM ebilling_sync")).fetchone()[0])
+        failed = int(conn.execute(text("SELECT COUNT(*) as count FROM ebilling_sync WHERE status = 'failed'")).fetchone()[0])
+    
     if total == 0:
         return {'failure_rate': 0, 'alert': False, 'message': 'No sync attempts recorded'}
+    
     rate = round((failed / total) * 100, 2)
     alert = rate > FAILURE_THRESHOLD
+    
     return {
         'failure_rate': rate,
         'alert': alert,

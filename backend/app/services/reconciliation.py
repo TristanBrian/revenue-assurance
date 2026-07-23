@@ -12,7 +12,6 @@
 """
 
 import pandas as pd
-# import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 import os
 from datetime import datetime
 import numpy as np
@@ -39,7 +38,6 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # =============================================================================
 
-# DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'kpc.db')  # SQLite-only path, no longer used directly
 UNDERPAYMENT_THRESHOLD = 100       # KSh - ignore tiny rounding errors
 CRITICAL_AGE_DAYS = 60             # Days after which pending becomes critical
 MATERIALITY_THRESHOLD = 100000     # KSh - only flag leaks above this (configurable)

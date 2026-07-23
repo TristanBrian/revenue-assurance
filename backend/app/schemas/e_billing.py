@@ -14,10 +14,28 @@ check_failure_rate() omits 'threshold' when there are zero sync attempts).
 Those fields are typed Optional[...] = None here to cover every path
 without changing what the routes actually return.
 """
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel
 
+
+# ============================================================================
+# PAGINATION SCHEMA (NEW)
+# ============================================================================
+
+class Pagination(BaseModel):
+    """Pagination metadata for paginated endpoints."""
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
+
+
+# ============================================================================
+# E-BILLING STATUS
+# ============================================================================
 
 class EBillingStatus(BaseModel):
     """Inner shape of GET /e-billing/status's "integration" field (get_ebilling_status())."""
@@ -37,6 +55,10 @@ class EBillingStatusResponse(BaseModel):
     status: str
     integration: EBillingStatus
 
+
+# ============================================================================
+# E-BILLING SYNC
+# ============================================================================
 
 class EBillingSyncResult(BaseModel):
     """Return shape of sync_invoices_to_ebilling() — used directly by POST
@@ -69,6 +91,10 @@ class EBillingTaskStatus(BaseModel):
     completed_at: Optional[str] = None
 
 
+# ============================================================================
+# E-BILLING LOGS
+# ============================================================================
+
 class EBillingLogEntry(BaseModel):
     """One row of get_ebilling_sync_logs()'s SELECT e.*, i.customer_name,
     i.value_kes ... LEFT JOIN invoices — customer_name/value_kes can be
@@ -89,6 +115,21 @@ class EBillingLogsResponse(BaseModel):
     count: int
 
 
+# ============================================================================
+# E-BILLING LOGS – PAGINATED (NEW)
+# ============================================================================
+
+class EBillingLogsPaginatedResponse(BaseModel):
+    """GET /e-billing/logs/paginated – returns paginated logs with metadata."""
+    status: str
+    data: list[EBillingLogEntry]
+    pagination: Pagination
+
+
+# ============================================================================
+# E-BILLING RETRY
+# ============================================================================
+
 class EBillingRetryResponse(BaseModel):
     """POST /e-billing/retry/{invoice_id}. retry_failed_sync() has 3 return
     shapes: not-found / not-failed (status+message only) and success
@@ -101,11 +142,40 @@ class EBillingRetryResponse(BaseModel):
     timestamp: Optional[str] = None
 
 
+# ============================================================================
+# E-BILLING PENDING
+# ============================================================================
+
 class EBillingPendingResponse(BaseModel):
     status: str
     pending_count: int
     invoice_ids: list[str]
 
+
+# ============================================================================
+# E-BILLING PENDING – PAGINATED (NEW)
+# ============================================================================
+
+class EBillingPendingItem(BaseModel):
+    """One pending invoice with details."""
+    invoice_id: str
+    customer_name: Optional[str] = None
+    value_kes: Optional[float] = None
+    date: Optional[str] = None
+    status: Optional[str] = None
+    retry_count: Optional[int] = None
+
+
+class EBillingPendingPaginatedResponse(BaseModel):
+    """GET /e-billing/pending/paginated – returns paginated pending invoices with metadata."""
+    status: str
+    data: list[EBillingPendingItem]
+    pagination: Pagination
+
+
+# ============================================================================
+# E-BILLING WEBHOOK
+# ============================================================================
 
 class EBillingWebhookResponse(BaseModel):
     """POST /e-billing/webhook. handle_webhook() omits invoice_id/new_status
@@ -115,6 +185,10 @@ class EBillingWebhookResponse(BaseModel):
     invoice_id: Optional[str] = None
     new_status: Optional[str] = None
 
+
+# ============================================================================
+# E-BILLING RECONCILIATION
+# ============================================================================
 
 class EBillingReconciliation(BaseModel):
     """Inner shape of GET /e-billing/reconcile's "data" field (get_ebilling_reconciliation())."""
@@ -132,6 +206,10 @@ class EBillingReconciliationResponse(BaseModel):
     data: EBillingReconciliation
 
 
+# ============================================================================
+# E-BILLING MONITOR
+# ============================================================================
+
 class EBillingFailureMonitor(BaseModel):
     """Inner shape of GET /e-billing/monitor's "monitoring" field
     (check_failure_rate()). 'threshold' is absent when there are zero
@@ -145,3 +223,13 @@ class EBillingFailureMonitor(BaseModel):
 class EBillingMonitorResponse(BaseModel):
     status: str
     monitoring: EBillingFailureMonitor
+
+
+# ============================================================================
+# E-BILLING CACHE REFRESH (NEW)
+# ============================================================================
+
+class EBillingCacheRefreshResponse(BaseModel):
+    """POST /e-billing/cache/refresh – response for manual cache invalidation."""
+    status: str
+    message: str
