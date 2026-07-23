@@ -21,8 +21,10 @@ from functools import wraps
 import uuid
 from typing import Dict, Any, Optional, List
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 from app.utils.db_connection import get_engine, SessionLocal
 from app.models.anomaly_resolution import AnomalyResolution
+from app.services.audit_service import log_action
 
 logger = logging.getLogger(__name__)
 
@@ -307,28 +309,39 @@ def sync_anomalies_to_ebilling(anomalies: list) -> dict:
     return sync_invoices_to_ebilling(invoice_ids)
 
 
-def update_anomaly_status(dispatch_id: str, status: str, notes: str = '') -> dict:
+def update_anomaly_status(db: Session, dispatch_id: str, status: str, notes: str = '', actor_user_id=None) -> dict:
     """
-    Persists resolution status via the ORM (SessionLocal), unlike the rest
-    of this file's raw engine/text() upserts — this is a single-record
-    CRUD by primary key, not a bulk sync operation, so the ORM is a more
-    natural fit here. Opens and closes its own session, same self-contained
-    resource-lifecycle convention the rest of this file's functions use
-    with engine.begin()/engine.connect() (no db/connection is threaded in
-    from the route).
+    Persists resolution status via the ORM, unlike the rest of this file's
+    raw engine/text() upserts — this is a single-record CRUD by primary
+    key, not a bulk sync operation, so the ORM is a more natural fit here.
+
+    Takes the caller's request-scoped session (routes/reconcile.py's
+    Depends(get_db)) instead of opening its own SessionLocal(), and a
+    single db.commit() covers both the AnomalyResolution write and the
+    audit_service.log_action() call below — so the audit entry is atomic
+    with the resolution it's recording, not a separate transaction that
+    could persist (or vanish) independently of it.
     """
-    db = SessionLocal()
-    try:
-        resolution = db.query(AnomalyResolution).filter(AnomalyResolution.dispatch_id == dispatch_id).first()
-        if resolution:
-            resolution.status = status
-            resolution.notes = notes
-        else:
-            resolution = AnomalyResolution(dispatch_id=dispatch_id, status=status, notes=notes)
-            db.add(resolution)
-        db.commit()
-    finally:
-        db.close()
+    resolution = db.query(AnomalyResolution).filter(AnomalyResolution.dispatch_id == dispatch_id).first()
+    if resolution:
+        before_status = resolution.status
+        resolution.status = status
+        resolution.notes = notes
+    else:
+        before_status = None
+        resolution = AnomalyResolution(dispatch_id=dispatch_id, status=status, notes=notes)
+        db.add(resolution)
+
+    log_action(
+        db,
+        actor_user_id=actor_user_id,
+        action="anomaly.resolve",
+        target_type="dispatch",
+        target_id=dispatch_id,
+        before={"status": before_status},
+        after={"status": status, "notes": notes},
+    )
+    db.commit()
 
     return {
         'status': 'success',

@@ -12,8 +12,10 @@ each live in their own file under `app/models/` — one class per file:
 [`depot_ledger.py`](app/models/depot_ledger.py),
 [`quota_ledger.py`](app/models/quota_ledger.py).
 `app/models/reconciliation.py` itself is an empty placeholder (like
-`audit.py`/`transactions.py`) — "reconciliation" isn't a table, just the
-domain name these files together represent.
+`transactions.py`) — "reconciliation" isn't a table, just the domain name
+these files together represent. `audit.py` used to be in that same
+placeholder category but is now a real model backing the `audit_logs`
+table (see the Audit Trail section below).
 
 ```mermaid
 erDiagram
@@ -207,8 +209,17 @@ under "What's real vs. reference-only" below.)
   unused by the app's logic currently.
 - **`quota_ledger`** has no service, route, or recalculation job reading or
   writing it yet either — only the schema exists, same status as
-  `audit.py`/`transactions.py`'s empty model placeholders, except this one
-  actually has a real table behind it already.
+  `transactions.py`'s empty model placeholder, except this one actually
+  has a real table behind it already.
+- **`audit_logs`** (`app/models/audit.py`) is genuinely implemented end to
+  end: `services/audit_service.py`, `schemas/audit.py`,
+  `routes/audit.py` (`GET /api/audit/logs`, `GET /api/audit/logs/{log_id}`,
+  gated by `view_audit`), and `log_action()` calls wired into anomaly
+  resolution, e-billing sync/retry, user administration, and login
+  attempts. `before_value`/`after_value`/`extra_metadata` are `JSONB` in
+  Postgres, with a `.with_variant(JSON(), "sqlite")` fallback so
+  `tests/test_audit_service.py` can run against an in-memory SQLite engine
+  without a Postgres dependency.
 - **`ebilling_sync`, `ebilling_dlq`, `ebilling_webhook_log`** are *not* in
   `schema.sql` or any file under `app/models/`. They're real persisted
   tables too (created by `services/e_billing.py`'s `init_ebilling_tables()`

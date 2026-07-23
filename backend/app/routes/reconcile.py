@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
-from app.core.dependencies import require_permission
+from sqlalchemy.orm import Session
+from app.core.dependencies import get_db, require_permission
 from app.models.user import User
 from app.services.reconciliation import run_reconciliation, run_reconciliation_on_dataframes
 from app.services.e_billing import sync_anomalies_to_ebilling, update_anomaly_status
 from app.services.feed import update_feed
+from app.services.audit_service import log_action
 from app.schemas.reconciliation import (
     MetricsResponse,
     AnomalyTableResponse,
@@ -271,7 +273,10 @@ async def download_template(
 # ============================================================================
 
 @router.post("/reconcile/sync", response_model=SyncAnomaliesResponse)
-def sync_anomalies(_: User = Depends(require_permission("manage_ebilling"))):
+def sync_anomalies(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("manage_ebilling")),
+):
     # Plain def, not async def: sync_anomalies_to_ebilling() calls
     # call_kra_api(), which sleeps synchronously (time.sleep, not
     # asyncio.sleep) per invoice plus retry backoff. As async def, that
@@ -283,6 +288,18 @@ def sync_anomalies(_: User = Depends(require_permission("manage_ebilling"))):
         anomalies = result.get('anomalies', [])
         pending = [a for a in anomalies if a.get('ebilling_status') == 'Pending']
         sync_result = sync_anomalies_to_ebilling(pending)
+        # sync_anomalies_to_ebilling() writes through its own raw-engine
+        # transaction (already committed by the time we get here), not
+        # this request's ORM session — so this commit is only for the
+        # audit row itself, not joint atomicity with the sync it describes.
+        log_action(
+            db,
+            actor_user_id=user.id,
+            action="ebilling.sync",
+            target_type="sync_task",
+            after={"pending_count": len(pending), "sync_result": sync_result},
+        )
+        db.commit()
         return {
             'status': 'success',
             'sync_result': sync_result,
@@ -298,10 +315,11 @@ async def update_anomaly(
     dispatch_id: str = Query(...),
     status: str = Query(...),
     notes: str = Query(''),
-    _: User = Depends(require_permission("resolve_anomaly")),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("resolve_anomaly")),
 ):
     try:
-        result = update_anomaly_status(dispatch_id, status, notes)
+        result = update_anomaly_status(db, dispatch_id, status, notes, actor_user_id=user.id)
         return result
     except Exception as e:
         logger.error(f"Update failed: {e}")

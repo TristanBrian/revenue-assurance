@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin  # <-- ADDED feed, heatmap, auth, detective, graph, admin
+from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit  # <-- ADDED feed, heatmap, auth, detective, graph, admin, audit
 # import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
@@ -58,6 +58,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])  # <-- ADDED 
 app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
 app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])  # <-- NEW
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
+app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
 
 
 @app.get("/")
@@ -97,6 +98,8 @@ async def root():
             "GET /api/admin/users - List all users",
             "PATCH /api/admin/users/{user_id} - Edit a user (email/name/role/password/is_active)",
             "DELETE /api/admin/users/{user_id} - Delete a user",
+            "GET /api/audit/logs - Paginated, filterable audit trail",
+            "GET /api/audit/logs/{log_id} - Single audit log entry",
             "GET /health - Health check"
         ]
     }
