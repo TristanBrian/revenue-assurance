@@ -279,23 +279,40 @@ docker compose exec backend pytest tests/ --cov=app.services --cov-report=term
 
 ## Sample Response
 
-`POST /api/reconcile/metrics` output (values vary by run — data is synthetically generated with randomized fraud injection):
+Every JSON response (success or error) is wrapped in a standard envelope: `Success` is `1` for 2xx responses and `0` otherwise, `Message` is a short human-readable status, `Data` holds the actual payload (or `null` on error), and `Timestamp` is ISO 8601 UTC. CSV/Excel downloads (`/api/reconcile/template/{type}`, `/api/reconcile/export`) are the one exception — those stream raw file bytes, not JSON.
+
+`POST /api/reconcile/metrics` (values vary by run — data is synthetically generated with randomized fraud injection):
 
 ```json
 {
-  "status": "success",
-  "metrics": {
-    "total_dispatched_kes": 150932276,
-    "total_leakage_kes": 16686227,
-    "reconciliation_rate": 88.94,
-    "anomaly_count": 90,
-    "critical_count": 84
+  "Success": 1,
+  "Message": "Success",
+  "Data": {
+    "metrics": {
+      "total_dispatched_kes": 150932276,
+      "total_leakage_kes": 16686227,
+      "reconciliation_rate": 88.94,
+      "anomaly_count": 90,
+      "critical_count": 84
+    },
+    "summary": { "...": "..." },
+    "performance": { "...": "..." },
+    "data_quality": { "...": "..." },
+    "ebilling_status": { "...": "..." },
+    "duplicate_anomalies": [ "..." ]
   },
-  "summary": { "...": "..." },
-  "performance": { "...": "..." },
-  "data_quality": { "...": "..." },
-  "ebilling_status": { "...": "..." },
-  "duplicate_anomalies": [ "..." ]
+  "Timestamp": "2026-07-23T18:21:45Z"
+}
+```
+
+A permission-denied error looks like:
+
+```json
+{
+  "Success": 0,
+  "Message": "Missing required permission: view_metrics",
+  "Data": null,
+  "Timestamp": "2026-07-23T18:21:45Z"
 }
 ```
 
@@ -305,13 +322,18 @@ E-Billing sync response:
 
 ```json
 {
-  "status": "success",
-  "message": "Successfully synced 998 invoices, 110 failed.",
-  "synced": 998,
-  "failed": 110,
-  "total_processed": 1108,
-  "failed_ids": ["INV-1001"],
-  "sync_time": "2026-07-22 08:15:00"
+  "Success": 1,
+  "Message": "Success",
+  "Data": {
+    "status": "success",
+    "message": "Successfully synced 998 invoices, 110 failed.",
+    "synced": 998,
+    "failed": 110,
+    "total_processed": 1108,
+    "failed_ids": ["INV-1001"],
+    "sync_time": "2026-07-22 08:15:00"
+  },
+  "Timestamp": "2026-07-23T18:21:45Z"
 }
 ```
 
