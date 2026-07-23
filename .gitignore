@@ -20,6 +20,9 @@ docker-compose.override.yml
 *.pid
 *.pid.lock
 
+# Local Postgres cluster (backend/scripts/setup_local_postgres.sh)
+backend/.localpg/
+
 # IDE
 .vscode/
 .idea/
