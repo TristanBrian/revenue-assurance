@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap, auth  # <-- ADDED feed, heatmap, auth
+from app.routes import reconcile, e_billing, feed, heatmap, auth, graph  # <-- ADDED feed, heatmap, auth, graph
 # import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
@@ -49,6 +49,7 @@ app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
 app.include_router(feed.router, prefix="/api", tags=["Live Feed"])      # <-- NEW
 app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])  # <-- ADDED auth router
+app.include_router(graph.router, prefix="/api", tags=["Fraud Graph"])  # <-- NEW
 
 
 @app.get("/")
@@ -76,6 +77,7 @@ async def root():
             "GET /api/e-billing/monitor - Failure rate monitoring",
             "GET /api/feed - Live anomaly feed",          # <-- NEW
             "GET /api/heatmap - Leakage heatmap (OMC × Product)",  # <-- NEW
+            "GET /api/graph - Fraud graph (OMC<->Depot leakage, community detection)",  # <-- NEW
             "GET /health - Health check"
         ]
     }
