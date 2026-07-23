@@ -14,7 +14,7 @@ class DepotLedger(Base):
 
     ledger_id = Column(Text, primary_key=True)
     depot = Column(Text, ForeignKey("depots.depot_id"))
-    product = Column(Text)
+    product = Column(Text, ForeignKey("products.product_id"))
     date = Column(Text)  # kept TEXT to match the original SQLite type; consider DateTime if the format is consistent
     opening_balance = Column(Integer)
     inbound = Column(Integer)
@@ -26,3 +26,4 @@ class DepotLedger(Base):
     variance_abs = Column(Integer)
 
     depot_ref = relationship("Depot", back_populates="ledger_entries")
+    product_ref = relationship("Product", back_populates="ledger_entries")
