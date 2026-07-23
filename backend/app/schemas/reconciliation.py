@@ -38,6 +38,13 @@ class Anomaly(BaseModel):
     ebilling_sync_date: Optional[str] = None
     age_days: int
     created_at: str
+    # Persisted overlay from anomaly_resolutions (app/models/anomaly_resolution.py) —
+    # None until someone calls POST /reconcile/update for this dispatch_id.
+    # Doesn't affect whether this anomaly appears at all; see
+    # services/reconciliation.py's resolution-overlay comment.
+    resolution_status: Optional[str] = None
+    resolution_notes: Optional[str] = None
+    resolution_updated_at: Optional[str] = None
 
 
 class Metrics(BaseModel):
