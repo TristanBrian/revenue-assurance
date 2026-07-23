@@ -34,8 +34,8 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Tables owned by mechanisms other than Alembic — do not let autogenerate
-# try to manage these here. omcs/depots/dispatches/invoices/payments/
-# depot_ledger are drop-and-recreated by scripts/etl_pipeline.py's
+# try to manage these here. omcs/depots/products/dispatches/invoices/
+# payments/depot_ledger are drop-and-recreated by scripts/etl_pipeline.py's
 # pandas .to_sql(if_exists='replace') every run; ebilling_sync/ebilling_dlq/
 # ebilling_webhook_log are created idempotently by
 # app/services/e_billing.py's init_ebilling_tables(). Bringing either set
@@ -45,6 +45,7 @@ target_metadata = Base.metadata
 NOT_ALEMBIC_MANAGED_TABLES = {
     "omcs",
     "depots",
+    "products",
     "dispatches",
     "invoices",
     "payments",

@@ -16,10 +16,11 @@ class Invoice(Base):
     dispatch_id = Column(Text, ForeignKey("dispatches.dispatch_id"))
     omc_id = Column(Text, ForeignKey("omcs.omc_id"))
     customer_name = Column(Text)
-    product = Column(Text)
+    product = Column(Text, ForeignKey("products.product_id"))
     date = Column(DateTime)
     value_kes = Column(Integer)
 
     dispatch = relationship("Dispatch", back_populates="invoice")
     omc = relationship("OMC", back_populates="invoices")
+    product_ref = relationship("Product", back_populates="invoices")
     payments = relationship("Payment", back_populates="invoice")
