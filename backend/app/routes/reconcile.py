@@ -2,6 +2,13 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from app.services.reconciliation import run_reconciliation, run_reconciliation_on_dataframes
 from app.services.e_billing import sync_anomalies_to_ebilling, update_anomaly_status
+from app.services.feed import update_feed  # <-- NEW IMPORT
+from app.schemas.reconciliation import (
+    ReconciliationResponse,
+    ReconciliationUploadResponse,
+    SyncAnomaliesResponse,
+    UpdateAnomalyResponse,
+)
 import pandas as pd
 import io
 import logging
@@ -10,17 +17,21 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-
 # ============================================================================
 # 1. RECONCILIATION (Database)
 # ============================================================================
 
-@router.post("/reconcile")
+@router.post("/reconcile", response_model=ReconciliationResponse)
 async def reconcile(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)")
 ):
+    """
+    Run reconciliation using the default database.
+    """
     try:
         result = run_reconciliation(materiality=materiality)
+        # 🚀 UPDATE THE LIVE FEED CACHE
+        update_feed(result.get('anomalies', []))
         return {'status': 'success', 'data': result}
     except Exception as e:
         logger.error(f"Reconciliation failed: {e}")
@@ -31,7 +42,7 @@ async def reconcile(
 # 2. UPLOAD (CSV) – WITH SMART VALIDATION
 # ============================================================================
 
-@router.post("/reconcile/upload")
+@router.post("/reconcile/upload", response_model=ReconciliationUploadResponse)
 async def reconcile_upload(
     dispatches_file: UploadFile = File(...),
     invoices_file: UploadFile = File(...),
@@ -40,7 +51,6 @@ async def reconcile_upload(
 ):
     """
     Upload custom CSVs to test reconciliation instantly.
-    Now with strict column validation!
     """
     try:
         # --- 1. Read CSVs ---
@@ -48,7 +58,7 @@ async def reconcile_upload(
         invoices_df = pd.read_csv(io.StringIO((await invoices_file.read()).decode('utf-8')))
         payments_df = pd.read_csv(io.StringIO((await payments_file.read()).decode('utf-8')))
 
-        # --- 2. VALIDATE DISPATCHES ---
+        # --- 2. Validate ---
         required_disp = ['dispatch_id', 'value_kes']
         missing_disp = [c for c in required_disp if c not in dispatches_df.columns]
         if missing_disp:
@@ -62,7 +72,6 @@ async def reconcile_upload(
                 detail="Dispatches CSV must contain either 'customer_name' or 'customer' column."
             )
 
-        # --- 3. VALIDATE INVOICES ---
         required_inv = ['invoice_id', 'dispatch_id', 'value_kes']
         missing_inv = [c for c in required_inv if c not in invoices_df.columns]
         if missing_inv:
@@ -71,17 +80,19 @@ async def reconcile_upload(
                 detail=f"Invoices CSV missing columns: {missing_inv}. Required: 'invoice_id', 'dispatch_id', 'value_kes'."
             )
 
-        # --- 4. VALIDATE PAYMENTS (This catches the Depot Ledger bug!) ---
         required_pay = ['invoice_id', 'value_kes']
         missing_pay = [c for c in required_pay if c not in payments_df.columns]
         if missing_pay:
             raise HTTPException(
                 status_code=400,
-                detail=f"Payments CSV missing columns: {missing_pay}. Required: 'invoice_id' and 'value_kes'. You may have uploaded the wrong file (e.g., Depot Ledger instead of Payments)."
+                detail=f"Payments CSV missing columns: {missing_pay}. Required: 'invoice_id' and 'value_kes'. You may have uploaded the wrong file."
             )
 
-        # --- 5. Run Reconciliation ---
+        # --- 3. Run Reconciliation ---
         result = run_reconciliation_on_dataframes(dispatches_df, invoices_df, payments_df, materiality)
+        
+        # 🚀 UPDATE THE LIVE FEED CACHE (for uploads too!)
+        update_feed(result.get('anomalies', []))
 
         return {
             'status': 'success',
@@ -94,7 +105,7 @@ async def reconcile_upload(
     except pd.errors.ParserError as e:
         raise HTTPException(status_code=400, detail=f"CSV parsing error: {str(e)}")
     except HTTPException:
-        raise  # Re-raise our custom validation errors
+        raise
     except Exception as e:
         logger.error(f"Upload reconciliation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -108,7 +119,6 @@ async def reconcile_upload(
 async def download_template(file_type: str):
     """
     Download a CSV template for Dispatches, Invoices, or Payments.
-    Use this to see the exact format required for upload.
     """
     if file_type not in ["dispatches", "invoices", "payments"]:
         raise HTTPException(
@@ -157,10 +167,10 @@ async def download_template(file_type: str):
 
 
 # ============================================================================
-# 4. SYNC & UPDATE
+# 4. SYNC, UPDATE & EXPORT
 # ============================================================================
 
-@router.post("/reconcile/sync")
+@router.post("/reconcile/sync", response_model=SyncAnomaliesResponse)
 async def sync_anomalies():
     try:
         result = run_reconciliation()
@@ -177,7 +187,7 @@ async def sync_anomalies():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/reconcile/update")
+@router.post("/reconcile/update", response_model=UpdateAnomalyResponse)
 async def update_anomaly(
     dispatch_id: str = Query(...),
     status: str = Query(...),

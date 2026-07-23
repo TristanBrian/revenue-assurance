@@ -6,12 +6,13 @@
 - OMC risk profiling
 - Materiality threshold support
 - Performance logging
-- 20/20 tests passing
-
+- NaN‑safe date and numeric conversions
+- JSON sanitizer for inf/nan values
+- 100% JSON‑compliant even with messy data
 """
 
 import pandas as pd
-import sqlite3
+# import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 import os
 from datetime import datetime
 import numpy as np
@@ -20,6 +21,9 @@ from typing import Dict, List, Optional
 from dataclasses import dataclass
 import time
 from collections import Counter
+import math
+
+from app.utils.db_connection import get_engine
 
 # =============================================================================
 # LOGGING SETUP
@@ -35,10 +39,36 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # =============================================================================
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'kpc.db')
+# DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'kpc.db')  # SQLite-only path, no longer used directly
 UNDERPAYMENT_THRESHOLD = 100       # KSh - ignore tiny rounding errors
 CRITICAL_AGE_DAYS = 60             # Days after which pending becomes critical
 MATERIALITY_THRESHOLD = 100000     # KSh - only flag leaks above this (configurable)
+
+# =============================================================================
+# JSON SANITIZER
+# =============================================================================
+
+def clean_json_values(obj):
+    """
+    Recursively clean dictionaries, lists, and primitive types.
+    Replaces NaN and Infinity with 0.
+    """
+    if isinstance(obj, dict):
+        return {k: clean_json_values(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [clean_json_values(v) for v in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return 0
+        return obj
+    elif isinstance(obj, (np.float64, np.float32)):
+        if np.isnan(obj) or np.isinf(obj):
+            return 0
+        return float(obj)
+    elif isinstance(obj, (np.int64, np.int32)):
+        return int(obj)
+    else:
+        return obj
 
 # =============================================================================
 # HELPERS
@@ -55,9 +85,10 @@ class DataQualityReport:
     quality_score: float
 
 
-def get_table_columns(conn: sqlite3.Connection, table_name: str) -> List[str]:
-    cursor = conn.execute(f"PRAGMA table_info({table_name})")
-    return [row[1] for row in cursor.fetchall()]
+# def get_table_columns(conn: sqlite3.Connection, table_name: str) -> List[str]:
+#     """SQLite-only helper (PRAGMA table_info). Unused; kept for reference."""
+#     cursor = conn.execute(f"PRAGMA table_info({table_name})")
+#     return [row[1] for row in cursor.fetchall()]
 
 
 def calculate_data_quality(df: pd.DataFrame, customer_col: str, value_col: str) -> DataQualityReport:
@@ -89,7 +120,6 @@ def calculate_data_quality(df: pd.DataFrame, customer_col: str, value_col: str) 
 
 
 def detect_duplicates(df: pd.DataFrame, column: str, label: str) -> List[Dict]:
-    """Detect duplicate values in a column and return anomaly dicts."""
     if column not in df.columns:
         return []
     dupes = df[df.duplicated(subset=[column], keep=False)]
@@ -105,7 +135,6 @@ def detect_duplicates(df: pd.DataFrame, column: str, label: str) -> List[Dict]:
 
 
 def calculate_omc_risk(anomalies_df: pd.DataFrame) -> List[Dict]:
-    """Aggregate anomalies by OMC and assign risk levels."""
     if anomalies_df.empty:
         return []
     omc_stats = anomalies_df.groupby('customer').agg({
@@ -119,7 +148,7 @@ def calculate_omc_risk(anomalies_df: pd.DataFrame) -> List[Dict]:
 
 
 # =============================================================================
-# CORE RECONCILIATION ENGINE (Works on DataFrames – CSV / DB / API)
+# CORE RECONCILIATION ENGINE
 # =============================================================================
 
 def run_reconciliation_on_dataframes(
@@ -128,26 +157,21 @@ def run_reconciliation_on_dataframes(
     payments_df: pd.DataFrame,
     materiality: float = MATERIALITY_THRESHOLD
 ) -> Dict:
-    """
-    Core reconciliation logic – pure function.
-    Accepts DataFrames, returns metrics + anomalies + data quality + FinTech extras.
-    """
     start_time = time.time()
     logger.info("🚀 Starting reconciliation on DataFrames...")
 
-    # --- 1. Copy to avoid mutation ---
     dispatches = dispatches_df.copy()
     invoices = invoices_df.copy()
     payments = payments_df.copy()
 
-    # --- 2. Clean dates ---
+    # Clean dates
     for col in ['date']:
         if col in dispatches.columns:
             dispatches[col] = pd.to_datetime(dispatches[col], errors='coerce')
         if col in invoices.columns:
             invoices[col] = pd.to_datetime(invoices[col], errors='coerce')
 
-    # --- 3. Dynamic column detection ---
+    # Detect columns
     customer_candidates = ['customer_name', 'customer', 'omc_id']
     customer_col = next((c for c in customer_candidates if c in dispatches.columns), None)
     if customer_col is None:
@@ -160,11 +184,11 @@ def run_reconciliation_on_dataframes(
 
     logger.info(f"👤 Customer column: '{customer_col}' | 💰 Value column: '{value_col}'")
 
-    # --- 4. Data quality ---
+    # Data quality
     quality_report = calculate_data_quality(dispatches, customer_col, value_col)
     logger.info(f"📊 Data quality score: {quality_report.quality_score}%")
 
-    # --- 5. Merge Dispatches → Invoices ---
+    # Merge Dispatches → Invoices
     merged = dispatches.merge(
         invoices,
         on='dispatch_id',
@@ -172,7 +196,7 @@ def run_reconciliation_on_dataframes(
         suffixes=('_disp', '_inv')
     )
 
-    # --- 6. Aggregate Payments (handle installments) ---
+    # Aggregate Payments
     if 'total_paid_kes' in payments.columns:
         payments_agg = payments
     else:
@@ -185,7 +209,7 @@ def run_reconciliation_on_dataframes(
         else:
             payments_agg = pd.DataFrame(columns=['invoice_id', 'total_paid_kes'])
 
-    # --- 7. Merge with payments ---
+    # Merge with payments
     if 'invoice_id' in merged.columns and 'invoice_id' in payments_agg.columns:
         merged = merged.merge(
             payments_agg[['invoice_id', 'total_paid_kes']],
@@ -197,7 +221,7 @@ def run_reconciliation_on_dataframes(
 
     merged['total_paid_kes'] = merged['total_paid_kes'].fillna(0)
 
-    # --- 8. Identify financial columns ---
+    # Financial columns
     disp_val_col = f'{value_col}_disp' if f'{value_col}_disp' in merged.columns else value_col
     inv_val_col = f'{value_col}_inv' if f'{value_col}_inv' in merged.columns else value_col
 
@@ -205,7 +229,7 @@ def run_reconciliation_on_dataframes(
     merged['invoiced_kes'] = merged[inv_val_col].fillna(0)
     merged['paid_kes'] = merged['total_paid_kes'].fillna(0)
 
-    # --- 9. Detect breaks (The Magic) ---
+    # Detect breaks
     merged['invoice_missing'] = merged['invoice_id'].isna()
     merged['diff_kes'] = merged['invoiced_kes'] - merged['paid_kes']
     merged['diff_abs'] = merged['diff_kes'].abs()
@@ -219,37 +243,37 @@ def run_reconciliation_on_dataframes(
     choices = ['Missing Invoice', 'Missing Payment', 'Underpayment', 'Overpayment']
     merged['break_type'] = np.select(conditions, choices, default='Reconciled')
 
-    # --- 10. Leakage calculation ---
+    # Leakage
     merged['leakage_kes'] = 0
     merged.loc[merged['break_type'] == 'Missing Invoice', 'leakage_kes'] = merged['dispatched_kes']
     merged.loc[merged['break_type'] == 'Missing Payment', 'leakage_kes'] = merged['invoiced_kes']
     merged.loc[merged['break_type'] == 'Underpayment', 'leakage_kes'] = merged['diff_kes']
     merged.loc[merged['break_type'] == 'Overpayment', 'leakage_kes'] = merged['diff_abs']
 
-    # --- 11. Age calculation ---
+    # Age (NaN-safe)
     today = datetime.now()
     if 'date_disp' in merged.columns:
         merged['age_days'] = (today - pd.to_datetime(merged['date_disp'])).dt.days
+        merged['age_days'] = merged['age_days'].fillna(0)
     else:
         merged['age_days'] = 0
 
-    # --- 12. Status with aging ---
+    # Status
     merged['status'] = 'Reconciled'
     merged.loc[merged['break_type'].isin(['Missing Invoice', 'Missing Payment']), 'status'] = 'Critical'
     merged.loc[(merged['break_type'] == 'Underpayment') & (merged['age_days'] > CRITICAL_AGE_DAYS), 'status'] = 'Critical'
     merged.loc[(merged['break_type'] == 'Underpayment') & (merged['age_days'] <= CRITICAL_AGE_DAYS), 'status'] = 'Pending'
     merged.loc[merged['break_type'] == 'Overpayment', 'status'] = 'Review Required'
 
-    # --- 13. Filter anomalies ---
+    # Filter anomalies
     anomalies_df = merged[merged['break_type'] != 'Reconciled'].copy()
     logger.info(f"🚨 Found {len(anomalies_df)} anomalies")
 
-    # --- 14. Apply Materiality Threshold ---
     if materiality > 0:
         anomalies_df = anomalies_df[anomalies_df['leakage_kes'] >= materiality]
         logger.info(f"🎯 Filtered by materiality (≥{materiality} KSh): {len(anomalies_df)} remaining")
 
-    # --- 15. Metrics ---
+    # Metrics
     total_disp = int(merged['dispatched_kes'].sum())
     total_inv = int(merged['invoiced_kes'].sum())
     total_pay = int(merged['paid_kes'].sum())
@@ -278,10 +302,9 @@ def run_reconciliation_on_dataframes(
         'review_count': len(anomalies_df[anomalies_df['status'] == 'Review Required'])
     }
 
-    # --- 16. Build anomalies list ---
+    # Build anomalies
     anomalies = []
     if not anomalies_df.empty:
-        # SAFE: Find customer column in merged DataFrame
         merged_customer_candidates = [
             'customer_name', 'customer', 'omc_id',
             'customer_name_disp', 'customer_name_inv',
@@ -304,9 +327,16 @@ def run_reconciliation_on_dataframes(
                     product_col = col
                     break
 
-        logger.info(f"📋 Anomalies customer column: '{merged_customer_col}'")
-
         for _, row in anomalies_df.iterrows():
+            age_val = row['age_days']
+            if pd.isna(age_val):
+                age_val = 0
+
+            if 'date_disp' in row and pd.notna(row['date_disp']):
+                created_at = row['date_disp'].strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
             anomalies.append({
                 'dispatch_id': row['dispatch_id'],
                 'invoice_id': row['invoice_id'] if not pd.isna(row['invoice_id']) else None,
@@ -320,13 +350,13 @@ def run_reconciliation_on_dataframes(
                 'status': row['status'],
                 'ebilling_status': 'Pending',
                 'ebilling_sync_date': None,
-                'age_days': int(row['age_days']),
-                'created_at': row['date_disp'].strftime('%Y-%m-%d %H:%M:%S') if 'date_disp' in row else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                'age_days': int(age_val),
+                'created_at': created_at
             })
 
     anomalies = sorted(anomalies, key=lambda x: x['leakage_kes'], reverse=True)
 
-    # --- 17. FinTech Extras ---
+    # Duplicates
     duplicate_anomalies = []
     if 'invoice_id' in invoices.columns:
         dup_invoices = detect_duplicates(invoices, 'invoice_id', 'Invoice')
@@ -337,7 +367,7 @@ def run_reconciliation_on_dataframes(
 
     omc_risk_profile = calculate_omc_risk(pd.DataFrame(anomalies) if anomalies else pd.DataFrame())
 
-    # --- 18. Performance ---
+    # Performance
     elapsed_time = round(time.time() - start_time, 2)
     performance = {
         'processing_time_seconds': elapsed_time,
@@ -345,7 +375,7 @@ def run_reconciliation_on_dataframes(
         'rows_per_second': round(len(merged) / elapsed_time, 2) if elapsed_time > 0 else 0
     }
 
-    return {
+    result = {
         'metrics': metrics,
         'anomalies': anomalies,
         'summary': {
@@ -377,21 +407,26 @@ def run_reconciliation_on_dataframes(
         'omc_risk_profile': omc_risk_profile
     }
 
+    # ---- JSON SANITIZER ----
+    return clean_json_values(result)
 
 # =============================================================================
-# DATABASE WRAPPER (For the existing /api/reconcile endpoint)
+# DATABASE WRAPPER
 # =============================================================================
 
 def run_reconciliation(materiality: float = MATERIALITY_THRESHOLD) -> Dict:
-    """
-    Load data from the SQLite database and run the core engine.
-    """
     try:
-        conn = sqlite3.connect(DB_PATH)
-        dispatches = pd.read_sql("SELECT * FROM dispatches", conn)
-        invoices = pd.read_sql("SELECT * FROM invoices", conn)
-        payments = pd.read_sql("SELECT * FROM payments", conn)
-        conn.close()
+        # --- Old SQLite-only connection (kept for reference) ---
+        # conn = sqlite3.connect(DB_PATH)
+        # dispatches = pd.read_sql("SELECT * FROM dispatches", conn)
+        # invoices = pd.read_sql("SELECT * FROM invoices", conn)
+        # payments = pd.read_sql("SELECT * FROM payments", conn)
+        # conn.close()
+
+        engine = get_engine()
+        dispatches = pd.read_sql("SELECT * FROM dispatches", engine)
+        invoices = pd.read_sql("SELECT * FROM invoices", engine)
+        payments = pd.read_sql("SELECT * FROM payments", engine)
         logger.info(f"📥 Loaded {len(dispatches)} dispatches, {len(invoices)} invoices, {len(payments)} payments from DB")
         return run_reconciliation_on_dataframes(dispatches, invoices, payments, materiality)
     except Exception as e:
