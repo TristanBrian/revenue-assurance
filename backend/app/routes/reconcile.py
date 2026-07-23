@@ -27,10 +27,21 @@ router = APIRouter()
 # shared cache between them, so a full page load that hits all three costs
 # the compute 3x. Acceptable trade-off for keeping each feature's visibility
 # independently gated without a caching layer.
+#
+# All three below are plain def, not async def: run_reconciliation() is a
+# synchronous, CPU-bound pandas pipeline over the full dataset (multi-second
+# even on this synthetic ~49k-row set). As async def, that blocks the whole
+# event loop for every concurrent request — across every user — for the
+# entire run; two of these firing together (e.g. the executive dashboard's
+# Promise.all of metrics + omc-risk-profile) serialize back-to-back on one
+# blocked loop and everything else queues behind them, which is exactly
+# what /reconcile/sync's own comment below already flags for the e-billing
+# path. FastAPI runs plain def routes in a threadpool automatically, which
+# keeps the event loop free for other requests while these run.
 # ============================================================================
 
 @router.post("/reconcile/metrics", response_model=MetricsResponse)
-async def reconcile_metrics(
+def reconcile_metrics(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     _: User = Depends(require_permission("view_metrics")),
 ):
@@ -53,7 +64,7 @@ async def reconcile_metrics(
 
 
 @router.get("/reconcile/anomalies", response_model=AnomalyTableResponse)
-async def reconcile_anomalies(
+def reconcile_anomalies(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     page: int = Query(1, description="Page number", ge=1),
     page_size: int = Query(20, description="Items per page", ge=1, le=100),
@@ -85,7 +96,7 @@ async def reconcile_anomalies(
 
 
 @router.get("/reconcile/omc-risk-profile", response_model=OmcRiskProfileResponse)
-async def reconcile_omc_risk_profile(
+def reconcile_omc_risk_profile(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     _: User = Depends(require_permission("view_omc_risk_profile")),
 ):
@@ -106,7 +117,7 @@ async def reconcile_omc_risk_profile(
 # ============================================================================
 
 @router.post("/reconcile/upload", response_model=ReconciliationUploadResponse)
-async def reconcile_upload(
+def reconcile_upload(
     dispatches_file: UploadFile = File(...),
     invoices_file: UploadFile = File(...),
     payments_file: UploadFile = File(...),
@@ -121,12 +132,18 @@ async def reconcile_upload(
     lists if the caller lacks view_anomaly_table / view_omc_risk_profile
     respectively — upload_csv alone doesn't imply visibility into those
     (e.g. Depot Supervisor can upload but shouldn't see the anomaly table).
+
+    Plain def, not async def, same reasoning as the block comment above —
+    run_reconciliation_on_dataframes() is the same synchronous pandas
+    pipeline. file.file.read() (the underlying SpooledTemporaryFile) is
+    used instead of the async UploadFile.read() since this handler no
+    longer has an event loop to await on.
     """
     try:
         # --- 1. Read CSVs ---
-        dispatches_df = pd.read_csv(io.StringIO((await dispatches_file.read()).decode('utf-8')))
-        invoices_df = pd.read_csv(io.StringIO((await invoices_file.read()).decode('utf-8')))
-        payments_df = pd.read_csv(io.StringIO((await payments_file.read()).decode('utf-8')))
+        dispatches_df = pd.read_csv(io.StringIO(dispatches_file.file.read().decode('utf-8')))
+        invoices_df = pd.read_csv(io.StringIO(invoices_file.file.read().decode('utf-8')))
+        payments_df = pd.read_csv(io.StringIO(payments_file.file.read().decode('utf-8')))
 
         # --- 2. Validate ---
         required_disp = ['dispatch_id', 'value_kes']
@@ -309,10 +326,13 @@ async def update_anomaly(
 
 
 @router.get("/reconcile/export")
-async def export_report(
+def export_report(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     _: User = Depends(require_permission("export_reports")),
 ):
+    # Plain def, not async def — same reasoning as the block comment above
+    # (run_reconciliation()) plus the ExcelWriter/openpyxl write itself,
+    # both synchronous and CPU-bound.
     try:
         result = run_reconciliation(materiality=materiality)
         output = io.BytesIO()

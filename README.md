@@ -200,6 +200,7 @@ python scripts/etl_pipeline.py        # loads to SQLite always, and to Postgres 
 
 alembic upgrade head                  # creates users/roles/permissions/user_roles/role_permissions
 python scripts/seed_roles.py          # seeds the roles + permissions in the README's Permission Mapping table above
+python scripts/seed_admin.py          # bootstraps the first system_admin (admin@yopmail.com / Admin@1234) — required before /api/auth/register works, since that route is itself gated behind manage_users
 python scripts/seed_demo_users.py     # seeds the 4 demo logins above
 
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

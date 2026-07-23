@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ApiError, reconcile } from "@/lib/api";
+import { ApiError, getMetrics, getOmcRiskProfile } from "@/lib/api";
 import type { Metrics, OmcRiskProfile as OmcRiskProfileEntry } from "@/lib/types";
 import BreakTypeBreakdown from "@/components/BreakTypeBreakdown";
 import OmcRiskProfile from "@/components/OmcRiskProfile";
@@ -36,11 +36,14 @@ function ExecutiveContent() {
   useEffect(() => {
     let cancelled = false;
 
-    reconcile(DEFAULT_MATERIALITY)
-      .then((data) => {
+    // Executive view needs both features; each is independently permissioned
+    // (view_metrics / view_omc_risk_profile) so they're fetched separately
+    // and joined here rather than via one bundled endpoint.
+    Promise.all([getMetrics(DEFAULT_MATERIALITY), getOmcRiskProfile(DEFAULT_MATERIALITY)])
+      .then(([metricsResult, riskProfile]) => {
         if (!cancelled) {
-          setMetrics(data.metrics);
-          setOmcRiskProfile(data.omc_risk_profile);
+          setMetrics(metricsResult.metrics);
+          setOmcRiskProfile(riskProfile);
         }
       })
       .catch((err: unknown) => {
@@ -125,7 +128,7 @@ function ExecutiveContent() {
 
 export default function ExecutivePage() {
   return (
-    <RequirePermission code="view_risk_profile">
+    <RequirePermission code="view_omc_risk_profile">
       <ExecutiveContent />
     </RequirePermission>
   );

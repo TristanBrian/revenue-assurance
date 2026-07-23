@@ -13,12 +13,12 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Overview" },
-  { href: "/dashboard/executive", label: "Executive Summary", anyOf: ["view_risk_profile"] },
-  { href: "/dashboard/anomalies", label: "Anomalies", anyOf: ["view_anomalies"] },
+  { href: "/dashboard/executive", label: "Executive Summary", anyOf: ["view_omc_risk_profile"] },
+  { href: "/dashboard/anomalies", label: "Anomalies", anyOf: ["view_anomaly_table"] },
   {
     href: "/dashboard/risk",
     label: "Risk & Fraud",
-    anyOf: ["view_heatmap", "view_risk_profile", "view_fraud_graph"],
+    anyOf: ["view_heatmap", "view_omc_risk_profile", "view_fraud_graph"],
   },
   { href: "/dashboard/upload", label: "Upload CSVs", anyOf: ["upload_csv"] },
   { href: "/dashboard/ebilling", label: "E-Billing", anyOf: ["manage_ebilling"] },
