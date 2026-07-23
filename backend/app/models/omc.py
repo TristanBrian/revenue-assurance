@@ -25,3 +25,6 @@ class OMC(Base):
     dispatches = relationship("Dispatch", back_populates="omc")
     invoices = relationship("Invoice", back_populates="omc")
     payments = relationship("Payment", back_populates="omc")
+    # No relationship() to QuotaLedger — see quota_ledger.py's docstring
+    # (no real FK to base a join on, deliberately, since omcs gets dropped
+    # and recreated by ETL every run).
