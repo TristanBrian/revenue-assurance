@@ -27,6 +27,29 @@ class RoleNotFoundError(Exception):
         super().__init__(f"Unknown role: {role_name}")
 
 
+# Ordered so more specific/longer keywords don't get shadowed by shorter
+# ones — e.g. "supervisor" must be checked before a hypothetical bare "s".
+# Callers pass free-text role names ("supervisor", "Depo", "MANAGER",
+# "revenue"), and we map that to the canonical role name seeded by
+# scripts/seed_roles.py rather than requiring an exact match.
+_ROLE_KEYWORDS: list[tuple[str, list[str]]] = [
+    ("depot_supervisor", ["depot_supervisor", "supervisor", "depot", "depo"]),
+    ("manager", ["manager", "mgr", "man"]),
+    ("revenue_assurance", ["revenue_assurance", "revenue", "assurance"]),
+]
+
+
+def normalize_role_name(raw: str) -> str:
+    """Maps loose free-text input to a canonical role name. Falls back to
+    the lowercased/trimmed input unchanged if nothing matches (e.g.
+    "system_admin"), so exact-match lookups downstream still work."""
+    cleaned = raw.strip().lower()
+    for canonical, keywords in _ROLE_KEYWORDS:
+        if any(kw in cleaned for kw in keywords):
+            return canonical
+    return cleaned
+
+
 class UserNotFoundError(Exception):
     def __init__(self, user_id: str):
         self.user_id = user_id
@@ -46,7 +69,7 @@ def register_user(db: Session, email: str, password: str, full_name: str | None,
     if db.query(User).filter(User.email == email).first():
         raise EmailAlreadyRegisteredError(email)
 
-    role = db.query(Role).filter(Role.name == role_name).first()
+    role = db.query(Role).filter(Role.name == normalize_role_name(role_name)).first()
     if not role:
         raise RoleNotFoundError(role_name)
 
@@ -97,7 +120,7 @@ def update_user(
         user.full_name = full_name
 
     if role_name is not None:
-        role = db.query(Role).filter(Role.name == role_name).first()
+        role = db.query(Role).filter(Role.name == normalize_role_name(role_name)).first()
         if not role:
             raise RoleNotFoundError(role_name)
         user.roles = [role]
