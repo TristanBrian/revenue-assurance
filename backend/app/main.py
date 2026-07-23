@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.response_envelope import ResponseEnvelopeMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin
+from app.routes import reconcile, e_billing, feed, heatmap, auth, graph
 from app.middleware.audit import AuditMiddleware
 from app.routes import audit
 from sqlalchemy import text
@@ -16,19 +15,20 @@ logger = logging.getLogger("kpc.startup")
 
 
 # ============================================================================
-# CREATE AUDIT TABLE ON STARTUP
+# CREATE AUDIT TABLE ON STARTUP (AUTOMATIC!)
 # ============================================================================
 def create_audit_table_if_not_exists():
     """Create the audit_logs table if it doesn't exist."""
     engine = get_engine()
     try:
         with engine.connect() as conn:
+            # Check if table exists (SQLite/PostgreSQL compatible)
             if engine.dialect.name == "sqlite":
                 result = conn.execute(text(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name='audit_logs'"
                 ))
                 exists = result.fetchone() is not None
-            else:
+            else:  # PostgreSQL
                 result = conn.execute(text(
                     "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='audit_logs')"
                 ))
@@ -69,12 +69,14 @@ def create_audit_table_if_not_exists():
 
 
 # ============================================================================
-# LIFESPAN
+# LIFESPAN (Runs on startup)
 # ============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Create audit table on startup
     create_audit_table_if_not_exists()
     
+    # Check database connection
     engine = get_engine()
     safe_url = engine.url.render_as_string(hide_password=True)
     try:
@@ -106,29 +108,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Response Envelope Middleware (remote)
-app.add_middleware(ResponseEnvelopeMiddleware)
-
-# Audit Middleware (yours)
+# Audit Middleware (auto-logs all API requests)
 app.add_middleware(AuditMiddleware)
 
-
-# ============================================================================
-# ROUTERS
-# ============================================================================
+# Include Routers
 app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
 app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
 app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
 app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
-app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])
-app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(graph.router, prefix="/api", tags=["Fraud Graph"])
 app.include_router(audit.router, prefix="/api", tags=["Audit"])
 
 
 # ============================================================================
-# ROOT, VERSION & HEALTH
+# ROOT & HEALTH
 # ============================================================================
 @app.get("/")
 async def root():
@@ -164,6 +158,9 @@ async def root():
 
 @app.get("/version")
 async def version():
+    """
+    Returns API version information for monitoring and CI/CD.
+    """
     return {
         "version": "2.0.0",
         "service": "kpc-revenue-assurance",
@@ -174,8 +171,12 @@ async def version():
 
 @app.get("/health")
 async def health_check():
+    """
+    Health check endpoint for monitoring and cloud deployments.
+    """
     db_status = "disconnected"
     start_time = time.time()
+    
     try:
         engine = get_engine()
         with engine.connect() as conn:
