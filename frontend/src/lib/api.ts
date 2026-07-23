@@ -79,6 +79,12 @@ export function templateUrl(fileType: TemplateType): string {
   return new URL(`/api/reconcile/template/${fileType}`, API_URL).toString();
 }
 
+export function exportUrl(materiality = 100000): string {
+  const url = new URL("/api/reconcile/export", API_URL);
+  url.searchParams.set("materiality", String(materiality));
+  return url.toString();
+}
+
 export async function getEbillingStatus(): Promise<EbillingIntegrationStatus> {
   const res = await fetch(new URL("/api/e-billing/status", API_URL));
   if (!res.ok) throw new ApiError(await parseErrorDetail(res), res.status);
