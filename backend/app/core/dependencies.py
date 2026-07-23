@@ -13,7 +13,7 @@ Usage in a route:
         ...
 """
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.orm import Session
 
@@ -21,7 +21,13 @@ from app.core.security import decode_access_token
 from app.models.user import User
 from app.utils.db_connection import SessionLocal  # adjust to match your existing session factory
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+# HTTPBearer (not OAuth2PasswordBearer) deliberately: you already have a
+# token from POST /api/auth/login, so Swagger's "Authorize" dialog should
+# just ask for that token to paste in — not re-run the whole username/
+# password (+ unused client_id/client_secret) OAuth2 password-flow form
+# for every other endpoint. /api/auth/login itself is unaffected — it still
+# takes OAuth2PasswordRequestForm directly, unrelated to this scheme.
+bearer_scheme = HTTPBearer()
 
 
 def get_db():
@@ -33,7 +39,7 @@ def get_db():
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     credentials_exception = HTTPException(
@@ -42,7 +48,7 @@ def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = decode_access_token(token)
+        payload = decode_access_token(credentials.credentials)
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
