@@ -81,8 +81,9 @@ async def root():
             "GET /api/detective/risk-features - OMC risk features (all OMCs)",
             "GET /api/detective/risk-features/{omc_id} - OMC risk features (single OMC)",
             "GET /api/detective/risk-features/export - Download risk features as CSV",
-            "GET /api/graph/network - OMC/depot network graph",
-            "GET /api/graph/communities - Detected risk communities",
+            "GET /api/graph - Anomaly-based fraud graph (OMC<->Depot leakage, Louvain communities)",
+            "GET /api/graph/network - OMC/depot structural network graph",
+            "GET /api/graph/communities - Detected risk communities (structural graph)",
             "GET /api/graph/omc/{omc_id} - Risk features + community info for one OMC",
             "GET /health - Health check"
         ]

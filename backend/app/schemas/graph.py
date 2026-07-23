@@ -1,14 +1,27 @@
 """
-Pydantic response schema for routes/graph.py.
+Pydantic response schemas for routes/graph.py — two coexisting graph
+features, each with its own schema set (no shared names):
 
-Note: there is no app/models/graph.py to mirror — like heatmap.py, this has
-no backing SQLAlchemy model (it's derived in-memory from reconciliation
-anomalies + the dispatches table, see app/services/graph_engine.py).
+- Anomaly-based fraud graph (GraphNode/GraphEdge/.../FraudGraphResponse):
+  OMC<->Depot leakage graph built from reconciliation anomalies, Louvain
+  via python-louvain. GET /api/graph. The frontend's types.ts mirrors this
+  shape directly — don't rename these.
+- OMC<->depot structural graph (OmcDepotNode/OmcDepotEdge/NetworkResponse/
+  CommunityOut): built from raw dispatch/omc/depot data (not anomalies),
+  Louvain via networkx's built-in community detection, scored via
+  detective_service. GET /api/graph/network, /communities, /omc/{omc_id}.
+
+Note: there is no app/models/graph.py to mirror either — like heatmap.py,
+neither has a backing SQLAlchemy model.
 """
 from typing import Optional
 
 from pydantic import BaseModel
 
+from app.schemas.detective import OmcRiskFeatures
+
+
+# --- Anomaly-based fraud graph (GET /api/graph) ------------------------------
 
 class GraphNode(BaseModel):
     id: str
@@ -58,32 +71,21 @@ class FraudGraphData(BaseModel):
 
 
 class FraudGraphResponse(BaseModel):
-    """GET /graph. 'message' is only present on the caught-exception error
-    path (status='error'), same convention as HeatmapResponse."""
+    """GET /api/graph. 'message' is only present on the caught-exception
+    error path (status='error'), same convention as HeatmapResponse."""
     status: str
     data: FraudGraphData
     message: Optional[str] = None
 
-"""
-Pydantic response schemas for routes/graph.py.
 
-Field lists match app/services/graph_engine.py's actual return shapes:
-build_omc_depot_graph() node/edge attributes and detect_risk_communities()'s
-per-community dict.
-"""
-from typing import Optional
+# --- OMC<->depot structural graph (GET /api/graph/network, /communities, /omc/{omc_id}) --
 
-from pydantic import BaseModel
-
-from app.schemas.detective import OmcRiskFeatures
-
-
-class GraphNode(BaseModel):
+class OmcDepotNode(BaseModel):
     id: str
     type: str  # "omc" | "depot"
 
 
-class GraphEdge(BaseModel):
+class OmcDepotEdge(BaseModel):
     source: str
     target: str
     # omc<->depot edges carry these two:
@@ -95,8 +97,8 @@ class GraphEdge(BaseModel):
 
 
 class NetworkResponse(BaseModel):
-    nodes: list[GraphNode]
-    edges: list[GraphEdge]
+    nodes: list[OmcDepotNode]
+    edges: list[OmcDepotEdge]
 
 
 class CommunityOut(BaseModel):
