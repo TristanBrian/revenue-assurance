@@ -137,11 +137,30 @@ class ReconciliationData(BaseModel):
 # RESPONSE SCHEMAS (WITH PAGINATION)
 # ============================================================================
 
-class ReconciliationResponse(BaseModel):
-    """POST /reconcile – returns reconciliation data with pagination."""
+class MetricsResponse(BaseModel):
+    """POST /reconcile/metrics – Executive Metrics feature (gated view_metrics).
+    Everything from ReconciliationData except the anomaly table and OMC risk
+    profile, which are gated separately and live in their own endpoints."""
     status: str
-    data: ReconciliationData
-    pagination: Pagination  # <-- Explicitly included
+    metrics: Metrics
+    summary: ReconciliationSummary
+    performance: PerformanceStats
+    data_quality: DataQuality
+    ebilling_status: ReconciliationEbillingStatus
+    duplicate_anomalies: list[DuplicateAnomaly]
+
+
+class AnomalyTableResponse(BaseModel):
+    """GET /reconcile/anomalies – Anomaly Table feature (gated view_anomaly_table)."""
+    status: str
+    anomalies: list[Anomaly]
+    pagination: Pagination
+
+
+class OmcRiskProfileResponse(BaseModel):
+    """GET /reconcile/omc-risk-profile – OMC Risk Profile feature (gated view_omc_risk_profile)."""
+    status: str
+    omc_risk_profile: list[OmcRiskProfile]
 
 
 class ReconciliationUploadResponse(BaseModel):

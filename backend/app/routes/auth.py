@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, get_db, require_permission
 from app.core.security import create_access_token, verify_password
 from app.models.user import User
-from app.schemas.user import LoginResponse, RegisterRequest, UserOut
+from app.schemas.user import LoginRequest, LoginResponse, RegisterRequest, UserOut
 from app.services.user_service import EmailAlreadyRegisteredError, RoleNotFoundError, register_user
 
 router = APIRouter()  # prefix="/api/auth" and tags=["Auth"] are supplied by main.py's include_router(), matching every other route file
@@ -40,10 +39,9 @@ def register(
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    """OAuth2 password flow: form fields are 'username' (=email) and 'password'."""
-    user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.hashed_password):
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == payload.email).first()
+    if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

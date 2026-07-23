@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph  # <-- ADDED feed, heatmap, auth, detective, graph
+from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin  # <-- ADDED feed, heatmap, auth, detective, graph, admin
 # import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
@@ -51,6 +51,7 @@ app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])  # <-- ADDED auth router
 app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
 app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])  # <-- NEW
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
 
 
 @app.get("/")
@@ -60,7 +61,9 @@ async def root():
         "status": "running",
         "version": "2.0.0",
         "endpoints": [
-            "POST /api/reconcile - Run reconciliation (DB)",
+            "POST /api/reconcile/metrics - Executive metrics (DB)",
+            "GET /api/reconcile/anomalies - Paginated anomaly table (DB)",
+            "GET /api/reconcile/omc-risk-profile - OMC risk profile (DB)",
             "POST /api/reconcile/upload - Run reconciliation (CSV Upload)",
             "POST /api/reconcile/sync - Sync anomalies to E-Billing",
             "POST /api/reconcile/update - Update anomaly status",
@@ -85,6 +88,9 @@ async def root():
             "GET /api/graph/network - OMC/depot structural network graph",
             "GET /api/graph/communities - Detected risk communities (structural graph)",
             "GET /api/graph/omc/{omc_id} - Risk features + community info for one OMC",
+            "GET /api/admin/users - List all users",
+            "PATCH /api/admin/users/{user_id} - Edit a user (email/name/role/password/is_active)",
+            "DELETE /api/admin/users/{user_id} - Delete a user",
             "GET /health - Health check"
         ]
     }
