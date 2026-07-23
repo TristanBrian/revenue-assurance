@@ -12,20 +12,26 @@ from app.models.user import User
 from app.models.role import Role
 from app.models.permission import Permission
 from app.models.omc import OMC
+from app.models.quota_ledger import QuotaLedger
 from app.models.depot import Depot
+from app.models.product import Product
 from app.models.dispatch import Dispatch
 from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.models.depot_ledger import DepotLedger
+from app.models.anomaly_resolution import AnomalyResolution
 
 __all__ = [
     "User",
     "Role",
     "Permission",
     "OMC",
+    "QuotaLedger",
     "Depot",
+    "Product",
     "Dispatch",
     "Invoice",
     "Payment",
     "DepotLedger",
+    "AnomalyResolution",
 ]
