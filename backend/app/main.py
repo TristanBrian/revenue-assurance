@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap, auth  # <-- ADDED feed, heatmap, auth
+from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph  # <-- ADDED feed, heatmap, auth, detective, graph
 # import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
@@ -49,6 +49,8 @@ app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
 app.include_router(feed.router, prefix="/api", tags=["Live Feed"])      # <-- NEW
 app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])  # <-- ADDED auth router
+app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
+app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])  # <-- NEW
 
 
 @app.get("/")
@@ -76,6 +78,12 @@ async def root():
             "GET /api/e-billing/monitor - Failure rate monitoring",
             "GET /api/feed - Live anomaly feed",          # <-- NEW
             "GET /api/heatmap - Leakage heatmap (OMC × Product)",  # <-- NEW
+            "GET /api/detective/risk-features - OMC risk features (all OMCs)",
+            "GET /api/detective/risk-features/{omc_id} - OMC risk features (single OMC)",
+            "GET /api/detective/risk-features/export - Download risk features as CSV",
+            "GET /api/graph/network - OMC/depot network graph",
+            "GET /api/graph/communities - Detected risk communities",
+            "GET /api/graph/omc/{omc_id} - Risk features + community info for one OMC",
             "GET /health - Health check"
         ]
     }
