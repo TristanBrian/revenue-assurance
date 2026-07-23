@@ -27,6 +27,7 @@ PERMISSIONS = [
     ("export_reports", "Export Excel/CSV reports"),
     ("view_fraud_graph", "View fraud/graph detection view (structural/network analysis)"),
     ("view_risk_analytics", "View OMC risk features (statistical/EDA analysis, no graph concept)"),
+    ("view_audit", "View the audit trail (who did what, when)"),
     ("manage_users", "Create, edit, deactivate users and assign roles to them"),
     ("manage_permissions", "Create/edit permissions and assign them to roles"),
 ]
@@ -44,6 +45,7 @@ PERMISSIONS = [
 # | Resolve/Review/Assign     | N | N | Y |
 # | E-Billing Sync            | N | N | Y |
 # | Export Reports            | N | Y | Y |
+# | Audit Trail               | N | N | Y |
 #
 # system_admin is scoped ONLY to user/permission control, not
 # revenue-assurance features.
@@ -74,6 +76,7 @@ ROLE_PERMISSIONS = {
         "export_reports",
         "view_fraud_graph",
         "view_risk_analytics",
+        "view_audit",
     ],
 }
 

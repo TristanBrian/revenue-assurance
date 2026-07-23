@@ -31,7 +31,7 @@ def edit_user(
     user_id: str,
     payload: UpdateUserRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("manage_users")),
+    admin: User = Depends(require_permission("manage_users")),
 ):
     try:
         return update_user(
@@ -42,6 +42,7 @@ def edit_user(
             role_name=payload.role_name,
             password=payload.password,
             is_active=payload.is_active,
+            actor_user_id=admin.id,
         )
     except UserNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")

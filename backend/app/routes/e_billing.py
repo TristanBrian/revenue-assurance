@@ -1,5 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, BackgroundTasks
-from app.core.dependencies import require_permission
+from sqlalchemy.orm import Session
+from app.core.dependencies import get_db, require_permission
+from app.models.user import User
+from app.services.audit_service import log_action
 from app.services.e_billing import (
     sync_invoices_to_ebilling,
     get_ebilling_status,
@@ -56,7 +59,8 @@ async def ebilling_status(_=Depends(require_permission("manage_ebilling"))):
 @router.post("/e-billing/sync", response_model=EBillingSyncResult)
 def sync_ebilling(
     invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending."),
-    _=Depends(require_permission("manage_ebilling")),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("manage_ebilling")),
 ):
     """Trigger synchronous sync of invoices.
 
@@ -69,6 +73,18 @@ def sync_ebilling(
     """
     try:
         result = sync_invoices_to_ebilling(invoice_ids)
+        # sync_invoices_to_ebilling() writes through its own raw-engine
+        # transaction (already committed by the time we get here), not
+        # this request's ORM session — so this commit is only for the
+        # audit row itself, not joint atomicity with the sync it describes.
+        log_action(
+            db,
+            actor_user_id=user.id,
+            action="ebilling.sync",
+            target_type="sync_task",
+            after=result,
+        )
+        db.commit()
         return result
     except Exception as e:
         logger.error(f"E-Billing sync error: {e}")
@@ -79,7 +95,8 @@ def sync_ebilling(
 async def sync_ebilling_async(
     background_tasks: BackgroundTasks,
     invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending."),
-    _=Depends(require_permission("manage_ebilling")),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("manage_ebilling")),
 ):
     """
     Trigger ASYNC sync of pending invoices.
@@ -88,6 +105,19 @@ async def sync_ebilling_async(
     try:
         task_id = str(uuid.uuid4())
         background_tasks.add_task(run_sync_task, task_id, invoice_ids)
+        # Logs the trigger, not the outcome — the actual sync runs later in
+        # the background task, outside this request/session entirely, so
+        # there's no result to record yet (poll /e-billing/task/{task_id}
+        # for that).
+        log_action(
+            db,
+            actor_user_id=user.id,
+            action="ebilling.sync",
+            target_type="sync_task",
+            target_id=task_id,
+            after={"status": "processing"},
+        )
+        db.commit()
         return {
             "status": "processing",
             "task_id": task_id,
@@ -122,7 +152,11 @@ async def ebilling_logs(
 
 
 @router.post("/e-billing/retry/{invoice_id}", response_model=EBillingRetryResponse)
-def retry_ebilling(invoice_id: str, _=Depends(require_permission("manage_ebilling"))):
+def retry_ebilling(
+    invoice_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("manage_ebilling")),
+):
     """Retry a failed sync for a specific invoice.
 
     Plain def, not async def: retry_failed_sync() -> sync_invoices_to_ebilling()
@@ -134,6 +168,18 @@ def retry_ebilling(invoice_id: str, _=Depends(require_permission("manage_ebillin
     """
     try:
         result = retry_failed_sync(invoice_id)
+        # Same caveat as /e-billing/sync: retry_failed_sync() commits
+        # through its own raw-engine transaction already, so this commit
+        # only covers the audit row.
+        log_action(
+            db,
+            actor_user_id=user.id,
+            action="ebilling.retry",
+            target_type="invoice",
+            target_id=invoice_id,
+            after=result,
+        )
+        db.commit()
         return result
     except Exception as e:
         logger.error(f"E-Billing retry error: {e}")

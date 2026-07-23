@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.security import hash_password
 from app.models.role import Role
 from app.models.user import User
+from app.services.audit_service import log_action
 
 
 class EmailAlreadyRegisteredError(Exception):
@@ -65,7 +66,14 @@ class LastSystemAdminError(Exception):
     pass
 
 
-def register_user(db: Session, email: str, password: str, full_name: str | None, role_name: str) -> User:
+def register_user(
+    db: Session,
+    email: str,
+    password: str,
+    full_name: str | None,
+    role_name: str,
+    actor_user_id=None,
+) -> User:
     if db.query(User).filter(User.email == email).first():
         raise EmailAlreadyRegisteredError(email)
 
@@ -80,6 +88,18 @@ def register_user(db: Session, email: str, password: str, full_name: str | None,
         roles=[role],
     )
     db.add(user)
+    # User.id's default=uuid.uuid4 is a column default, applied when the
+    # INSERT is emitted (flush time) — not at object construction — so
+    # user.id is still None here until this explicit flush populates it.
+    db.flush()
+    log_action(
+        db,
+        actor_user_id=actor_user_id,
+        action="user.create",
+        target_type="user",
+        target_id=str(user.id),
+        after={"email": email, "full_name": full_name, "role_name": role.name},
+    )
     db.commit()
     db.refresh(user)
     return user
@@ -108,28 +128,54 @@ def update_user(
     role_name: str | None = None,
     password: str | None = None,
     is_active: bool | None = None,
+    actor_user_id=None,
 ) -> User:
     user = _get_user_or_raise(db, user_id)
+
+    before = {}
+    after = {}
 
     if email is not None and email != user.email:
         if db.query(User).filter(User.email == email).first():
             raise EmailAlreadyRegisteredError(email)
+        before["email"] = user.email
         user.email = email
+        after["email"] = email
 
-    if full_name is not None:
+    if full_name is not None and full_name != user.full_name:
+        before["full_name"] = user.full_name
         user.full_name = full_name
+        after["full_name"] = full_name
 
     if role_name is not None:
         role = db.query(Role).filter(Role.name == normalize_role_name(role_name)).first()
         if not role:
             raise RoleNotFoundError(role_name)
-        user.roles = [role]
+        before_roles = [r.name for r in user.roles]
+        if before_roles != [role.name]:
+            before["roles"] = before_roles
+            user.roles = [role]
+            after["roles"] = [role.name]
 
     if password is not None:
         user.hashed_password = hash_password(password)
+        after["password"] = "changed"  # never log the actual password/hash
 
-    if is_active is not None:
+    if is_active is not None and is_active != user.is_active:
+        before["is_active"] = user.is_active
         user.is_active = is_active
+        after["is_active"] = is_active
+
+    if after:
+        log_action(
+            db,
+            actor_user_id=actor_user_id,
+            action="user.edit",
+            target_type="user",
+            target_id=str(user.id),
+            before=before or None,
+            after=after,
+        )
 
     db.commit()
     db.refresh(user)
@@ -152,5 +198,14 @@ def delete_user(db: Session, user_id: str, requesting_user_id) -> None:
         if remaining_admins == 0:
             raise LastSystemAdminError()
 
+    before = {"email": user.email, "full_name": user.full_name, "roles": [r.name for r in user.roles]}
+    log_action(
+        db,
+        actor_user_id=requesting_user_id,
+        action="user.delete",
+        target_type="user",
+        target_id=str(user.id),
+        before=before,
+    )
     db.delete(user)
     db.commit()
