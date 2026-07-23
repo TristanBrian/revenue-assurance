@@ -19,9 +19,52 @@ PIPELINE_TARIFF = 5.53
 STORAGE_TARIFF = 1000.00
 DEPOT_DISTANCES = {"Mombasa (KOSF)": 10, "Mombasa (Kipevu)": 5, "Nairobi": 450, "Kisumu": 650, "Eldoret": 700}
 OMC_NAMES = ["TotalEnergies Kenya", "Vivo Energy", "Rubis Energy", "Gulf Energy", "PetroOil Kenya", "Hashi Energy", "Kobil", "National Oil", "Dalbit Petroleum", "Tamoil", "Hass Petroleum", "Galana Energies", "Lake Oil", "Saudi Petroleum", "Mombasa Petroleum", "KPA Marine", "KAA Aviation", "Uganda National Oil", "Tanzania Petroleum", "Ethiopian Oil"]
-PRODUCTS = ["Petrol (PMS)", "Diesel (AGO)", "Kerosene (DPK)", "Jet A-1", "Heavy Fuel Oil", "LPG", "Lubricants"]
+# Bare product codes — PMS/AGO/DPK are the official KPC/EPRA fuel codes
+# (Premium Motor Spirit/Petrol, Automotive Gas Oil/Diesel, Dual Purpose
+# Kerosene/Kerosene). JETA1/HFO/LPG/LUB aren't part of that official set but
+# already exist in this generator (JETA1 and LPG are also the values used
+# by inject_fraud_ring() below) — see products.csv / PRODUCT_MASTER for the
+# full name + price of each. Matches products.product_id in app/models/product.py.
+PRODUCTS = ["PMS", "AGO", "DPK", "JETA1", "HFO", "LPG", "LUB"]
+
+# Product master data: (product_id, product_name, unit_price_kes).
+# Prices are illustrative placeholders for the 3 real fuel codes (Kenyan
+# pump prices fluctuate under EPRA's monthly cap, this is not a live
+# figure) — not used in any dispatch/invoice value calculation below, which
+# is all tariff-based, not priced-per-litre. The other 4 have no
+# established price basis in this dataset, so unit_price_kes is None.
+PRODUCT_MASTER = [
+    ("PMS", "Premium Motor Spirit (Petrol)", 182.00),
+    ("AGO", "Automotive Gas Oil (Diesel)", 168.00),
+    ("DPK", "Dual Purpose Kerosene (Kerosene)", 145.00),
+    ("JETA1", "Jet A-1", None),
+    ("HFO", "Heavy Fuel Oil", None),
+    ("LPG", "Liquefied Petroleum Gas", None),
+    ("LUB", "Lubricants", None),
+]
 DEPOTS = list(DEPOT_DISTANCES.keys())
 CONFIG = {"num_dispatches": 1200, "invoice_leak": 0.08, "payment_leak": 0.06, "underpay": 0.18, "installment": 0.30, "fraud_size": 3}
+
+def generate_product_master():
+    return pd.DataFrame(
+        [{'product_id': pid, 'product_name': name, 'unit_price_kes': price, 'is_active': True}
+         for pid, name, price in PRODUCT_MASTER]
+    )
+
+def generate_depot_master():
+    # depot_id reuses the DEPOT_DISTANCES keys as-is (e.g. "Nairobi",
+    # "Mombasa (KOSF)") — same natural-key treatment as products, matching
+    # what dispatches/depot_ledger.depot already store. Previously nothing
+    # populated the depots table at all (schema/ORM existed, no data ever
+    # loaded) — every consumer that reads it (e.g. graph_engine.py's
+    # build_omc_depot_graph) silently got zero depot rows as a result.
+    # capacity_litres is a placeholder (no real capacity data in this
+    # dataset); location is left unset for the same reason.
+    return pd.DataFrame(
+        [{'depot_id': depot_id, 'depot_name': depot_id, 'location': None,
+          'capacity_litres': random.randint(2000000, 8000000), 'is_active': True}
+         for depot_id in DEPOTS]
+    )
 
 def generate_omc_master():
     omcs = []
@@ -51,7 +94,7 @@ def generate_dispatches(omcs_df):
 
 def inject_fraud_ring(dispatches_df, omcs_df):
     fraud_omcs = omcs_df.sample(CONFIG["fraud_size"])['omc_id'].tolist()
-    weird_product = random.choice(["Jet A-1", "LPG"])
+    weird_product = random.choice(["JETA1", "LPG"])
     print(f"⚠️ Injecting Fraud: {fraud_omcs} -> {weird_product}")
     idxs = dispatches_df[dispatches_df['omc_id'].isin(fraud_omcs)].index
     for idx in random.sample(list(idxs), min(20, len(idxs))):
@@ -123,12 +166,16 @@ def generate_ledger(dispatches_df):
 
 if __name__ == "__main__":
     os.makedirs('data/raw', exist_ok=True)
+    products = generate_product_master()
+    depots = generate_depot_master()
     omcs = generate_omc_master()
     disp = generate_dispatches(omcs)
     disp = inject_fraud_ring(disp, omcs)
     inv = generate_invoices(disp)
     pay = generate_payments(inv)
     ledger = generate_ledger(disp)
+    products.to_csv('data/raw/products.csv', index=False)
+    depots.to_csv('data/raw/depots.csv', index=False)
     omcs.to_csv('data/raw/omcs.csv', index=False)
     disp.to_csv('data/raw/dispatches.csv', index=False)
     inv.to_csv('data/raw/invoices.csv', index=False)

@@ -20,6 +20,8 @@ def run_etl():
     if not os.path.exists(raw_dir):
         raise FileNotFoundError(f"Raw data folder '{raw_dir}' not found. Run generator first.")
     
+    raw_products = pd.read_csv(f'{raw_dir}/products.csv')
+    raw_depots = pd.read_csv(f'{raw_dir}/depots.csv')
     raw_omcs = pd.read_csv(f'{raw_dir}/omcs.csv')
     raw_disp = pd.read_csv(f'{raw_dir}/dispatches.csv')
     raw_inv = pd.read_csv(f'{raw_dir}/invoices.csv')
@@ -93,10 +95,12 @@ def run_etl():
     # 3. LOAD (SQLite dev / PostgreSQL prod, driven by DATABASE_URL)
     engine = get_engine()
 
+    raw_products.to_sql('products', engine, if_exists='replace', index=False)
+    raw_depots.to_sql('depots', engine, if_exists='replace', index=False)
+    raw_omcs.to_sql('omcs', engine, if_exists='replace', index=False)
     clean_disp_valid.to_sql('dispatches', engine, if_exists='replace', index=False)
     raw_inv.to_sql('invoices', engine, if_exists='replace', index=False)
     clean_payments.to_sql('payments', engine, if_exists='replace', index=False)  # Already aggregated!
-    raw_omcs.to_sql('omcs', engine, if_exists='replace', index=False)
     clean_ledger.to_sql('depot_ledger', engine, if_exists='replace', index=False)
 
     # Create indexes for performance (Person A will love this)
@@ -110,6 +114,8 @@ def run_etl():
     
     # Print summary for team
     print("\n📊 DATA SUMMARY:")
+    print(f"   Products: {len(raw_products)}")
+    print(f"   Depots: {len(raw_depots)}")
     print(f"   OMCs: {len(raw_omcs)}")
     print(f"   Valid Dispatches: {len(clean_disp_valid)}")
     print(f"   Invoices: {len(raw_inv)}")
