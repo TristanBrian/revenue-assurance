@@ -22,13 +22,15 @@ router = APIRouter()
 
 def _scope_and_paginate(result: dict, user: User, page: int, page_size: int) -> dict:
     """
-    /reconcile bundles line-item detail (anomalies, omc_risk_profile,
-    duplicate_anomalies) with aggregate metrics in one payload. Metrics/
-    summary/performance/data_quality are the "Executive Metrics" row in
-    the README's permission matrix — universal, every role sees them.
-    The detail rows are the "Anomaly Table" row — Manager/Revenue
-    Assurance only. There's no separate endpoint for the detail, so we
-    filter it out of the response here rather than in the frontend.
+    /reconcile bundles several line-item detail sections with aggregate
+    metrics in one payload. Metrics/summary/performance/data_quality are
+    the "Executive Metrics" row in the README's permission matrix —
+    universal, every role sees them. anomalies/duplicate_anomalies are the
+    "Anomaly Table" row (view_anomalies); omc_risk_profile is its own
+    "OMC Risk Profile" row (view_risk_profile) — a separate permission in
+    the matrix, even though today's seeded roles happen to grant both
+    together. There's no separate endpoint for either, so we filter them
+    out of the response here rather than in the frontend.
 
     Pagination is applied after permission scoping, so a caller without
     view_anomalies gets an empty page (total=0) rather than a real total
@@ -36,12 +38,12 @@ def _scope_and_paginate(result: dict, user: User, page: int, page_size: int) -> 
     """
     if user.has_permission("view_anomalies"):
         all_anomalies = result.get('anomalies', [])
-        omc_risk_profile = result.get('omc_risk_profile', [])
         duplicate_anomalies = result.get('duplicate_anomalies', [])
     else:
         all_anomalies = []
-        omc_risk_profile = []
         duplicate_anomalies = []
+
+    omc_risk_profile = result.get('omc_risk_profile', []) if user.has_permission("view_risk_profile") else []
 
     total = len(all_anomalies)
     total_pages = (total + page_size - 1) // page_size if total > 0 else 1
