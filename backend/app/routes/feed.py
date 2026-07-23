@@ -1,8 +1,10 @@
 # backend/app/routes/feed.py
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from app.services.feed import get_feed
 from app.services.reconciliation import run_reconciliation
 from app.schemas.feed import FeedResponse
+from app.core.dependencies import get_current_user
+from app.models.user import User
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,7 +13,10 @@ router = APIRouter()
 
 
 @router.get("/feed", response_model=FeedResponse)
-async def live_feed(limit: int = Query(20, description="Number of recent anomalies to return")):
+async def live_feed(
+    limit: int = Query(20, description="Number of recent anomalies to return"),
+    _user: User = Depends(get_current_user),
+):
     """
     Returns the latest anomalies for the live feed.
     If the cache is empty, runs reconciliation to populate it.

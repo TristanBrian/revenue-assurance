@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query, Body, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, BackgroundTasks
 from app.services.e_billing import (
     sync_invoices_to_ebilling,
     get_ebilling_status,
@@ -14,6 +14,8 @@ from app.services.e_billing import (
     get_pending_invoices_paginated,
     invalidate_total_count_cache
 )
+from app.core.dependencies import require_permission
+from app.models.user import User
 import uuid
 import logging
 
@@ -23,11 +25,11 @@ router = APIRouter()
 
 
 # ============================================================================
-# EXISTING ENDPOINTS 
+# EXISTING ENDPOINTS
 # ============================================================================
 
 @router.get("/e-billing/status")
-async def ebilling_status():
+async def ebilling_status(_user: User = Depends(require_permission("manage_ebilling"))):
     """Get E-Billing integration status."""
     try:
         status = get_ebilling_status()
@@ -39,7 +41,8 @@ async def ebilling_status():
 
 @router.post("/e-billing/sync")
 async def sync_ebilling(
-    invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending.")
+    invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending."),
+    _user: User = Depends(require_permission("manage_ebilling")),
 ):
     """Trigger synchronous sync of invoices."""
     try:
@@ -53,7 +56,8 @@ async def sync_ebilling(
 @router.post("/e-billing/sync/async")
 async def sync_ebilling_async(
     background_tasks: BackgroundTasks,
-    invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending.")
+    invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending."),
+    _user: User = Depends(require_permission("manage_ebilling")),
 ):
     """
     Trigger ASYNC sync of pending invoices.
@@ -73,8 +77,11 @@ async def sync_ebilling_async(
 
 
 @router.get("/e-billing/task/{task_id}")
-async def get_task(task_id: str):
-    """Get the status of a background sync task."""
+async def get_task(task_id: str, _user: User = Depends(require_permission("manage_ebilling"))):
+    """
+    Get the status of a background sync task.
+    Returns progress, status, and result if completed.
+    """
     status = get_task_status(task_id)
     if status.get("status") == "not_found":
         raise HTTPException(status_code=404, detail="Task not found")
@@ -83,7 +90,8 @@ async def get_task(task_id: str):
 
 @router.get("/e-billing/logs")
 async def ebilling_logs(
-    limit: int = Query(50, description="Number of log entries to return", ge=1, le=100)
+    limit: int = Query(50, description="Number of log entries to return", ge=1, le=100),
+    _user: User = Depends(require_permission("manage_ebilling")),
 ):
     """Get recent sync logs (capped at 100)."""
     try:
@@ -95,7 +103,7 @@ async def ebilling_logs(
 
 
 @router.post("/e-billing/retry/{invoice_id}")
-async def retry_ebilling(invoice_id: str):
+async def retry_ebilling(invoice_id: str, _user: User = Depends(require_permission("manage_ebilling"))):
     """Retry a failed sync for a specific invoice."""
     try:
         result = retry_failed_sync(invoice_id)
@@ -106,7 +114,7 @@ async def retry_ebilling(invoice_id: str):
 
 
 @router.get("/e-billing/pending")
-async def ebilling_pending():
+async def ebilling_pending(_user: User = Depends(require_permission("manage_ebilling"))):
     """Get list of pending invoice IDs (capped at 100 for performance)."""
     try:
         pending = get_pending_invoices()
@@ -132,7 +140,7 @@ async def kra_webhook(payload: dict = Body(...)):
 
 
 @router.get("/e-billing/reconcile")
-async def ebilling_reconcile():
+async def ebilling_reconcile(_user: User = Depends(require_permission("manage_ebilling"))):
     """Get E-Billing reconciliation dashboard data."""
     try:
         data = get_ebilling_reconciliation()
@@ -143,7 +151,7 @@ async def ebilling_reconcile():
 
 
 @router.get("/e-billing/monitor")
-async def ebilling_monitor():
+async def ebilling_monitor(_user: User = Depends(require_permission("manage_ebilling"))):
     """Get failure rate monitoring."""
     try:
         data = check_failure_rate()
@@ -160,7 +168,8 @@ async def ebilling_monitor():
 @router.get("/e-billing/logs/paginated")
 async def ebilling_logs_paginated(
     page: int = Query(1, description="Page number", ge=1),
-    page_size: int = Query(20, description="Items per page", ge=1, le=100)
+    page_size: int = Query(20, description="Items per page", ge=1, le=100),
+    _user: User = Depends(require_permission("manage_ebilling")),
 ):
     """
     Get paginated sync logs.
@@ -178,7 +187,8 @@ async def ebilling_logs_paginated(
 @router.get("/e-billing/pending/paginated")
 async def ebilling_pending_paginated(
     page: int = Query(1, description="Page number", ge=1),
-    page_size: int = Query(20, description="Items per page", ge=1, le=100)
+    page_size: int = Query(20, description="Items per page", ge=1, le=100),
+    _user: User = Depends(require_permission("manage_ebilling")),
 ):
     """
     Get paginated list of pending invoices with details.
@@ -194,7 +204,7 @@ async def ebilling_pending_paginated(
 
 
 @router.post("/e-billing/cache/refresh")
-async def refresh_ebilling_cache():
+async def refresh_ebilling_cache(_user: User = Depends(require_permission("manage_ebilling"))):
     """
     Manually refresh the total count cache.
     Useful after large sync operations.

@@ -152,6 +152,8 @@ graph TD
 
 | Templates | ✅ | ❌ | ✅ |
 
+This matrix is enforced on both sides now, not just documented: every backend route requires the matching `require_permission(...)` (see `app/core/dependencies.py`), and `backend/scripts/seed_roles.py` seeds these exact permissions per role. The frontend's dashboard (`frontend/src/app/dashboard/`) reads a logged-in user's `permissions` array from `/api/auth/me` to decide what to show — but that's UX only; the API 403s independently of what the frontend renders.
+
 ## Quick Start
 
 
@@ -163,19 +165,35 @@ graph TD
 
 
 
+### Demo logins
+
+Auth is real (JWT + RBAC, enforced on every route) — you need to log in. Both setup paths below seed the same four demo accounts automatically, so no one needs to ask a teammate for credentials:
+
+| Role | Email | Password |
+|---|---|---|
+| Depot Supervisor | `depot_supervisor@kpc-demo.co.ke` | `demo-pass-123` |
+| Manager | `manager@kpc-demo.co.ke` | `demo-pass-123` |
+| Revenue Assurance | `revenue_assurance@kpc-demo.co.ke` | `demo-pass-123` |
+| System Admin | `system_admin@kpc-demo.co.ke` | `demo-pass-123` |
+
+These are throwaway local-dev accounts seeded by `backend/scripts/seed_demo_users.py` — never point that script at a real deployment.
+
 ### With Docker
+
+Fully self-contained — includes its own Postgres container, runs migrations and seeds the demo accounts above automatically. Nothing to configure first.
 
 ```bash
 git clone git@github.com:TristanBrian/revenue-assurance.git
 cd revenue-assurance
+cp .env.example .env   # works as-is for local/demo use; regenerate SECRET_KEY (openssl rand -hex 32) for anything beyond that
 docker compose up --build
 ```
 
-Backend: [http://localhost:8000](http://localhost:8000) · Swagger docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+Backend: [http://localhost:8000](http://localhost:8000) · Swagger docs: [http://localhost:8000/docs](http://localhost:8000/docs) · Frontend: [http://localhost:3000](http://localhost:3000)
 
 ### Local development
 
-Backend:
+Auth requires PostgreSQL — `users`/`roles`/`permissions` use Postgres-native `UUID` columns, which SQLite has no type for. `backend/scripts/setup_local_postgres.sh` sets up a self-contained cluster with no sudo and no system Postgres config — safe to run even if you already have Postgres installed, since it uses its own port (5433) and doesn't touch anything else:
 
 ```bash
 cd backend
@@ -183,8 +201,15 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
+./scripts/setup_local_postgres.sh     # prints the DATABASE_URL to put in your repo-root .env
+# (edit .env, then continue)
+
 python scripts/generate_kpc_data.py   # generate synthetic CSVs
-python scripts/etl_pipeline.py        # build the SQLite database
+python scripts/etl_pipeline.py        # loads to SQLite always, and to Postgres too if DATABASE_URL is a postgresql:// URI
+
+alembic upgrade head                  # creates users/roles/permissions/user_roles/role_permissions
+python scripts/seed_roles.py          # seeds the roles + permissions in the README's Permission Mapping table above
+python scripts/seed_demo_users.py     # seeds the 4 demo logins above
 
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -198,14 +223,20 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-Frontend: [http://localhost:3000](http://localhost:3000)
+Frontend: [http://localhost:3000](http://localhost:3000) — redirects to `/login`, then to the role-appropriate dashboard.
 
 ## API Endpoints
 
 
 | Method | Endpoint                         | Description                                                           |
 | ------ | -------------------------------- | --------------------------------------------------------------------- |
-| POST   | `/api/reconcile`                 | Run reconciliation against the database — returns metrics + anomalies |
+| POST   | `/api/auth/register`             | Create a user (open, no auth — see the bootstrap note above)          |
+| POST   | `/api/auth/login`                | OAuth2 password flow — form fields `username` (email) + `password`    |
+| GET    | `/api/auth/me`                   | Current user's id/email/roles/permissions                             |
+| GET    | `/api/heatmap`                   | OMC × Product leakage matrix — `view_heatmap`                         |
+| GET    | `/api/graph`                     | OMC↔depot leakage graph + community detection — `view_fraud_graph`    |
+| GET    | `/api/feed`                      | Live anomaly feed (universal — any logged-in user)                    |
+| POST   | `/api/reconcile`                 | Run reconciliation against the database — returns metrics + anomalies (anomaly detail requires `view_anomalies`, everything else is universal) |
 | POST   | `/api/reconcile/upload`          | Run reconciliation against uploaded CSVs                              |
 | POST   | `/api/reconcile/sync`            | Sync anomalies to E-Billing                                           |
 | POST   | `/api/reconcile/update`          | Resolve/update an anomaly                                             |
@@ -328,7 +359,7 @@ Note: `MATERIALITY_THRESHOLD`, `CRITICAL_AGE_DAYS`, and the KRA endpoint/key are
 
 ## Project Status
 
-See [PROGRESS.md](./PROGRESS.md) for the current state of frontend/backend integration. In short: all 5 phases are complete — reconciliation dashboard, CSV upload, the E-Billing panel, Excel export, and the fraud graph (backend + frontend) are all wired to live data and manually verified end-to-end. CI (GitHub Actions) runs backend tests and frontend lint/typecheck/build on every push/PR to `main`.
+See [PROGRESS.md](./PROGRESS.md) for the current state of frontend/backend integration. In short: all 7 phases are complete — reconciliation dashboard, CSV upload, the E-Billing panel, Excel export, the fraud graph, and RBAC (backend enforcement + a role-based multi-dashboard frontend, replacing the single page that used to show every feature to every visitor) are all wired to live data and manually verified end-to-end as all 3 roles. CI (GitHub Actions) runs backend tests and frontend lint/typecheck/build on every push/PR to `main`.
 
 ## License
 

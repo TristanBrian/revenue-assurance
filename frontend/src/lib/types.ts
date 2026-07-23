@@ -209,3 +209,42 @@ export interface FraudGraphData {
     top_risk_entities: TopRiskEntity[];
   };
 }
+
+// Mirrors backend/app/schemas/user.py — the response shapes for /api/auth/*.
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  full_name: string | null;
+  roles: string[];
+  permissions: string[];
+}
+
+// Mirrors backend/app/schemas/feed.py.
+export interface FeedData {
+  anomalies: Anomaly[];
+  last_updated: string | null;
+  total_count: number;
+}
+
+// Mirrors UpdateAnomalyResponse in backend/app/schemas/reconciliation.py.
+export interface UpdateAnomalyResponse {
+  status: string;
+  message: string;
+  dispatch_id: string;
+  new_status: string;
+  timestamp: string;
+}
+
+// Mirrors backend/app/schemas/heatmap.py.
+export interface HeatmapData {
+  data: number[][];
+  omcs: string[];
+  products: string[];
+  total_leakage: number;
+}
