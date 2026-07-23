@@ -1,6 +1,7 @@
 # backend/app/routes/heatmap.py
 from fastapi import APIRouter, Query
 from app.services.heatmap import get_heatmap_data
+from app.schemas.heatmap import HeatmapResponse
 import logging
 
 logger = logging.getLogger(__name__)
@@ -8,7 +9,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/heatmap")
+@router.get("/heatmap", response_model=HeatmapResponse)
 async def heatmap(materiality: float = Query(0, description="Min leakage to include")):
     """
     Returns leakage heatmap data: OMC × Product matrix.
