@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, Query, Body, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, BackgroundTasks
+from app.core.dependencies import require_permission
 from app.services.e_billing import (
     sync_invoices_to_ebilling,
     get_ebilling_status,
@@ -14,6 +15,21 @@ from app.services.e_billing import (
     get_pending_invoices_paginated,
     invalidate_total_count_cache
 )
+from app.schemas.e_billing import (
+    EBillingStatusResponse,
+    EBillingSyncResult,
+    EBillingAsyncSyncResponse,
+    EBillingTaskStatus,
+    EBillingLogsResponse,
+    EBillingLogsPaginatedResponse,
+    EBillingRetryResponse,
+    EBillingPendingResponse,
+    EBillingPendingPaginatedResponse,
+    EBillingWebhookResponse,
+    EBillingReconciliationResponse,
+    EBillingMonitorResponse,
+    EBillingCacheRefreshResponse,
+)
 import uuid
 import logging
 
@@ -23,11 +39,11 @@ router = APIRouter()
 
 
 # ============================================================================
-#  ENDPOINTS
+# EXISTING ENDPOINTS
 # ============================================================================
 
-@router.get("/e-billing/status")
-async def ebilling_status():
+@router.get("/e-billing/status", response_model=EBillingStatusResponse)
+async def ebilling_status(_=Depends(require_permission("manage_ebilling"))):
     """Get E-Billing integration status."""
     try:
         status = get_ebilling_status()
@@ -37,11 +53,20 @@ async def ebilling_status():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/e-billing/sync")
-async def sync_ebilling(
-    invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending.")
+@router.post("/e-billing/sync", response_model=EBillingSyncResult)
+def sync_ebilling(
+    invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending."),
+    _=Depends(require_permission("manage_ebilling")),
 ):
-    """Trigger synchronous sync of invoices."""
+    """Trigger synchronous sync of invoices.
+
+    Plain def, not async def: sync_invoices_to_ebilling() calls
+    call_kra_api(), which sleeps synchronously (time.sleep, not
+    asyncio.sleep) per invoice plus retry backoff. As async def, that
+    blocks the entire event loop for every concurrent request across
+    every user until this one finishes. FastAPI runs plain def routes in
+    a threadpool automatically, which keeps the event loop free.
+    """
     try:
         result = sync_invoices_to_ebilling(invoice_ids)
         return result
@@ -50,10 +75,11 @@ async def sync_ebilling(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/e-billing/sync/async")
+@router.post("/e-billing/sync/async", response_model=EBillingAsyncSyncResponse)
 async def sync_ebilling_async(
     background_tasks: BackgroundTasks,
-    invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending.")
+    invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending."),
+    _=Depends(require_permission("manage_ebilling")),
 ):
     """
     Trigger ASYNC sync of pending invoices.
@@ -72,8 +98,8 @@ async def sync_ebilling_async(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/e-billing/task/{task_id}")
-async def get_task(task_id: str):
+@router.get("/e-billing/task/{task_id}", response_model=EBillingTaskStatus)
+async def get_task(task_id: str, _=Depends(require_permission("manage_ebilling"))):
     """Get the status of a background sync task."""
     status = get_task_status(task_id)
     if status.get("status") == "not_found":
@@ -81,9 +107,10 @@ async def get_task(task_id: str):
     return status
 
 
-@router.get("/e-billing/logs")
+@router.get("/e-billing/logs", response_model=EBillingLogsResponse)
 async def ebilling_logs(
-    limit: int = Query(50, description="Number of log entries to return", ge=1, le=100)
+    limit: int = Query(50, description="Number of log entries to return", ge=1, le=100),
+    _=Depends(require_permission("manage_ebilling")),
 ):
     """Get recent sync logs (capped at 100)."""
     try:
@@ -94,9 +121,17 @@ async def ebilling_logs(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/e-billing/retry/{invoice_id}")
-async def retry_ebilling(invoice_id: str):
-    """Retry a failed sync for a specific invoice."""
+@router.post("/e-billing/retry/{invoice_id}", response_model=EBillingRetryResponse)
+def retry_ebilling(invoice_id: str, _=Depends(require_permission("manage_ebilling"))):
+    """Retry a failed sync for a specific invoice.
+
+    Plain def, not async def: retry_failed_sync() -> sync_invoices_to_ebilling()
+    calls call_kra_api(), which sleeps synchronously (time.sleep, not
+    asyncio.sleep) plus retry backoff. As async def, that blocks the
+    entire event loop for every concurrent request across every user
+    until this one finishes. FastAPI runs plain def routes in a
+    threadpool automatically, which keeps the event loop free.
+    """
     try:
         result = retry_failed_sync(invoice_id)
         return result
@@ -105,8 +140,8 @@ async def retry_ebilling(invoice_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/e-billing/pending")
-async def ebilling_pending():
+@router.get("/e-billing/pending", response_model=EBillingPendingResponse)
+async def ebilling_pending(_=Depends(require_permission("manage_ebilling"))):
     """Get list of pending invoice IDs (capped at 100 for performance)."""
     try:
         pending = get_pending_invoices()
@@ -120,7 +155,7 @@ async def ebilling_pending():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/e-billing/webhook")
+@router.post("/e-billing/webhook", response_model=EBillingWebhookResponse)
 async def kra_webhook(payload: dict = Body(...)):
     """Simulate KRA's webhook callback."""
     try:
@@ -131,8 +166,8 @@ async def kra_webhook(payload: dict = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/e-billing/reconcile")
-async def ebilling_reconcile():
+@router.get("/e-billing/reconcile", response_model=EBillingReconciliationResponse)
+async def ebilling_reconcile(_=Depends(require_permission("manage_ebilling"))):
     """Get E-Billing reconciliation dashboard data."""
     try:
         data = get_ebilling_reconciliation()
@@ -142,8 +177,8 @@ async def ebilling_reconcile():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/e-billing/monitor")
-async def ebilling_monitor():
+@router.get("/e-billing/monitor", response_model=EBillingMonitorResponse)
+async def ebilling_monitor(_=Depends(require_permission("manage_ebilling"))):
     """Get failure rate monitoring."""
     try:
         data = check_failure_rate()
@@ -154,13 +189,14 @@ async def ebilling_monitor():
 
 
 # ============================================================================
-# PAGINATED ENDPOINTS
+# PAGINATED ENDPOINTS (NEW – Production-Ready)
 # ============================================================================
 
-@router.get("/e-billing/logs/paginated")
+@router.get("/e-billing/logs/paginated", response_model=EBillingLogsPaginatedResponse)
 async def ebilling_logs_paginated(
     page: int = Query(1, description="Page number", ge=1),
-    page_size: int = Query(20, description="Items per page", ge=1, le=100)
+    page_size: int = Query(20, description="Items per page", ge=1, le=100),
+    _=Depends(require_permission("manage_ebilling")),
 ):
     """
     Get paginated sync logs.
@@ -175,10 +211,11 @@ async def ebilling_logs_paginated(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/e-billing/pending/paginated")
+@router.get("/e-billing/pending/paginated", response_model=EBillingPendingPaginatedResponse)
 async def ebilling_pending_paginated(
     page: int = Query(1, description="Page number", ge=1),
-    page_size: int = Query(20, description="Items per page", ge=1, le=100)
+    page_size: int = Query(20, description="Items per page", ge=1, le=100),
+    _=Depends(require_permission("manage_ebilling")),
 ):
     """
     Get paginated list of pending invoices with details.
@@ -193,8 +230,8 @@ async def ebilling_pending_paginated(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/e-billing/cache/refresh")
-async def refresh_ebilling_cache():
+@router.post("/e-billing/cache/refresh", response_model=EBillingCacheRefreshResponse)
+async def refresh_ebilling_cache(_=Depends(require_permission("manage_ebilling"))):
     """
     Manually refresh the total count cache.
     Useful after large sync operations.
@@ -204,32 +241,4 @@ async def refresh_ebilling_cache():
         return {'status': 'success', 'message': 'Cache invalidated'}
     except Exception as e:
         logger.error(f"Cache refresh error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ============================================================================
-# Sync Status Summary
-# ============================================================================
-
-@router.get("/e-billing/sync-status")
-async def ebilling_sync_status():
-    """
-    Get a quick summary of the current sync status.
-    Returns counts for frontend progress display.
-    """
-    try:
-        status = get_ebilling_status()
-        return {
-            'status': 'success',
-            'data': {
-                'total_invoices': status['total_invoices'],
-                'synced': status['synced_count'],
-                'pending': status['pending_count'],
-                'failed': status['failed_count'],
-                'synced_percentage': round((status['synced_count'] / status['total_invoices']) * 100, 2) if status['total_invoices'] > 0 else 0,
-                'last_sync': status['last_sync']
-            }
-        }
-    except Exception as e:
-        logger.error(f"Sync status error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -22,7 +22,8 @@ from functools import wraps
 import uuid
 from typing import Dict, Any, Optional, List
 from sqlalchemy import text
-from app.utils.db_connection import get_engine
+from app.utils.db_connection import get_engine, SessionLocal
+from app.models.anomaly_resolution import AnomalyResolution
 
 logger = logging.getLogger(__name__)
 
@@ -374,6 +375,28 @@ def sync_anomalies_to_ebilling(anomalies: list) -> dict:
 
 
 def update_anomaly_status(dispatch_id: str, status: str, notes: str = '') -> dict:
+    """
+    Persists resolution status via the ORM (SessionLocal), unlike the rest
+    of this file's raw engine/text() upserts — this is a single-record
+    CRUD by primary key, not a bulk sync operation, so the ORM is a more
+    natural fit here. Opens and closes its own session, same self-contained
+    resource-lifecycle convention the rest of this file's functions use
+    with engine.begin()/engine.connect() (no db/connection is threaded in
+    from the route).
+    """
+    db = SessionLocal()
+    try:
+        resolution = db.query(AnomalyResolution).filter(AnomalyResolution.dispatch_id == dispatch_id).first()
+        if resolution:
+            resolution.status = status
+            resolution.notes = notes
+        else:
+            resolution = AnomalyResolution(dispatch_id=dispatch_id, status=status, notes=notes)
+            db.add(resolution)
+        db.commit()
+    finally:
+        db.close()
+
     return {
         'status': 'success',
         'message': f'Anomaly {dispatch_id} updated to {status}',
