@@ -25,70 +25,58 @@ Faker.seed(42)
 random.seed(42)
 np.random.seed(42)
 
-# --- GLOBAL CONFIGURATION & CONSTANTS ---
-CONFIG = {
-    "num_dispatches": 50000,
-    "unmetered_loading_leak": 0.03,  # Loading events with missing/bypassed dispatch
-    "dispatch_loading_skew": 0.05,   # Discrepancy between physical loaded vs dispatch volumes
-    "invoice_leak": 0.08,            # Dispatches that are never invoiced
-    "payment_leak": 0.06,            # Invoices that receive no payments
-    "underpay_rate": 0.18,           # Payments that are less than invoice value
-    "installment_rate": 0.30,        # Payments split into multiple transactions
-    "fraud_ring_size": 3,            # OMCs involved in anomalous high-volume patterns
-}
+# --- CONSTANTS ---
+PIPELINE_TARIFF = 5.53
+STORAGE_TARIFF = 1000.00
+DEPOT_DISTANCES = {"Mombasa (KOSF)": 10, "Mombasa (Kipevu)": 5, "Nairobi": 450, "Kisumu": 650, "Eldoret": 700}
+OMC_NAMES = ["TotalEnergies Kenya", "Vivo Energy", "Rubis Energy", "Gulf Energy", "PetroOil Kenya", "Hashi Energy", "Kobil", "National Oil", "Dalbit Petroleum", "Tamoil", "Hass Petroleum", "Galana Energies", "Lake Oil", "Saudi Petroleum", "Mombasa Petroleum", "KPA Marine", "KAA Aviation", "Uganda National Oil", "Tanzania Petroleum", "Ethiopian Oil"]
+# Bare product codes — PMS/AGO/DPK are the official KPC/EPRA fuel codes
+# (Premium Motor Spirit/Petrol, Automotive Gas Oil/Diesel, Dual Purpose
+# Kerosene/Kerosene). JETA1/HFO/LPG/LUB aren't part of that official set but
+# already exist in this generator (JETA1 and LPG are also the values used
+# by inject_fraud_ring() below) — see products.csv / PRODUCT_MASTER for the
+# full name + price of each. Matches products.product_id in app/models/product.py.
+PRODUCTS = ["PMS", "AGO", "DPK", "JETA1", "HFO", "LPG", "LUB"]
 
-DEPOT_DISTANCES_KM = {
-    "Mombasa (KOSF)": 10,
-    "Mombasa (Kipevu)": 5,
-    "Nairobi": 450,
-    "Kisumu": 650,
-    "Eldoret": 700,
-}
-
-OMC_NAMES = [
-    "TotalEnergies Kenya", "Vivo Energy", "Rubis Energy", "Gulf Energy",
-    "PetroOil Kenya", "Hashi Energy", "Kobil", "National Oil",
-    "Dalbit Petroleum", "Tamoil", "Hass Petroleum", "Galana Energies",
-    "Lake Oil", "Texol Energies", "Mombasa Petroleum", "KPA Marine",
-    "KAA Aviation", "Uganda National Oil", "Tanzania Petroleum", "Ethiopian Oil"
+# Product master data: (product_id, product_name, unit_price_kes).
+# Prices are illustrative placeholders for the 3 real fuel codes (Kenyan
+# pump prices fluctuate under EPRA's monthly cap, this is not a live
+# figure) — not used in any dispatch/invoice value calculation below, which
+# is all tariff-based, not priced-per-litre. The other 4 have no
+# established price basis in this dataset, so unit_price_kes is None.
+PRODUCT_MASTER = [
+    ("PMS", "Premium Motor Spirit (Petrol)", 182.00),
+    ("AGO", "Automotive Gas Oil (Diesel)", 168.00),
+    ("DPK", "Dual Purpose Kerosene (Kerosene)", 145.00),
+    ("JETA1", "Jet A-1", None),
+    ("HFO", "Heavy Fuel Oil", None),
+    ("LPG", "Liquefied Petroleum Gas", None),
+    ("LUB", "Lubricants", None),
 ]
+DEPOTS = list(DEPOT_DISTANCES.keys())
+CONFIG = {"num_dispatches": 1200, "invoice_leak": 0.08, "payment_leak": 0.06, "underpay": 0.18, "installment": 0.30, "fraud_size": 3}
 
-PRODUCTS = [
-    "Petrol (PMS)", "Diesel (AGO)", "Kerosene (DPK)",
-    "Jet A-1", "Heavy Fuel Oil", "LPG", "Lubricants"
-]
+def generate_product_master():
+    return pd.DataFrame(
+        [{'product_id': pid, 'product_name': name, 'unit_price_kes': price, 'is_active': True}
+         for pid, name, price in PRODUCT_MASTER]
+    )
 
-# --- 1. GENERATE TARIFF MASTER (SCD TYPE 2) ---
-def generate_tariff_master():
-    """Generates tariff schedule with versioned rate changes over time."""
-    tariffs = []
-    # Rate Schedule 2025
-    for product in PRODUCTS:
-        for depot in DEPOT_DISTANCES_KM.keys():
-            tariffs.append({
-                'tariff_id': f"TRF-2025-{hash(product+depot)%10000:04d}",
-                'product': product,
-                'depot': depot,
-                'pipeline_tariff_per_m3_km': 5.53,
-                'storage_tariff_per_m3_day': 1000.00,
-                'effective_start': '2025-01-01',
-                'effective_end': '2025-12-31'
-            })
-    # Adjusted Rate Schedule 2026 (5% Tariff Revision)
-    for product in PRODUCTS:
-        for depot in DEPOT_DISTANCES_KM.keys():
-            tariffs.append({
-                'tariff_id': f"TRF-2026-{hash(product+depot)%10000:04d}",
-                'product': product,
-                'depot': depot,
-                'pipeline_tariff_per_m3_km': round(5.53 * 1.05, 2),
-                'storage_tariff_per_m3_day': round(1000.00 * 1.05, 2),
-                'effective_start': '2026-01-01',
-                'effective_end': '2026-12-31'
-            })
-    return pd.DataFrame(tariffs)
+def generate_depot_master():
+    # depot_id reuses the DEPOT_DISTANCES keys as-is (e.g. "Nairobi",
+    # "Mombasa (KOSF)") — same natural-key treatment as products, matching
+    # what dispatches/depot_ledger.depot already store. Previously nothing
+    # populated the depots table at all (schema/ORM existed, no data ever
+    # loaded) — every consumer that reads it (e.g. graph_engine.py's
+    # build_omc_depot_graph) silently got zero depot rows as a result.
+    # capacity_litres is a placeholder (no real capacity data in this
+    # dataset); location is left unset for the same reason.
+    return pd.DataFrame(
+        [{'depot_id': depot_id, 'depot_name': depot_id, 'location': None,
+          'capacity_litres': random.randint(2000000, 8000000), 'is_active': True}
+         for depot_id in DEPOTS]
+    )
 
-# --- 2. GENERATE OMC MASTER ---
 def generate_omc_master():
     """Generates customer master records."""
     omcs = []
@@ -187,9 +175,9 @@ def generate_loading_and_dispatches(omcs_df, tariffs_df):
 
 # --- 4. INJECT FRAUD PATTERNS ---
 def inject_fraud_ring(dispatches_df, omcs_df):
-    """Injects high-volume product substitution anomalies into targeted OMC accounts."""
-    fraud_omcs = omcs_df.sample(CONFIG["fraud_ring_size"])['omc_id'].tolist()
-    weird_product = random.choice(["Jet A-1", "LPG"])
+    fraud_omcs = omcs_df.sample(CONFIG["fraud_size"])['omc_id'].tolist()
+    weird_product = random.choice(["JETA1", "LPG"])
+    print(f"⚠️ Injecting Fraud: {fraud_omcs} -> {weird_product}")
     idxs = dispatches_df[dispatches_df['omc_id'].isin(fraud_omcs)].index
     
     for idx in random.sample(list(idxs), min(25, len(idxs))):
@@ -348,46 +336,20 @@ def inject_messiness(df, date_col=None, float_col=None):
 
 # --- MAIN EXECUTION PIPELINE ---
 if __name__ == "__main__":
-    output_dir = 'data/raw'
-    os.makedirs(output_dir, exist_ok=True)
-    print("⏳ Starting Synthetic Data Generation for KPC Revenue Assurance...")
-
-    # Step 1: Base Entities
-    tariffs_df = generate_tariff_master()
-    omcs_df = generate_omc_master()
-
-    # Step 2: Physical & Commercial Loading/Dispatches
-    loading_df, dispatches_df = generate_loading_and_dispatches(omcs_df, tariffs_df)
-    dispatches_df = inject_fraud_ring(dispatches_df, omcs_df)
-
-    # Step 3: Order-to-Cash Invoicing & Payments
-    invoices_df = generate_invoices(dispatches_df)
-    payments_df = generate_payments(invoices_df)
-
-    # Step 4: Physical Tank Inventory Ledger
-    inventory_df = generate_depot_inventory(dispatches_df)
-
-    # Step 5: Messiness Injection
-    loading_messy = inject_messiness(loading_df, date_col='loading_timestamp')
-    dispatches_messy = inject_messiness(dispatches_df, date_col='date', float_col='value_kes')
-    invoices_messy = inject_messiness(invoices_df, date_col='date', float_col='value_kes')
-    payments_messy = inject_messiness(payments_df, date_col='date', float_col='value_kes')
-    inventory_messy = inject_messiness(inventory_df, date_col='date')
-
-    # Step 6: Export CSV Files
-    tariffs_df.to_csv(f'{output_dir}/tariffs.csv', index=False)
-    omcs_df.to_csv(f'{output_dir}/omcs.csv', index=False)
-    loading_messy.to_csv(f'{output_dir}/depot_loading_logs.csv', index=False)
-    dispatches_messy.to_csv(f'{output_dir}/dispatches.csv', index=False)
-    invoices_messy.to_csv(f'{output_dir}/invoices.csv', index=False)
-    payments_messy.to_csv(f'{output_dir}/payments.csv', index=False)
-    inventory_messy.to_csv(f'{output_dir}/depot_daily_inventory.csv', index=False)
-
-    print(f" Raw synthetic CSV datasets successfully created in '{output_dir}/':")
-    print("  - tariffs.csv (Tariff Master & Rates)")
-    print("  - omcs.csv (OMC Master)")
-    print("  - depot_loading_logs.csv (Physical Loading Bay Events)")
-    print("  - dispatches.csv (Commercial Waybills)")
-    print("  - invoices.csv (Financial Invoices)")
-    print("  - payments.csv (Payment Remittances)")
-    print("  - depot_daily_inventory.csv (Physical Tank Dips & Balances)")
+    os.makedirs('data/raw', exist_ok=True)
+    products = generate_product_master()
+    depots = generate_depot_master()
+    omcs = generate_omc_master()
+    disp = generate_dispatches(omcs)
+    disp = inject_fraud_ring(disp, omcs)
+    inv = generate_invoices(disp)
+    pay = generate_payments(inv)
+    ledger = generate_ledger(disp)
+    products.to_csv('data/raw/products.csv', index=False)
+    depots.to_csv('data/raw/depots.csv', index=False)
+    omcs.to_csv('data/raw/omcs.csv', index=False)
+    disp.to_csv('data/raw/dispatches.csv', index=False)
+    inv.to_csv('data/raw/invoices.csv', index=False)
+    pay.to_csv('data/raw/payments.csv', index=False)
+    ledger.to_csv('data/raw/depot_ledger.csv', index=False)
+    print("✅ Raw CSVs generated in data/raw/")
