@@ -75,17 +75,6 @@ ROLE_PERMISSIONS = {
         "view_fraud_graph",
         "view_risk_analytics",
     ],
-    "revenue_assurance": [
-        "upload_csv",
-        "view_heatmap",
-        "view_risk_profile",
-        "view_anomalies",
-        "view_audit",
-        "export_reports",
-        "resolve_anomaly",
-        "manage_ebilling",
-        "view_fraud_graph",
-    ],
 }
 
 ROLE_DESCRIPTIONS = {
