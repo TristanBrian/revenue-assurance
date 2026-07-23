@@ -6,6 +6,7 @@ import type { ReconcileResult } from "@/lib/types";
 import MetricCards from "@/components/MetricCards";
 import AnomalyTable from "@/components/AnomalyTable";
 import CsvUploadPanel from "@/components/CsvUploadPanel";
+import EbillingPanel from "@/components/EbillingPanel";
 
 const DEFAULT_MATERIALITY = 100000;
 
@@ -144,6 +145,10 @@ export default function Home() {
         )}
 
         <CsvUploadPanel materiality={materiality} onUploaded={handleUploaded} />
+
+        <hr className="border-zinc-200 dark:border-zinc-800" />
+
+        <EbillingPanel />
       </main>
     </div>
   );
