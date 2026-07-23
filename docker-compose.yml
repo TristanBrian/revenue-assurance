@@ -1,20 +1,23 @@
-version: '3.8'
-
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: kpc-backend
-    ports:
-      - "8000:8000"
+    # Host networking (Linux only): container shares the host's network namespace,
+    # so DATABASE_URL's "localhost:5432" in .env resolves to the host's actual
+    # Postgres — same as running the app outside Docker. Avoids widening Postgres's
+    # listen_addresses/pg_hba.conf just for local dev. `ports:` is a no-op under
+    # host networking (the app binds directly to the host's port), so it's dropped.
+    network_mode: host
     volumes:
       - ./backend:/app
       - ./backend/data:/app/data
       - /app/__pycache__  # Ignore cache
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
-      - DATABASE_URL=sqlite:///./app/kpc.db
     command: >
       sh -c "python scripts/generate_kpc_data.py &&
              python scripts/etl_pipeline.py &&
