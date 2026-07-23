@@ -31,7 +31,17 @@ function statusClass(status: Anomaly["status"]): string {
   }
 }
 
-export default function AnomalyTable({ anomalies }: { anomalies: Anomaly[] }) {
+export default function AnomalyTable({
+  anomalies,
+  onResolve,
+  resolvingId,
+}: {
+  anomalies: Anomaly[];
+  /** When provided, renders a "Resolve" action column — omit to hide it
+   * (e.g. for roles without resolve_anomaly permission). */
+  onResolve?: (dispatchId: string) => void;
+  resolvingId?: string | null;
+}) {
   const [sortKey, setSortKey] = useState<SortKey>("leakage_kes");
   const [sortDesc, setSortDesc] = useState(true);
 
@@ -86,6 +96,7 @@ export default function AnomalyTable({ anomalies }: { anomalies: Anomaly[] }) {
             <th className="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">
               Status
             </th>
+            {onResolve && <th className="px-4 py-2" />}
           </tr>
         </thead>
         <tbody>
@@ -106,6 +117,18 @@ export default function AnomalyTable({ anomalies }: { anomalies: Anomaly[] }) {
                   {a.status}
                 </span>
               </td>
+              {onResolve && (
+                <td className="px-4 py-2">
+                  <button
+                    type="button"
+                    onClick={() => onResolve(a.dispatch_id)}
+                    disabled={resolvingId === a.dispatch_id}
+                    className="rounded bg-zinc-900 px-2 py-1 text-xs text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900"
+                  >
+                    {resolvingId === a.dispatch_id ? "Resolving…" : "Resolve"}
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
