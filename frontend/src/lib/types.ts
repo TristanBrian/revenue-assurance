@@ -207,9 +207,6 @@ export interface GraphNode {
   anomaly_count: number;
   community: number;
   risk_level: RiskLevel;
-  // Optional layout coordinates returned by the graph builder (0..1 range)
-  x_coord?: number;
-  y_coord?: number;
 }
 
 export interface GraphEdge {

@@ -34,6 +34,32 @@ function riskBadgeClass(risk: GraphNode["risk_level"]): string {
   }
 }
 
+// Same rose/amber/emerald triad as riskFillClass/riskBadgeClass, as hex —
+// used for edge strokes and the high-risk halo, where SVG needs a real
+// color value rather than a Tailwind fill class.
+function riskHex(risk: GraphNode["risk_level"]): string {
+  switch (risk) {
+    case "High":
+      return "#f43f5e";
+    case "Medium":
+      return "#f59e0b";
+    default:
+      return "#10b981";
+  }
+}
+
+const RISK_RANK: Record<GraphNode["risk_level"], number> = {
+  High: 2,
+  Medium: 1,
+  Low: 0,
+};
+
+// An edge's color follows the worse-risk endpoint, so the busiest/riskiest
+// leakage flows read as a heatmap at a glance instead of uniform indigo.
+function edgeRiskColor(a: GraphNode["risk_level"], b: GraphNode["risk_level"]): string {
+  return riskHex(RISK_RANK[a] >= RISK_RANK[b] ? a : b);
+}
+
 interface HoverState {
   node: GraphNode;
   x: number;
@@ -76,19 +102,69 @@ export default function FraudGraph() {
   const WIDTH = 680;
   const HEIGHT = 460;
 
-  // Simple Force-Directed layout mapping
+  // The backend never returns per-node coordinates, so lay nodes out
+  // deterministically here: all OMC nodes on one outer ring, and depot
+  // nodes clustered on a small ring at the canvas center. OMCs are ordered
+  // around the ring by risk severity (High first) so risky accounts cluster
+  // into a contiguous, scannable arc instead of falling in random order.
   const laidOutNodes = useMemo(() => {
     if (!graph) return [];
 
-    // Seed positions deterministically using layout coordinates
-    const nodes = graph.nodes.map((n) => ({
-      ...n,
-      x: (n.x_coord ?? 0.5) * (WIDTH - 120) + 60,
-      y: (n.y_coord ?? 0.5) * (HEIGHT - 120) + 60,
-      r: n.type === "depot" ? 10 : 8,
-    }));
+    const centerX = WIDTH / 2;
+    const centerY = HEIGHT / 2;
+    const omcRadius = Math.min(WIDTH, HEIGHT) / 2 - 70;
 
-    return nodes;
+    const omcNodes = [...graph.nodes]
+      .filter((n) => n.type === "omc")
+      .sort(
+        (a, b) =>
+          RISK_RANK[b.risk_level] - RISK_RANK[a.risk_level] ||
+          b.leakage_kes - a.leakage_kes,
+      );
+    const depotNodes = [...graph.nodes]
+      .filter((n) => n.type !== "omc")
+      .sort((a, b) => b.leakage_kes - a.leakage_kes);
+    const depotRadius =
+      depotNodes.length > 1 ? Math.min(60, 16 + depotNodes.length * 6) : 0;
+
+    const positions = new Map<string, { x: number; y: number }>();
+
+    omcNodes.forEach((n, i) => {
+      const angle = (i / Math.max(omcNodes.length, 1)) * 2 * Math.PI;
+      positions.set(n.id, {
+        x: centerX + omcRadius * Math.cos(angle),
+        y: centerY + omcRadius * Math.sin(angle),
+      });
+    });
+
+    depotNodes.forEach((n, i) => {
+      const angle = (i / Math.max(depotNodes.length, 1)) * 2 * Math.PI;
+      positions.set(n.id, {
+        x: centerX + depotRadius * Math.cos(angle),
+        y: centerY + depotRadius * Math.sin(angle),
+      });
+    });
+
+    // Radius encodes leakage magnitude (area-proportional via sqrt), scaled
+    // within each node type separately — depot totals aggregate many OMCs'
+    // leakage, so a shared scale would flatten OMC-to-OMC differences.
+    const maxOmcLeakage = Math.max(1, ...omcNodes.map((n) => n.leakage_kes));
+    const maxDepotLeakage = Math.max(1, ...depotNodes.map((n) => n.leakage_kes));
+
+    return graph.nodes.map((n) => {
+      const pos = positions.get(n.id) ?? { x: centerX, y: centerY };
+      const isDepot = n.type === "depot";
+      const base = isDepot ? 9 : 6;
+      const extra = isDepot ? 9 : 13;
+      const maxLeakage = isDepot ? maxDepotLeakage : maxOmcLeakage;
+      const t = Math.sqrt(Math.max(0, n.leakage_kes) / maxLeakage);
+      return {
+        ...n,
+        x: pos.x,
+        y: pos.y,
+        r: base + extra * t,
+      };
+    });
   }, [graph]);
 
   const nodeById = useMemo(() => {
@@ -101,13 +177,18 @@ export default function FraudGraph() {
     return Math.min(Math.max(weight * 2.2, 1.2), 6.5);
   }
 
-  // Label only top nodes by default
+  // Label the top-5 by leakage, plus every High-risk node — an investigator
+  // scanning for fraud should never have to hover to find a red node's name.
   const topLabelIds = useMemo(() => {
     if (!graph) return new Set<string>();
     const sorted = [...graph.nodes].sort(
       (a, b) => b.leakage_kes - a.leakage_kes,
     );
-    return new Set(sorted.slice(0, 5).map((n) => n.id));
+    const ids = new Set(sorted.slice(0, 5).map((n) => n.id));
+    graph.nodes.forEach((n) => {
+      if (n.risk_level === "High") ids.add(n.id);
+    });
+    return ids;
   }, [graph]);
 
   function handleNodeEnter(node: GraphNode, e: React.MouseEvent) {
@@ -143,20 +224,20 @@ export default function FraudGraph() {
       : [];
 
   return (
-    <section className="flex flex-col gap-5 bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm relative text-zinc-850 dark:text-zinc-100">
+    <section className="flex flex-col gap-5 bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm relative text-zinc-800 dark:text-zinc-100">
       <div>
         <h2 className="text-base font-bold text-zinc-900 dark:text-white">
           Fraud Graph — OMC × Depot Leakage Clusters
         </h2>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mt-1">
-          Visual network representing dispatches between OMCs and depots. Color
-          groupings indicate communities parsed by the Louvain Community
-          Detection algorithm.
+          OMCs ring the depots at the center of the network. Node size scales
+          with leakage value, node/edge color with risk severity — the
+          biggest, reddest shapes are where to look first.
         </p>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-4 text-sm text-red-650 dark:text-red-300">
+        <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-4 text-sm text-red-600 dark:text-red-300">
           {error}
         </div>
       )}
@@ -176,14 +257,14 @@ export default function FraudGraph() {
       {graph && !loading && graph.nodes.length > 0 && (
         <>
           {/* Legend and stats */}
-          <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-850 rounded-lg p-3">
+          <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3">
             <span className="flex items-center gap-1.5 font-medium">
               <svg width="10" height="10">
                 <circle
                   cx="5"
                   cy="5"
                   r="5"
-                  className="fill-zinc-500 dark:fill-zinc-450"
+                  className="fill-zinc-500 dark:fill-zinc-400"
                 />
               </svg>
               OMC (Circle)
@@ -194,7 +275,7 @@ export default function FraudGraph() {
                   width="10"
                   height="10"
                   rx="2"
-                  className="fill-zinc-500 dark:fill-zinc-450"
+                  className="fill-zinc-500 dark:fill-zinc-400"
                 />
               </svg>
               Depot (Square)
@@ -207,9 +288,18 @@ export default function FraudGraph() {
             </span>
             <span className="flex items-center gap-1.5 font-medium">
               <svg width="10" height="10">
+                <circle cx="5" cy="5" r="5" className="fill-amber-500" />
+              </svg>
+              Medium Risk
+            </span>
+            <span className="flex items-center gap-1.5 font-medium">
+              <svg width="10" height="10">
                 <circle cx="5" cy="5" r="5" className="fill-rose-500" />
               </svg>
               High Risk
+            </span>
+            <span className="flex items-center gap-1.5 font-medium text-zinc-400 dark:text-zinc-500">
+              Size = leakage value
             </span>
           </div>
 
@@ -235,6 +325,10 @@ export default function FraudGraph() {
                     !selectedId ||
                     edge.source === selectedId ||
                     edge.target === selectedId;
+                  const color = edgeRiskColor(
+                    source.risk_level,
+                    target.risk_level,
+                  );
 
                   return (
                     <line
@@ -243,12 +337,12 @@ export default function FraudGraph() {
                       y1={source.y}
                       x2={target.x}
                       y2={target.y}
-                      stroke={isHighlighted ? "#6366f1" : "currentColor"}
+                      stroke={isHighlighted ? color : "currentColor"}
                       strokeWidth={strokeWidthFor(edge.weight)}
-                      strokeOpacity={isHighlighted ? 0.75 : 0.15}
+                      strokeOpacity={isHighlighted ? 0.7 : 0.15}
                       className={`transition-all duration-300 ${
                         isHighlighted
-                          ? "text-indigo-500"
+                          ? ""
                           : "text-zinc-200 dark:text-zinc-800"
                       }`}
                     />
@@ -285,6 +379,20 @@ export default function FraudGraph() {
                         r={Math.max(node.r, 12) + 8}
                         fill="transparent"
                       />
+
+                      {/* Subtle attention halo for High-risk nodes — a
+                          secondary cue beyond fill color, so severity is
+                          legible even without color vision. */}
+                      {node.risk_level === "High" && !isDimmed && (
+                        <circle
+                          cx={node.x}
+                          cy={node.y}
+                          r={node.r + 6}
+                          fill="#f43f5e"
+                          fillOpacity={0.18}
+                          className="animate-pulse pointer-events-none"
+                        />
+                      )}
 
                       {node.type === "omc" ? (
                         <circle
@@ -328,7 +436,7 @@ export default function FraudGraph() {
                           x={node.x}
                           y={node.y + node.r + 13}
                           textAnchor="middle"
-                          className="fill-zinc-650 dark:fill-zinc-300 text-[10px] font-bold tracking-wide pointer-events-none"
+                          className="fill-zinc-600 dark:fill-zinc-300 text-[10px] font-bold tracking-wide pointer-events-none"
                         >
                           {node.label}
                         </text>
@@ -357,7 +465,7 @@ export default function FraudGraph() {
                       {formatKes(hover.node.leakage_kes)}
                     </span>
                   </div>
-                  <p className="text-[10px] text-zinc-450 dark:text-zinc-500 font-semibold">
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-semibold">
                     {hover.node.anomaly_count} active anomalies
                   </p>
                 </div>
