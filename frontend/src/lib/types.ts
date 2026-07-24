@@ -9,7 +9,7 @@ export type BreakType =
   | "Overpayment"
   | "Reconciled";
 
-export type AnomalyStatus = "Critical" | "Pending" | "Review Required";
+export type AnomalyStatus = "Critical" | "Pending" | "Review Required" | "Resolved";
 
 export interface Metrics {
   total_dispatched_kes: number;
