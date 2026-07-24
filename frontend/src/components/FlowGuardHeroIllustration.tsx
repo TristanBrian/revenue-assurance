@@ -93,40 +93,26 @@ export default function FlowGuardHeroIllustration({
           }
         `}</style>
 
-        {/* Pipeline 1: Cyan/Blue flow (Flows up to avoid the centered login card, then joins back to center) */}
-        <path d="M -50,230 L 380,230 C 420,230 440,90 480,90 L 770,90 C 810,90 830,230 870,230 L 1250,230" stroke="rgba(255,255,255,0.03)" strokeWidth="10" strokeLinecap="round" />
-        <path d="M -50,230 L 380,230 C 420,230 440,90 480,90 L 770,90 C 810,90 830,230 870,230 L 1250,230" stroke={C.cyan} strokeWidth="2.2" strokeLinecap="round" className="flow-line-cyan" filter={`url(#${id}-glow)`} />
+        {/* Pipeline 1: Cyan/Blue flow (Flows at Y=150 in the middle, running below header but above login card) */}
+        <path d="M -50,230 L 380,230 C 420,230 440,150 480,150 L 770,150 C 810,150 830,230 870,230 L 1250,230" stroke="rgba(255,255,255,0.03)" strokeWidth="10" strokeLinecap="round" />
+        <path d="M -50,230 L 380,230 C 420,230 440,150 480,150 L 770,150 C 810,150 830,230 870,230 L 1250,230" stroke={C.cyan} strokeWidth="2.2" strokeLinecap="round" className="flow-line-cyan" filter={`url(#${id}-glow)`} />
 
-        {/* Pipeline 2: Emerald/Green flow (Flows down to avoid the centered login card, then joins back to center) */}
-        <path d="M -50,290 L 380,290 C 420,290 440,430 480,430 L 770,430 C 810,430 830,290 870,290 L 1250,290" stroke="rgba(255,255,255,0.04)" strokeWidth="8" strokeLinecap="round" />
-        <path d="M -50,290 L 380,290 C 420,290 440,430 480,430 L 770,430 C 810,430 830,290 870,290 L 1250,290" stroke={C.emerald} strokeWidth="1.8" strokeLinecap="round" className="flow-line-emerald" filter={`url(#${id}-glow)`} />
+        {/* Pipeline 2: Emerald/Green flow (Flows at Y=370 in the middle, running below login card) */}
+        <path d="M -50,290 L 380,290 C 420,290 440,370 480,370 L 770,370 C 810,370 830,290 870,290 L 1250,290" stroke="rgba(255,255,255,0.04)" strokeWidth="8" strokeLinecap="round" />
+        <path d="M -50,290 L 380,290 C 420,290 440,370 480,370 L 770,370 C 810,370 830,290 870,290 L 1250,290" stroke={C.emerald} strokeWidth="1.8" strokeLinecap="round" className="flow-line-emerald" filter={`url(#${id}-glow)`} />
 
-        {/* Pipeline 3: Bottom Dark Blue flow (Shifted downward to create vertical room for tagline) */}
-        <path d="M -50,435 L 200,435 C 240,435 260,495 300,495 L 980,495 C 1020,495 1040,375 1080,375 L 1250,375" stroke="rgba(255,255,255,0.03)" strokeWidth="6" strokeLinecap="round" />
-        <path d="M -50,435 L 200,435 C 240,435 260,495 300,495 L 980,495 C 1020,495 1040,375 1080,375 L 1250,375" stroke={C.blue} strokeWidth="1.6" strokeLinecap="round" className="flow-line-blue" filter={`url(#${id}-glow)`} />
+        {/* Pipeline 3: Bottom Dark Blue flow (Slightly adjusted downward to prevent tagline overlaps) */}
+        <path d="M -50,420 L 200,420 C 240,420 260,480 300,480 L 980,480 C 1020,480 1040,360 1080,360 L 1250,360" stroke="rgba(255,255,255,0.03)" strokeWidth="6" strokeLinecap="round" />
+        <path d="M -50,420 L 200,420 C 240,420 260,480 300,480 L 980,480 C 1020,480 1040,360 1080,360 L 1250,360" stroke={C.blue} strokeWidth="1.6" strokeLinecap="round" className="flow-line-blue" filter={`url(#${id}-glow)`} />
 
-        {/* Tagline text centered between the Green stream (Y=430) and bottom Blue stream (Y=495) */}
-        <text 
-          x="600" 
-          y="466" 
-          textAnchor="middle" 
-          fill="#a1a1aa" 
-          style={{ 
-            fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-            fontSize: "12.5px",
-            fontWeight: "600",
-            letterSpacing: "0.04em"
-          }}
-        >
-          Detect, Reconcile, Predict, Protect every transaction.
-        </text>
+
 
         {/* Junction points */}
         <circle cx="380" cy="230" r="3" fill="white" />
         <circle cx="380" cy="290" r="3" fill="white" />
         <circle cx="870" cy="230" r="3" fill="white" />
         <circle cx="870" cy="290" r="3" fill="white" />
-        <circle cx="980" cy="495" r="3" fill="white" />
+        <circle cx="980" cy="480" r="3" fill="white" />
       </g>
     </svg>
   );
