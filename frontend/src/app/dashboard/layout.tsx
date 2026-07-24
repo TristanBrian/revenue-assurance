@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { getMetrics, getOmcRiskProfile, getEbillingStatus } from "@/lib/api";
 import { MaterialityProvider, useMateriality } from "@/context/MaterialityContext";
+import { useTheme } from "@/context/ThemeContext";
+import { BRAND_CONFIG } from "@/lib/brand-config";
 
 interface NavItem {
   href: string;
@@ -94,6 +96,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { materiality } = useMateriality();
   const pathname = usePathname();
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
 
   // Badges state
   const [anomalyCount, setAnomalyCount] = useState<number>(0);
@@ -136,21 +139,35 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex min-h-full flex-1 bg-zinc-950 text-zinc-100">
+    <div className="flex min-h-full flex-1 bg-white dark:bg-zinc-950 text-zinc-800 dark:text-zinc-100 transition-colors duration-250">
       {/* Sidebar navigation panel */}
-      <aside className="flex w-56 shrink-0 flex-col border-r border-zinc-900 bg-zinc-950 p-4 transition-all duration-300">
+      <aside className="flex w-56 shrink-0 flex-col border-r border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 p-4 transition-all duration-200">
         
-        {/* Logo matching the mockup */}
+        {/* Brand Logo & Title */}
         <div className="flex items-center gap-2 mb-6">
-          <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center font-bold text-black text-lg shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-            $
+          <div 
+            className="w-7 h-7 rounded flex items-center justify-center font-bold text-white text-xs shadow-md relative shrink-0"
+            style={{ backgroundColor: BRAND_CONFIG.primaryColor }}
+          >
+            <span className="font-black text-[10px]">F</span>
+            <div 
+              className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-zinc-50 dark:border-zinc-950"
+              style={{ backgroundColor: BRAND_CONFIG.accentColor }}
+            ></div>
           </div>
           <div>
-            <h1 className="text-sm font-bold tracking-tight text-white uppercase leading-none">
-              KPC Revenue
+            <h1 
+              className="text-sm font-extrabold tracking-tight uppercase leading-none"
+              style={{ color: BRAND_CONFIG.primaryColor }}
+            >
+              {BRAND_CONFIG.companyName}
             </h1>
-            <span className="text-[8px] text-zinc-500 font-bold uppercase tracking-wider block mt-0.5">
-              Assurance Platform
+            <span className="text-[8px] text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider block mt-0.5 leading-tight">
+              {BRAND_CONFIG.systemName.split(" ").map((word, idx) => (
+                <span key={idx} className="block">
+                  {word}
+                </span>
+              ))}
             </span>
           </div>
         </div>
@@ -172,8 +189,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 className={`flex items-center justify-between rounded px-3 py-2 text-xs font-semibold tracking-wide transition-all duration-150 ${
                   active
-                    ? "bg-zinc-900 text-white"
-                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/30"
+                    ? "bg-zinc-200 dark:bg-zinc-900 text-zinc-900 dark:text-white"
+                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-200/50 dark:hover:bg-zinc-900/30"
                 }`}
               >
                 <div className="flex items-center">
@@ -203,6 +220,45 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </span>
         </div>
 
+        {/* Theme Selector Widget */}
+        <div className="mt-4 border-t border-zinc-900 pt-4 flex flex-col gap-1.5">
+          <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">
+            Theme Mode
+          </span>
+          <div className="grid grid-cols-3 gap-1 bg-zinc-950/80 p-0.5 border border-zinc-900 rounded">
+            <button
+              onClick={() => setTheme("light")}
+              className={`py-1 text-[10px] font-semibold rounded text-center transition-all ${
+                theme === "light"
+                  ? "bg-zinc-900 text-white"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              Light
+            </button>
+            <button
+              onClick={() => setTheme("dark")}
+              className={`py-1 text-[10px] font-semibold rounded text-center transition-all ${
+                theme === "dark"
+                  ? "bg-zinc-900 text-white"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              Dark
+            </button>
+            <button
+              onClick={() => setTheme("system")}
+              className={`py-1 text-[10px] font-semibold rounded text-center transition-all ${
+                theme === "system"
+                  ? "bg-zinc-900 text-white"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              System
+            </button>
+          </div>
+        </div>
+
         {/* User profile section */}
         <div className="mt-4 border-t border-zinc-900 pt-4">
           {!authLoading && user && (
@@ -223,7 +279,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-x-auto p-8 bg-zinc-950 min-h-screen">
+      <main className="flex-1 overflow-x-auto p-8 bg-zinc-50 dark:bg-zinc-950 min-h-screen transition-colors duration-250">
         {children}
       </main>
     </div>
