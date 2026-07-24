@@ -1,15 +1,31 @@
 services:
+  db:
+    image: postgres:16
+    container_name: kpc-db
+    # Own port (5434, not 5432) so this never collides with a Postgres you
+    # might already be running on the host — this container is fully
+    # self-contained, doesn't touch anything outside itself.
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_USER=kpc_app
+      - POSTGRES_PASSWORD=kpc_local_dev
+      - POSTGRES_DB=kpc_db
+    volumes:
+      - kpc-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kpc_app -d kpc_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: kpc-backend
-    # Host networking (Linux only): container shares the host's network namespace,
-    # so DATABASE_URL's "localhost:5432" in .env resolves to the host's actual
-    # Postgres — same as running the app outside Docker. Avoids widening Postgres's
-    # listen_addresses/pg_hba.conf just for local dev. `ports:` is a no-op under
-    # host networking (the app binds directly to the host's port), so it's dropped.
-    network_mode: host
+    ports:
+      - "8000:8000"
     volumes:
       - ./backend:/app
       - ./backend/data:/app/data
@@ -18,9 +34,21 @@ services:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
+      # Overrides whatever DATABASE_URL is in .env (that value is for
+      # running the backend directly on the host, e.g. via
+      # setup_local_postgres.sh) — inside Compose's network, the DB is
+      # only reachable at the "db" service name, never localhost.
+      - DATABASE_URL=postgresql+psycopg2://kpc_app:kpc_local_dev@db:5432/kpc_db
+    depends_on:
+      db:
+        condition: service_healthy
     command: >
       sh -c "python scripts/generate_kpc_data.py &&
              python scripts/etl_pipeline.py &&
+             alembic upgrade head &&
+             python scripts/seed_roles.py &&
+             python scripts/seed_admin.py &&
+             python scripts/seed_demo_users.py &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     stdin_open: true
     tty: true
@@ -30,20 +58,23 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: kpc-frontend
-    # Same host-networking rationale as the backend service: the backend
-    # also uses network_mode: host, which means it doesn't get a
-    # container-internal "backend" DNS name, so NEXT_PUBLIC_API_URL has to
-    # reach it via localhost — only possible if frontend is on host
-    # networking too. `ports:` is a no-op under host networking, so it's
-    # dropped (matches the backend service above).
-    network_mode: host
+    ports:
+      - "3000:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules  # don't overwrite container's node_modules with host's
       - /app/.next
     env_file:
       - .env
+    environment:
+      # Browser-facing, not container-facing: NEXT_PUBLIC_API_URL ends up
+      # in client-side JS and is evaluated by the browser on the host, which
+      # can't resolve the "backend" service name — only the published port.
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       - backend
     stdin_open: true
     tty: true
+
+volumes:
+  kpc-db-data:

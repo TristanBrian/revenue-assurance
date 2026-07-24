@@ -61,38 +61,68 @@ export interface OmcRiskProfile {
   risk_level: "Low" | "Medium" | "High";
 }
 
+export interface ReconciliationSummary {
+  total_anomalies: number;
+  total_leakage_kes: number;
+  reconciliation_rate: number;
+  critical_count: number;
+  pending_count: number;
+  review_count: number;
+}
+
+export interface PerformanceStats {
+  processing_time_seconds: number;
+  rows_processed: number;
+  rows_per_second: number;
+}
+
+export interface ReconciliationEbillingStatus {
+  system: string;
+  connected: boolean;
+  total_pending: number;
+  total_synced: number;
+  last_sync: string | null;
+}
+
 export interface ReconcileResult {
   metrics: Metrics;
   anomalies: Anomaly[];
-  summary: {
-    total_anomalies: number;
-    total_leakage_kes: number;
-    reconciliation_rate: number;
-    critical_count: number;
-    pending_count: number;
-    review_count: number;
-  };
-  performance: {
-    processing_time_seconds: number;
-    rows_processed: number;
-    rows_per_second: number;
-  };
+  summary: ReconciliationSummary;
+  performance: PerformanceStats;
   data_quality: DataQuality;
-  ebilling_status: {
-    system: string;
-    connected: boolean;
-    total_pending: number;
-    total_synced: number;
-    last_sync: string | null;
-  };
+  ebilling_status: ReconciliationEbillingStatus;
   duplicate_anomalies: unknown[];
   omc_risk_profile: OmcRiskProfile[];
 }
 
-// The route wraps the above in {status, data}
-export interface ReconcileResponse {
-  status: string;
-  data: ReconcileResult;
+export interface Pagination {
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+// GET /api/reconcile/metrics — the "Executive Metrics" feature (view_metrics).
+export interface MetricsResult {
+  metrics: Metrics;
+  summary: ReconciliationSummary;
+  performance: PerformanceStats;
+  data_quality: DataQuality;
+  ebilling_status: ReconciliationEbillingStatus;
+  duplicate_anomalies: unknown[];
+}
+
+// GET /api/reconcile/anomalies — the "Anomaly Table" feature (view_anomaly_table).
+export interface AnomalyTableResult {
+  anomalies: Anomaly[];
+  pagination: Pagination;
+}
+
+// GET /api/reconcile/omc-risk-profile — its own feature (view_omc_risk_profile).
+export interface OmcRiskProfileResult {
+  omc_risk_profile: OmcRiskProfile[];
 }
 
 // Mirrors backend/app/services/e_billing.py response shapes.
@@ -208,4 +238,43 @@ export interface FraudGraphData {
     community_count: number;
     top_risk_entities: TopRiskEntity[];
   };
+}
+
+// Mirrors backend/app/schemas/user.py — the response shapes for /api/auth/*.
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  full_name: string | null;
+  roles: string[];
+  permissions: string[];
+}
+
+// Mirrors backend/app/schemas/feed.py.
+export interface FeedData {
+  anomalies: Anomaly[];
+  last_updated: string | null;
+  total_count: number;
+}
+
+// Mirrors UpdateAnomalyResponse in backend/app/schemas/reconciliation.py.
+export interface UpdateAnomalyResponse {
+  status: string;
+  message: string;
+  dispatch_id: string;
+  new_status: string;
+  timestamp: string;
+}
+
+// Mirrors backend/app/schemas/heatmap.py.
+export interface HeatmapData {
+  data: number[][];
+  omcs: string[];
+  products: string[];
+  total_leakage: number;
 }

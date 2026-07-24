@@ -1,26 +1,46 @@
 """
-Schema stub for app/models/audit.py — that model file is currently EMPTY
-(no SQLAlchemy model defined), and there is no audit route or service
-implementation anywhere in the codebase (routes/audit.py is also an empty
-stub, not mounted in main.py). "Audit Trail" only exists today as a named
-permission-mapped feature in README.md — there's no actual data yet.
-
-AuditLog below is a minimal placeholder inferred only from that feature
-name and the generic concept of an audit log entry (id/user_id/action/
-timestamp) — not from any real model, route, or service, since none exist.
-Treat every field as provisional; replace this once app/models/audit.py
-and its route/service are actually implemented.
+Pydantic schemas for routes/audit.py, backed by app/models/audit.py's
+AuditLog SQLAlchemy model.
 """
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
-class AuditLog(BaseModel):
+class AuditLogOut(BaseModel):
     id: str
-    user_id: Optional[str] = None
+    actor_user_id: Optional[str] = None
     action: str
-    timestamp: datetime
+    target_type: Optional[str] = None
+    target_id: Optional[str] = None
+    before_value: Optional[Any] = None
+    after_value: Optional[Any] = None
+    extra_metadata: Optional[Any] = None
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("id", "actor_user_id", mode="before")
+    @classmethod
+    def _stringify_uuid(cls, v: Any) -> Optional[str]:
+        # ORM id / actor_user_id are uuid.UUID; Pydantic's plain `str`
+        # type does not auto-coerce UUID -> str, so do it explicitly.
+        return str(v) if v is not None else v
+
+
+class AuditLogListResponse(BaseModel):
+    """GET /api/audit/logs, GET /api/audit/me"""
+    items: list[AuditLogOut]
+    total: int
+    page: int
+    page_size: int
+
+
+class AuditSummaryResponse(BaseModel):
+    """GET /api/audit/summary"""
+    total_actions: int
+    actions_by_type: dict[str, int]
+    actions_by_actor: dict[str, int]
+    period_days: int
+    since: datetime

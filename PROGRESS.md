@@ -1,7 +1,7 @@
 # Frontend ↔ Backend Wiring Progress
 
-**Current phase:** Phase 5 — Fraud Graph (done). All 5 phases complete.
-**Branch:** `feat/graph-export-devops`
+**Current phase:** Phase 7 — Role-Based Dashboards (done). All 7 phases complete.
+**Branch:** `feat/auth-rbac-dashboards`
 
 Update this file as the last step of each phase/step below, before moving to the next one. It's the source of truth for "where are we" across sessions.
 
@@ -50,3 +50,18 @@ Update this file as the last step of each phase/step below, before moving to the
 - [x] Fixed the backend test suite, which was broken before this work started (24/42 tests erroring — two fixtures still patched a `DB_PATH` module constant removed by an earlier SQLAlchemy migration)
 - [x] Local full-stack Docker Compose — `frontend/Dockerfile` + completed the `frontend` service in `docker-compose.yml` (was a commented-out stub)
 - [x] Inert deployment templates (`render.yaml`, `frontend/vercel.json`) matching the platforms named in `PROBLEM_FRAMING_AND_ARCHITECTURE.md` — do nothing until connected to a real account; no account was created or secret provisioned
+
+## Phase 6 — RBAC Enforcement (backend)
+- [x] Local Postgres: a second, self-contained cluster on port 5433 under this machine's own user (not the system instance on 5432) — no sudo needed. `.env`'s `DATABASE_URL` now points there; `users`/`roles`/`permissions`/`user_roles`/`role_permissions` only work on Postgres (`sa.UUID()` columns, unsupported by SQLite)
+- [x] `alembic upgrade head` run against it, business tables reloaded via `generate_kpc_data.py` + `etl_pipeline.py` (which needed a `load_dotenv()` fix — it never read `.env`, only real shell env vars, so `DATABASE_URL` silently never resolved there before)
+- [x] `scripts/seed_roles.py`: replaced its explicitly-placeholder permission mapping (own docstring said so) with the README's actual Permission Mapping table; fixed a stale `from app.models.user import Permission, Role` import broken by an earlier model-file split
+- [x] `require_permission()` (existed since an earlier session, never wired to anything) added to every route in `reconcile.py`/`heatmap.py`/`graph.py`/`feed.py`/`e_billing.py`, matching the corrected matrix. `POST /e-billing/webhook` deliberately left open — it's a server-to-server callback from the simulated KRA system.
+- [x] `/reconcile`'s response is now filtered server-side by `view_anomalies` (empty `anomalies`/`omc_risk_profile`/`duplicate_anomalies` for roles without it) — there's no separate anomaly-table endpoint to gate instead, so this had to be a response-shape change, not just a decorator
+- [x] Verified via curl as all 3 roles + no token: 401/403/200 all match the matrix exactly; full test suite still green against Postgres (49 passed, 1 skipped)
+
+## Phase 7 — Role-Based Dashboards (frontend)
+- [x] Auth foundation: login page, `authFetch()` (every existing API call now sends the bearer token — previously sent none), `proxy.ts` (Next.js 16 renamed `middleware.ts` — confirmed in this exact version's bundled docs)
+- [x] Sidebar shell (`dashboard/layout.tsx`) filtered to each user's actual `permissions` array from `/api/auth/me`, plus `RequirePermission` guarding direct URL access to routes a role can't reach
+- [x] Replaced the single 170-line `page.tsx` (which showed every feature to every visitor, no login) with one route per feature area — Overview, Anomalies, Risk & Fraud, Upload, E-Billing, Reports — reusing every existing component as-is
+- [x] Filled two gaps found while building this: `Heatmap`/`OmcRiskProfile` had backend support but no frontend ever built; `AnomalyTable` gained an optional resolve action for `resolve_anomaly` holders
+- [x] Verified live as all 3 roles: sidebar filtering, "Not authorized" on direct URL access, populated-vs-empty anomaly data, Resolve button presence/absence, and the Resolve action itself — all match the matrix. This is real access control (backend enforces independently per Phase 6), not UI-only theater.

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ApiError, reconcileUpload, templateUrl, type TemplateType } from "@/lib/api";
+import { ApiError, downloadTemplate, reconcileUpload, type TemplateType } from "@/lib/api";
 import type { ReconcileResult } from "@/lib/types";
 
 const FILE_FIELDS: { key: TemplateType; label: string }[] = [
@@ -25,6 +25,16 @@ export default function CsvUploadPanel({
 
   function handleFileChange(key: TemplateType, fileList: FileList | null) {
     setFiles((prev) => ({ ...prev, [key]: fileList?.[0] }));
+  }
+
+  async function handleTemplateDownload(key: TemplateType) {
+    try {
+      await downloadTemplate(key);
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Could not download the template.",
+      );
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -76,12 +86,13 @@ export default function CsvUploadPanel({
               onChange={(e) => handleFileChange(f.key, e.target.files)}
               className="flex-1 text-xs text-zinc-600 file:mr-3 file:rounded file:border-0 file:bg-zinc-200 file:px-2 file:py-1 file:text-xs dark:text-zinc-400 dark:file:bg-zinc-800"
             />
-            <a
-              href={templateUrl(f.key)}
+            <button
+              type="button"
+              onClick={() => handleTemplateDownload(f.key)}
               className="shrink-0 text-xs text-zinc-500 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
             >
               template
-            </a>
+            </button>
           </div>
         ))}
 

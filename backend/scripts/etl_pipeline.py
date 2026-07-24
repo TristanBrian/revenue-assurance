@@ -1,11 +1,13 @@
 """
 KPC Revenue Assurance - Foundational ETL Pipeline (Stage 1)
 ---------------------------------------------------------------
-Extracts messy raw O2C datasets, runs strict data quality gates, 
-routes corrupted records to an audit quarantine table, and loads 
+Extracts messy raw O2C datasets, runs strict data quality gates,
+routes corrupted records to an audit quarantine table, and loads
 clean foundational tables into SQLite and/or PostgreSQL.
 
 Datasets Processed:
+  - products.csv
+  - depots.csv
   - tariffs.csv
   - omcs.csv
   - depot_loading_logs.csv
@@ -22,6 +24,14 @@ from datetime import datetime
 from typing import Dict
 import pandas as pd
 from sqlalchemy import create_engine
+from dotenv import load_dotenv
+
+# This script (like generate_kpc_data.py) is run standalone, not through
+# app.config — os.getenv("DATABASE_URL") alone only sees real exported
+# shell env vars, never the repo-root .env file. Without this, DATABASE_URL
+# silently falls through to None here even when .env has it set correctly,
+# and the Postgres load below gets skipped with no obvious reason why.
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '.env'))
 
 # ==========================================
 # 1. LOGGING & CONFIGURATION
@@ -48,7 +58,7 @@ RAW_DATA_DIR = "data/raw"
 # ==========================================
 class AuditQuarantineManager:
     """Collects and standardizes rejected records for governance & auditing."""
-    
+
     def __init__(self):
         self.quarantine_records = []
 
@@ -56,7 +66,7 @@ class AuditQuarantineManager:
         """Appends failed records to the quarantine list."""
         if corrupted_df.empty:
             return
-            
+
         for _, row in corrupted_df.iterrows():
             self.quarantine_records.append({
                 "quarantine_id": f"QRT-{len(self.quarantine_records)+1:06d}",
@@ -66,12 +76,12 @@ class AuditQuarantineManager:
                 "quarantined_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
                 "raw_record_json": row.to_json()
             })
-            
+
     def get_quarantine_dataframe(self) -> pd.DataFrame:
         """Returns the quarantine log as a DataFrame for DB loading."""
         if not self.quarantine_records:
             return pd.DataFrame(columns=[
-                "quarantine_id", "dataset_name", "failed_gate", 
+                "quarantine_id", "dataset_name", "failed_gate",
                 "reason", "quarantined_at", "raw_record_json"
             ])
         return pd.DataFrame(self.quarantine_records)
@@ -125,11 +135,11 @@ class DataQualitySuite:
             if date_col in df_clean.columns:
                 parsed_dates = pd.to_datetime(df_clean[date_col], format='mixed', errors='coerce')
                 missing_mask = parsed_dates.isna()
-                
+
                 if missing_mask.sum() > 0:
                     corrupted = df_clean[missing_mask].copy()
                     self.qm.log_quarantine(dataset_name, "Gate C (Date Standardizer)", f"Missing/Unparseable date in '{date_col}'", corrupted)
-                    
+
                     df_clean[date_col] = parsed_dates
                     df_clean = df_clean.dropna(subset=[date_col]).copy()
                     df_clean[date_col] = df_clean[date_col].dt.strftime('%Y-%m-%d')
@@ -185,7 +195,7 @@ class DatabaseLoader:
             # Test connection
             with engine.connect() as conn:
                 logger.info(" PostgreSQL connection established successfully.")
-            
+
             for table_name, df in dataframes.items():
                 df.to_sql(table_name, engine, if_exists='replace', index=False)
                 logger.info(f" [PostgreSQL] Table '{table_name}' loaded ({len(df)} rows).")
@@ -206,6 +216,8 @@ def main():
 
     # 1. EXTRACT
     file_mapping = {
+        "products": "products.csv",
+        "depots": "depots.csv",
         "tariffs": "tariffs.csv",
         "omcs": "omcs.csv",
         "depot_loading_logs": "depot_loading_logs.csv",
@@ -228,6 +240,11 @@ def main():
     logger.info("\n--- Applying Data Quality Suite ---")
 
     # A. Clean Master Tables
+    products_clean = dq.gate_a_deduplicate(raw_dfs["products"], "products")
+    products_clean = dq.gate_b_clean_currency(products_clean, "products", ["unit_price_kes"])
+
+    depots_clean = dq.gate_a_deduplicate(raw_dfs["depots"], "depots")
+
     omcs_clean = dq.gate_a_deduplicate(raw_dfs["omcs"], "omcs")
     omcs_clean = dq.gate_b_clean_currency(omcs_clean, "omcs", ["credit_limit_kes"])
 
@@ -261,6 +278,8 @@ def main():
 
     # 3. COMPILE CLEAN DATASETS
     datasets_clean = {
+        "products": products_clean,
+        "depots": depots_clean,
         "tariffs": tariffs_clean,
         "omcs": omcs_clean,
         "depot_loading_logs": loading_clean,
@@ -270,7 +289,7 @@ def main():
         "depot_daily_inventory": inv_ledger_clean,
         "quarantine_audit_log": qm.get_quarantine_dataframe() # Crucial for QA evidence
     }
-    
+
     logger.info(f"\n Total quarantined records captured for governance audit: {len(datasets_clean['quarantine_audit_log'])}")
 
     # 4. LOAD TO TARGET DATABASES
@@ -278,7 +297,7 @@ def main():
 
     if TARGET_ENV in ["sqlite", "both"]:
         DatabaseLoader.load_to_sqlite(datasets_clean)
-        
+
     if TARGET_ENV in ["postgres", "both"]:
         DatabaseLoader.load_to_postgres(datasets_clean)
 
