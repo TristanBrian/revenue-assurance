@@ -166,32 +166,32 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       <aside className="flex w-56 shrink-0 flex-col border-r border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950 p-4 transition-all duration-200">
         
         {/* Brand Logo & Title */}
-        <div className="flex items-center gap-2 mb-6">
-          <div 
-            className="w-7 h-7 rounded flex items-center justify-center font-bold text-white text-xs shadow-md relative shrink-0"
-            style={{ backgroundColor: BRAND_CONFIG.primaryColor }}
-          >
-            <span className="font-black text-[10px]">F</span>
+        {/* Brand Logo Card (Centered & Expanded) */}
+        <div className="mb-6 flex justify-center w-full">
+          {BRAND_CONFIG.logoUrl ? (
+            <div className="w-full h-16 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-2 flex items-center justify-center relative shadow-md">
+              <img 
+                src={BRAND_CONFIG.logoUrl} 
+                alt={`${BRAND_CONFIG.companyName} logo`} 
+                className="w-full h-full object-contain"
+              />
+              <div 
+                className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-zinc-50 dark:border-zinc-950"
+                style={{ backgroundColor: BRAND_CONFIG.accentColor }}
+              ></div>
+            </div>
+          ) : (
             <div 
-              className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-zinc-50 dark:border-zinc-950"
-              style={{ backgroundColor: BRAND_CONFIG.accentColor }}
-            ></div>
-          </div>
-          <div>
-            <h1 
-              className="text-sm font-extrabold tracking-tight uppercase leading-none"
-              style={{ color: BRAND_CONFIG.primaryColor }}
+              className="w-full h-16 rounded-lg flex items-center justify-center font-extrabold text-white text-sm shadow-md relative"
+              style={{ backgroundColor: BRAND_CONFIG.primaryColor }}
             >
-              {BRAND_CONFIG.companyName}
-            </h1>
-            <span className="text-[8px] text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-wider block mt-0.5 leading-tight">
-              {BRAND_CONFIG.systemName.split(" ").map((word, idx) => (
-                <span key={idx} className="block">
-                  {word}
-                </span>
-              ))}
-            </span>
-          </div>
+              <span>{BRAND_CONFIG.companyName.toUpperCase()}</span>
+              <div 
+                className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-zinc-50 dark:border-zinc-950"
+                style={{ backgroundColor: BRAND_CONFIG.accentColor }}
+              ></div>
+            </div>
+          )}
         </div>
 
         {/* Sidebar Nav Items */}
@@ -242,44 +242,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </span>
         </div>
 
-        {/* Theme Selector Widget */}
-        <div className="mt-4 border-t border-zinc-900 pt-4 flex flex-col gap-1.5">
-          <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">
-            Theme Mode
-          </span>
-          <div className="grid grid-cols-3 gap-1 bg-zinc-950/80 p-0.5 border border-zinc-900 rounded">
-            <button
-              onClick={() => setTheme("light")}
-              className={`py-1 text-[10px] font-semibold rounded text-center transition-all ${
-                theme === "light"
-                  ? "bg-zinc-900 text-white"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              Light
-            </button>
-            <button
-              onClick={() => setTheme("dark")}
-              className={`py-1 text-[10px] font-semibold rounded text-center transition-all ${
-                theme === "dark"
-                  ? "bg-zinc-900 text-white"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              Dark
-            </button>
-            <button
-              onClick={() => setTheme("system")}
-              className={`py-1 text-[10px] font-semibold rounded text-center transition-all ${
-                theme === "system"
-                  ? "bg-zinc-900 text-white"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              System
-            </button>
-          </div>
-        </div>
+        {/* Theme Selector Widget Removed from here */}
 
         {/* User profile section */}
         <div className="mt-4 border-t border-zinc-900 pt-4">
@@ -301,9 +264,66 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-x-auto p-8 bg-zinc-50 dark:bg-zinc-950 min-h-screen transition-colors duration-250">
-        {children}
-      </main>
+      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+        {/* TOP HEADER BAR (Holds the theme switcher in the top right corner) */}
+        <header className="flex h-14 items-center justify-between px-8 border-b border-zinc-200 dark:border-zinc-900 bg-zinc-50/70 dark:bg-zinc-950/70 backdrop-blur-md shrink-0 transition-colors duration-250">
+          <div>
+            <span 
+              className="text-[10px] font-black uppercase tracking-widest"
+              style={{ color: BRAND_CONFIG.secondaryColor }}
+            >
+              FlowGuard Control Center
+            </span>
+          </div>
+
+          {/* Theme Selector Widget */}
+          <div className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-900/50 p-1 border border-zinc-200 dark:border-zinc-800 rounded-lg">
+            <button
+              onClick={() => setTheme("light")}
+              className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-black uppercase tracking-wider rounded transition-all duration-150 ${
+                theme === "light"
+                  ? "bg-white text-[#0A2E5C] shadow-sm border border-zinc-200"
+                  : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-250"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.364 17.636l-.707.707M17.636 17.636l.707-.707M6.364 6.364l.707-.707M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span>Light</span>
+            </button>
+            <button
+              onClick={() => setTheme("dark")}
+              className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-black uppercase tracking-wider rounded transition-all duration-150 ${
+                theme === "dark"
+                  ? "bg-zinc-800 text-white shadow-sm border border-zinc-700"
+                  : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+              </svg>
+              <span>Dark</span>
+            </button>
+            <button
+              onClick={() => setTheme("system")}
+              className={`flex items-center gap-1.5 px-3 py-1 text-[10px] font-black uppercase tracking-wider rounded transition-all duration-150 ${
+                theme === "system"
+                  ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-white shadow-sm border border-zinc-300 dark:border-zinc-700"
+                  : "text-zinc-500 hover:text-zinc-850 dark:text-zinc-400 dark:hover:text-zinc-200"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span>System</span>
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-x-auto p-8 bg-zinc-50 dark:bg-zinc-950 min-h-screen transition-colors duration-250">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }
