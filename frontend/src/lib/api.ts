@@ -1,6 +1,8 @@
 import type {
+  AdminUser,
   AnomalyTableResult,
   AuthUser,
+  CreateUserPayload,
   EbillingIntegrationStatus,
   EbillingLogEntry,
   FailureRateMonitor,
@@ -15,6 +17,7 @@ import type {
   RetrySyncResult,
   TaskStatusResponse,
   UpdateAnomalyResponse,
+  UpdateUserPayload,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -282,5 +285,35 @@ export async function sendEbillingWebhook(payload: {
     body: JSON.stringify(payload),
   });
   return unwrap<Record<string, unknown>>(res);
+}
+
+// User administration — gated on manage_users (system_admin only).
+
+export async function getUsers(): Promise<AdminUser[]> {
+  const res = await authFetch(new URL("/api/admin/users", API_URL));
+  return unwrap<AdminUser[]>(res);
+}
+
+export async function createUser(payload: CreateUserPayload): Promise<AdminUser> {
+  const res = await authFetch(new URL("/api/auth/register", API_URL), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return unwrap<AdminUser>(res);
+}
+
+export async function updateUser(userId: string, payload: UpdateUserPayload): Promise<AdminUser> {
+  const res = await authFetch(new URL(`/api/admin/users/${userId}`, API_URL), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return unwrap<AdminUser>(res);
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  const res = await authFetch(new URL(`/api/admin/users/${userId}`, API_URL), { method: "DELETE" });
+  await unwrap<{ status: string; message: string }>(res);
 }
 

@@ -9,10 +9,7 @@ docstring for the full split):
 
 Both gated on view_fraud_graph. All bare — this router's own paths don't
 repeat "/graph"; prefix="/api/graph" is supplied by main.py's
-include_router(), same convention as every other route file. (The path
-was previously "/graph" here on TOP of that prefix, producing
-/api/graph/graph — a real bug the frontend would have 404'd on, fixed by
-this change.)
+include_router(), same convention as every other route file.
 """
 import logging
 
@@ -23,41 +20,70 @@ from app.models.user import User
 from app.schemas.detective import OmcRiskDetail
 from app.schemas.graph import CommunityOut, FraudGraphResponse, NetworkResponse, OmcDepotEdge, OmcDepotNode
 from app.services import detective_service, graph_engine
-from app.services.graph_engine import build_fraud_graph
 from app.core.cache import get_cached_result, set_cached_result
+from app.services.reconciliation import run_reconciliation
 from app.utils.db_connection import get_engine
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
+# ============================================================================
+# Main graph endpoint (cached)
+# ============================================================================
+
 @router.get("", response_model=FraudGraphResponse)
 def fraud_graph(
-    materiality: float = Query(0, description="Min leakage to include"),
+    materiality: float = Query(100000, description="Min leakage to include"),
     user: User = Depends(require_permission("view_fraud_graph")),
 ):
     """
-    Returns the OMC<->Depot leakage graph with Louvain community detection —
-    clusters of correlated revenue leakage worth a closer audit.
-    Cached for 60 seconds.
+    Returns the OMC<->Depot leakage graph with Louvain community detection.
+    Uses cached reconciliation data to avoid re-running reconciliation.
+
+    Reuses graph_engine.build_fraud_graph_from_dataframes() — the same
+    pure builder build_fraud_graph() delegates to — on both the cache-hit
+    and cache-miss paths, rather than a separate reimplementation. An
+    earlier version of this cache-sharing optimization built its own
+    OMC-to-OMC "shared product" graph with no depot nodes at all as a
+    stand-in ("we'll skip depot nodes for now... placeholder; you should
+    adapt to your actual graph logic"), and that shape didn't satisfy
+    FraudGraphResponse's schema (edges need anomaly_count, communities need
+    node_ids/member_count/total_leakage_kes/risk_level) — every call 500'd.
+    dispatches_df is a cheap single-table read either way, so reusing the
+    real builder costs nothing extra on the cache-hit path.
     """
     try:
-        cache_key = f"fraud_graph_{materiality}"
+        cache_key = f"metrics_{materiality}"
         cached = get_cached_result(cache_key)
-        if cached:
-            logger.info(f"✅ Fraud graph cache hit for materiality={materiality}")
-            return cached
 
-        logger.info(f"🔄 Fraud graph cache miss – running reconciliation...")
-        data = build_fraud_graph(materiality=materiality)
-        response = {
-            'status': 'success',
-            'data': data
-        }
-        set_cached_result(cache_key, response)
-        logger.info(f"✅ Fraud graph cached for materiality={materiality}")
-        return response
+        if cached and 'anomalies' in cached:
+            logger.info(f"✅ Graph using cached anomalies for materiality={materiality}")
+            anomalies = cached['anomalies']
+        else:
+            logger.info(f"🔄 Graph cache miss – running reconciliation...")
+            result = run_reconciliation(materiality=materiality)
+            anomalies = result.get('anomalies', [])
+
+            metrics_data = {
+                'metrics': result['metrics'],
+                'summary': result['summary'],
+                'performance': result['performance'],
+                'data_quality': result['data_quality'],
+                'ebilling_status': result.get('ebilling_status'),
+                'duplicate_anomalies': result.get('duplicate_anomalies', []),
+                'omc_risk_profile': result.get('omc_risk_profile', []),
+                'anomalies': anomalies,
+            }
+            set_cached_result(cache_key, metrics_data)
+            logger.info(f"✅ Graph cached full result for materiality={materiality}")
+
+        anomalies_df = pd.DataFrame(anomalies)
+        dispatches_df = pd.read_sql("SELECT dispatch_id, omc_id, depot FROM dispatches", get_engine())
+        data = graph_engine.build_fraud_graph_from_dataframes(anomalies_df, dispatches_df)
+        return {'status': 'success', 'data': data}
 
     except Exception as e:
         logger.error(f"Fraud graph error: {e}")
@@ -67,6 +93,10 @@ def fraud_graph(
             'data': {'nodes': [], 'edges': [], 'communities': [], 'summary': {'node_count': 0, 'edge_count': 0, 'community_count': 0, 'top_risk_entities': []}}
         }
 
+
+# ============================================================================
+# Other graph endpoints (unchanged)
+# ============================================================================
 
 @router.get("/network", response_model=NetworkResponse)
 def get_network(user: User = Depends(require_permission("view_fraud_graph"))):

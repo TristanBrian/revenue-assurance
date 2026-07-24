@@ -1,12 +1,18 @@
 """
-Simple in-memory cache for reconciliation results
-TTL = 60 seconds
+Simple in-memory cache for reconciliation results.
+
+TTL = 10 minutes. The underlying computation (run_reconciliation) takes
+several seconds on this dataset, and the data it reads only changes via an
+explicit CSV upload or e-billing sync — both of which already call
+invalidate_cache(). A 60s TTL meant every user hit that multi-second cold
+path on almost every page load; 10 minutes keeps pages fast while still
+bounding how stale a view can get between explicit invalidations.
 """
 import time
 from typing import Optional, Dict, Any
 
 _cache: Dict[str, Dict[str, Any]] = {}
-CACHE_TTL_SECONDS = 60  # Cache results for 60 seconds
+CACHE_TTL_SECONDS = 600
 
 
 def get_cached_result(key: str) -> Optional[Dict[str, Any]]:
