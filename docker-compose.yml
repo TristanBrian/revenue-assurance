@@ -2,9 +2,6 @@ services:
   db:
     image: postgres:16
     container_name: kpc-db
-    # Own port (5434, not 5432) so this never collides with a Postgres you
-    # might already be running on the host — this container is fully
-    # self-contained, doesn't touch anything outside itself.
     ports:
       - "5434:5432"
     environment:
@@ -29,27 +26,17 @@ services:
     volumes:
       - ./backend:/app
       - ./backend/data:/app/data
-      - /app/__pycache__  # Ignore cache
+      - /app/__pycache__
     env_file:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
-      # Overrides whatever DATABASE_URL is in .env (that value is for
-      # running the backend directly on the host, e.g. via
-      # setup_local_postgres.sh) — inside Compose's network, the DB is
-      # only reachable at the "db" service name, never localhost.
       - DATABASE_URL=postgresql+psycopg2://kpc_app:kpc_local_dev@db:5432/kpc_db
     depends_on:
       db:
         condition: service_healthy
-    command: >
-      sh -c "python scripts/generate_kpc_data.py &&
-             python scripts/etl_pipeline.py &&
-             alembic upgrade head &&
-             python scripts/seed_roles.py &&
-             python scripts/seed_admin.py &&
-             python scripts/seed_demo_users.py &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    # ✅ Use the start.sh script (file-existence check + all steps)
+    command: /app/scripts/start.sh
     stdin_open: true
     tty: true
 
@@ -62,14 +49,11 @@ services:
       - "3000:3000"
     volumes:
       - ./frontend:/app
-      - /app/node_modules  # don't overwrite container's node_modules with host's
+      - /app/node_modules
       - /app/.next
     env_file:
       - .env
     environment:
-      # Browser-facing, not container-facing: NEXT_PUBLIC_API_URL ends up
-      # in client-side JS and is evaluated by the browser on the host, which
-      # can't resolve the "backend" service name — only the published port.
       - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       - backend

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from app.core.dependencies import require_permission
 from app.services.heatmap import get_heatmap_data
 from app.schemas.heatmap import HeatmapResponse
-from app.core.dependencies import require_permission
+from app.core.cache import get_cached_result, set_cached_result
 from app.models.user import User
 import logging
 
@@ -19,18 +19,25 @@ def heatmap(
 ):
     """
     Returns leakage heatmap data: OMC × Product matrix.
-
-    Plain def, not async def: get_heatmap_data() calls run_reconciliation(),
-    the same synchronous CPU-bound pandas pipeline used by routes/reconcile.py
-    (see the block comment there) — as async def this blocks the event loop
-    for every concurrent request across every user for the run's duration.
+    Cached for 60 seconds to avoid re-running reconciliation.
     """
     try:
+        cache_key = f"heatmap_{materiality}"
+        cached = get_cached_result(cache_key)
+        if cached:
+            logger.info(f"✅ Heatmap cache hit for materiality={materiality}")
+            return cached
+
+        logger.info(f"🔄 Heatmap cache miss – running reconciliation...")
         data = get_heatmap_data(materiality=materiality)
-        return {
+        response = {
             'status': 'success',
             'data': data
         }
+        set_cached_result(cache_key, response)
+        logger.info(f"✅ Heatmap cached for materiality={materiality}")
+        return response
+
     except Exception as e:
         logger.error(f"Heatmap error: {e}")
         return {

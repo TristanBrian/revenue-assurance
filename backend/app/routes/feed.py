@@ -1,17 +1,15 @@
 # backend/app/routes/feed.py
 from fastapi import APIRouter, Depends, Query
 from app.core.dependencies import require_permission
-from app.services.feed import get_feed
+from app.services.feed import get_feed, update_feed
 from app.services.reconciliation import run_reconciliation
 from app.schemas.feed import FeedResponse
-from app.core.dependencies import get_current_user
-from app.models.user import User
+from app.core.cache import get_cached_result, set_cached_result
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
 
 @router.get("/feed", response_model=FeedResponse)
 def live_feed(
@@ -20,26 +18,52 @@ def live_feed(
 ):
     """
     Returns the latest anomalies for the live feed.
-    If the cache is empty, runs reconciliation to populate it.
+    Uses a dedicated cache to avoid running reconciliation on every request.
 
-    Plain def, not async def: the cache-hit path is cheap, but a cold cache
-    falls back to run_reconciliation() — the same synchronous CPU-bound
-    pipeline flagged in routes/reconcile.py's block comment — which would
-    block the event loop on first load (or after any process restart).
+    - Cache hit: instant response (<10ms)
+    - Cache miss: runs reconciliation (2–3s), caches result for 60 seconds
     """
     try:
+        # 1. Try to get feed data from the in-memory feed cache (fast, but may be empty)
         feed_data = get_feed(limit)
-        # If cache is empty, run reconciliation to initialize it
-        if not feed_data['anomalies']:
-            logger.info("Cache empty – running reconciliation to populate feed...")
-            result = run_reconciliation(materiality=100000)
-            from app.services.feed import update_feed
-            update_feed(result.get('anomalies', []))
+        if feed_data['anomalies']:
+            logger.info("✅ Feed cache hit – returning anomalies")
+            return {
+                'status': 'success',
+                'data': feed_data
+            }
+
+        # 2. Feed cache is empty – try reconciliation cache
+        cache_key = "reconciliation_for_feed"
+        cached = get_cached_result(cache_key)
+        if cached:
+            logger.info("✅ Reconciliation cache hit – populating feed")
+            anomalies = cached.get("anomalies", [])
+            update_feed(anomalies)
             feed_data = get_feed(limit)
+            return {
+                'status': 'success',
+                'data': feed_data
+            }
+
+        # 3. No cache – run reconciliation and store
+        logger.info("🔄 Cache empty – running reconciliation to populate feed...")
+        result = run_reconciliation(materiality=100000)
+        anomalies = result.get('anomalies', [])
+
+        # Update in-memory feed cache
+        update_feed(anomalies)
+
+        # Store reconciliation result in Redis cache for 60 seconds
+        set_cached_result(cache_key, {"anomalies": anomalies})
+        logger.info("✅ Reconciliation result cached for 60s")
+
+        feed_data = get_feed(limit)
         return {
             'status': 'success',
             'data': feed_data
         }
+
     except Exception as e:
         logger.error(f"Live feed error: {e}")
         return {
