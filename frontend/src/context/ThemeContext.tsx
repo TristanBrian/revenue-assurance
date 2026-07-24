@@ -18,7 +18,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const saved = localStorage.getItem("kpc_theme_mode") as ThemeMode | null;
     if (saved === "light" || saved === "dark" || saved === "system") {
-      setThemeState(saved);
+      setTimeout(() => {
+        setThemeState(saved);
+      }, 0);
     }
   }, []);
 
