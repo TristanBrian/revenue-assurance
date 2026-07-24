@@ -45,7 +45,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("KPC_ETL")
 
-POSTGRES_URI = os.getenv("DATABASE_URL", "postgresql://postgres:Kabarnet%409@localhost:5432/kpc_revenue")
+# REMOVED HARDCODED PASSWORD
+POSTGRES_URI = os.getenv("DATABASE_URL")
+
 # Route SQLite DB directly into the clean folder
 SQLITE_DB_PATH = os.path.join(CLEAN_DATA_DIR, "kpc_revenue_assurance.db")
 
@@ -286,7 +288,11 @@ def main():
         DatabaseLoader.load_to_sqlite(datasets_clean)
         
     if TARGET_ENV in ["postgres", "both"]:
-        DatabaseLoader.load_to_postgres(datasets_clean)
+        # NEW SECURITY CHECK ADDED HERE
+        if not POSTGRES_URI:
+            logger.error("DATABASE_URL environment variable is not set. Cannot connect to PostgreSQL.")
+        else:
+            DatabaseLoader.load_to_postgres(datasets_clean)
 
     logger.info("==================================================")
     logger.info(" KPC REVENUE ETL PIPELINE EXECUTION COMPLETE")
