@@ -26,20 +26,28 @@ from sqlalchemy import create_engine
 # ==========================================
 # 1. LOGGING & CONFIGURATION
 # ==========================================
+# Environment DB URIs & Directories
+RAW_DATA_DIR = "data/raw"
+CLEAN_DATA_DIR = "data/clean"
+LOG_DIR = "logs"
+
+# Ensure log directory exists before setting up file logging
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE_PATH = os.path.join(LOG_DIR, "kpc_etl_execution.log")
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler("kpc_etl_execution.log", encoding="utf-8"),
+        logging.FileHandler(LOG_FILE_PATH, encoding="utf-8"),
         logging.StreamHandler(sys.stdout)
     ]
 )
 logger = logging.getLogger("KPC_ETL")
 
-# Environment DB URIs
 POSTGRES_URI = os.getenv("DATABASE_URL", "postgresql://postgres:Kabarnet%409@localhost:5432/kpc_revenue")
-SQLITE_DB_PATH = "kpc_revenue_assurance.db"
-RAW_DATA_DIR = "data/raw"
+# Route SQLite DB directly into the clean folder
+SQLITE_DB_PATH = os.path.join(CLEAN_DATA_DIR, "kpc_revenue_assurance.db")
 
 # ==========================================
 # 2. AUDIT QUARANTINE MANAGER
@@ -195,6 +203,9 @@ def main():
     logger.info("==================================================")
     logger.info(" STARTING KPC REVENUE ASSURANCE ETL PIPELINE")
     logger.info("==================================================")
+
+    # Ensure clean data directory exists for SQLite database storage
+    os.makedirs(CLEAN_DATA_DIR, exist_ok=True)
 
     qm = AuditQuarantineManager()
     dq = DataQualitySuite(qm)
