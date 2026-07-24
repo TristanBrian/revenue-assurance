@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app.core.dependencies import get_db, require_permission
 from app.models.user import User
 from app.services.reconciliation import run_reconciliation, run_reconciliation_on_dataframes
@@ -22,6 +23,7 @@ import numpy as np
 import io
 import logging
 import math
+from app.utils.db_connection import get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -43,23 +45,21 @@ def deep_sanitize(obj):
     """
     # 1. Handle array‑like objects with at least one dimension (shape non‑empty)
     if hasattr(obj, 'shape') and len(obj.shape) > 0:
-        # It's an ndarray, Series, etc. – convert to list
         if hasattr(obj, 'tolist'):
             obj = obj.tolist()
         else:
             obj = list(obj)
         return [deep_sanitize(item) for item in obj]
 
-    # 2. Handle numpy scalars (e.g., np.float64, np.int64)
+    # 2. Handle numpy scalars
     if isinstance(obj, np.generic):
         obj = obj.item() if hasattr(obj, 'item') else obj
 
-    # 3. Try to check for NaN – catch any exception safely
+    # 3. Check for NaN
     try:
         if pd.isna(obj):
             return None
     except (ValueError, TypeError):
-        # If pd.isna fails, just continue (it's likely not a scalar)
         pass
 
     # 4. Convert timestamps
@@ -74,13 +74,12 @@ def deep_sanitize(obj):
             return int(obj)
         return obj
 
-    # 6. Recurse into containers
+    # 6. Recurse
     if isinstance(obj, dict):
         return {k: deep_sanitize(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [deep_sanitize(item) for item in obj]
 
-    # 7. Everything else (str, int, bool, etc.) – return unchanged
     return obj
 
 # ============================================================================
@@ -142,25 +141,16 @@ def reconcile_anomalies(
     page_size: int = Query(20, description="Items per page", ge=1, le=100),
     _: User = Depends(require_permission("view_anomaly_table")),
 ):
-    """
-    Anomaly Table feature: paginated raw anomaly rows.
-    Uses cached reconciliation data to avoid re-running full reconciliation.
-    """
     try:
         cache_key = f"metrics_{materiality}"
         cached = get_cached_result(cache_key)
-        
-        # If cache exists, use it
         if cached:
             logger.info(f"✅ Anomalies cache hit for materiality={materiality}")
             all_anomalies = cached.get('anomalies', [])
         else:
-            # If not cached, run reconciliation and cache it
             logger.info(f"🔄 Anomalies cache miss – running reconciliation...")
             result = run_reconciliation(materiality=materiality)
             update_feed(result.get('anomalies', []))
-            
-            # Cache the full result
             metrics_data = {
                 'metrics': result['metrics'],
                 'summary': result['summary'],
@@ -175,7 +165,6 @@ def reconcile_anomalies(
             set_cached_result(cache_key, metrics_data)
             all_anomalies = result.get('anomalies', [])
 
-        # Paginate from cached data
         total_anomalies = int(len(all_anomalies))
         total_pages = int((total_anomalies + page_size - 1) // page_size) if total_anomalies > 0 else 1
         offset = (page - 1) * page_size
@@ -204,27 +193,18 @@ def reconcile_omc_risk_profile(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     _: User = Depends(require_permission("view_omc_risk_profile")),
 ):
-    """
-    OMC Risk Profile feature.
-    Uses cached metrics data to avoid re-running reconciliation.
-    """
     try:
         cache_key = f"metrics_{materiality}"
         cached = get_cached_result(cache_key)
-        
         if cached:
             logger.info(f"✅ OMC Risk Profile cache hit for materiality={materiality}")
-            omc_profile = cached.get('omc_risk_profile', [])
             return {
                 'status': 'success',
-                'omc_risk_profile': omc_profile
+                'omc_risk_profile': cached.get('omc_risk_profile', [])
             }
 
-        # If not cached, run reconciliation once and cache everything
         logger.info(f"🔄 OMC Risk Profile cache miss – running reconciliation...")
         result = run_reconciliation(materiality=materiality)
-        
-        # Cache the full result
         metrics_data = {
             'metrics': result['metrics'],
             'summary': result['summary'],
@@ -238,7 +218,7 @@ def reconcile_omc_risk_profile(
         metrics_data = deep_sanitize(metrics_data)
         set_cached_result(cache_key, metrics_data)
         logger.info(f"✅ OMC Risk Profile cached for materiality={materiality}")
-        
+
         return {
             'status': 'success',
             'omc_risk_profile': result.get('omc_risk_profile', [])
@@ -249,7 +229,7 @@ def reconcile_omc_risk_profile(
 
 
 # ============================================================================
-# 2. UPLOAD (CSV) – FINAL VERSION WITH ULTIMATE SANITIZATION
+# 2. UPLOAD (CSV) – WITH DATABASE PERSISTENCE AND COLUMN DROPPING
 # ============================================================================
 
 @router.post("/reconcile/upload", response_model=ReconciliationUploadResponse)
@@ -294,20 +274,37 @@ def reconcile_upload(
         if missing:
             raise HTTPException(400, f"Payments missing: {missing}")
 
-        # --- Run reconciliation ---
-        result = run_reconciliation_on_dataframes(dispatches_df, invoices_df, payments_df, materiality)
+        # --- 🔥 Drop columns that don't exist in the database schema ---
+        for col in ['installment_number', 'total_installments']:
+            if col in payments_df.columns:
+                payments_df.drop(columns=[col], inplace=True)
+
+        # --- 🔥 PERSIST UPLOADED DATA TO DATABASE (overwrite tables) ---
+        engine = get_engine()
+        with engine.begin() as conn:
+            # Truncate (CASCADE handles foreign keys)
+            conn.execute(text("TRUNCATE TABLE dispatches RESTART IDENTITY CASCADE"))
+            conn.execute(text("TRUNCATE TABLE invoices RESTART IDENTITY CASCADE"))
+            conn.execute(text("TRUNCATE TABLE payments RESTART IDENTITY CASCADE"))
+            # Insert new data
+            dispatches_df.to_sql('dispatches', conn, if_exists='append', index=False)
+            invoices_df.to_sql('invoices', conn, if_exists='append', index=False)
+            payments_df.to_sql('payments', conn, if_exists='append', index=False)
+        logger.info(f"✅ Uploaded {len(dispatches_df)} dispatches, {len(invoices_df)} invoices, {len(payments_df)} payments to DB")
+
+        # --- Run reconciliation on the NEW database data ---
+        result = run_reconciliation(materiality=materiality)
         update_feed(result.get('anomalies', []))
         invalidate_cache()
         logger.info("✅ Cache invalidated after upload")
 
-        # --- Paginate anomalies ---
+        # --- Paginate anomalies from the result ---
         all_anomalies = result.get('anomalies', [])
         total_anomalies = int(len(all_anomalies))
         total_pages = int((total_anomalies + page_size - 1) // page_size) if total_anomalies > 0 else 1
         offset = (page - 1) * page_size
         paginated_anomalies = all_anomalies[offset:offset + page_size] if user.has_permission("view_anomaly_table") else []
 
-        # --- Build the raw response dict ---
         raw_response = {
             'metrics': result['metrics'],
             'anomalies': paginated_anomalies,
@@ -319,10 +316,8 @@ def reconcile_upload(
             'omc_risk_profile': result.get('omc_risk_profile', []) if user.has_permission("view_omc_risk_profile") else []
         }
 
-        # --- DEEP SANITIZE (handles arrays, scalars, Timestamps, whole floats) ---
         sanitized_data = deep_sanitize(raw_response)
 
-        # --- Explicitly cast known integer fields ---
         if 'metrics' in sanitized_data:
             for key in ['total_anomalies', 'critical_count', 'high_risk_count', 'total_dispatches', 'total_invoices', 'total_payments']:
                 if key in sanitized_data['metrics']:
@@ -332,7 +327,6 @@ def reconcile_upload(
                 if key in sanitized_data['summary']:
                     sanitized_data['summary'][key] = int(sanitized_data['summary'][key])
 
-        # --- Pagination ---
         pagination = {
             'page': int(page),
             'page_size': int(page_size),
@@ -344,17 +338,14 @@ def reconcile_upload(
 
         processing_time = result['performance']['processing_time_seconds']
 
-        # --- Build final response ---
         final_response = {
             'status': 'success',
             'data': sanitized_data,
             'pagination': pagination,
-            'message': f'✅ Processed {len(dispatches_df)} dispatches in {processing_time:.2f}s. Found {total_anomalies} anomalies, {sanitized_data["metrics"]["critical_count"]} critical.'
+            'message': f'✅ Uploaded and processed {len(dispatches_df)} dispatches in {processing_time:.2f}s. Found {total_anomalies} anomalies, {sanitized_data["metrics"]["critical_count"]} critical.'
         }
 
-        # --- One final sanitize pass ---
         final_response = deep_sanitize(final_response)
-
         return final_response
 
     except pd.errors.EmptyDataError:
@@ -400,9 +391,7 @@ async def download_template(file_type: str, _: User = Depends(require_permission
             "invoice_id": ["INV-0001"],
             "customer_name": ["TotalEnergies Kenya"],
             "date": ["2025-02-01"],
-            "value_kes": [1500000],
-            "installment_number": [1],
-            "total_installments": [1]
+            "value_kes": [1500000]
         })
     output = io.StringIO()
     df.to_csv(output, index=False)
@@ -442,10 +431,13 @@ async def update_anomaly(
     user: User = Depends(require_permission("resolve_anomaly")),
 ):
     try:
-        return update_anomaly_status(db, dispatch_id, status, notes, actor_user_id=user.id)
+        result = update_anomaly_status(db, dispatch_id, status, notes, actor_user_id=user.id)
+        invalidate_cache()
+        logger.info(f"✅ Cache invalidated after resolving anomaly {dispatch_id}")
+        return result
     except Exception as e:
         logger.error(f"Update failed: {e}")
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/reconcile/export")
