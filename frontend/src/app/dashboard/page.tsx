@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ApiError, reconcile } from "@/lib/api";
+import { ApiError, getMetrics } from "@/lib/api";
 import type { Metrics } from "@/lib/types";
 import MetricCards from "@/components/MetricCards";
 import LiveFeed from "@/components/LiveFeed";
@@ -16,7 +16,7 @@ export default function DashboardOverviewPage() {
   useEffect(() => {
     let cancelled = false;
 
-    reconcile(DEFAULT_MATERIALITY)
+    getMetrics(DEFAULT_MATERIALITY)
       .then((data) => {
         if (!cancelled) setMetrics(data.metrics);
       })

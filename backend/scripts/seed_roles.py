@@ -25,9 +25,9 @@ PERMISSIONS = [
     ("resolve_anomaly", "Resolve/review/assign anomalies"),
     ("manage_ebilling", "Trigger/retry e-billing sync, view sync logs and monitoring"),
     ("export_reports", "Export Excel/CSV reports"),
+    ("view_audit", "View the audit trail (who did what, when)"),
     ("view_fraud_graph", "View fraud/graph detection view (structural/network analysis)"),
     ("view_risk_analytics", "View OMC risk features (statistical/EDA analysis, no graph concept)"),
-    ("view_audit", "View the audit trail (who did what, when)"),
     ("manage_users", "Create, edit, deactivate users and assign roles to them"),
     ("manage_permissions", "Create/edit permissions and assign them to roles"),
 ]
@@ -45,7 +45,7 @@ PERMISSIONS = [
 # | Resolve/Review/Assign     | N | N | Y |
 # | E-Billing Sync            | N | N | Y |
 # | Export Reports            | N | Y | Y |
-# | Audit Trail               | N | N | Y |
+# | Audit Trail               | N | Y | Y |
 #
 # system_admin is scoped ONLY to user/permission control, not
 # revenue-assurance features.
@@ -63,6 +63,7 @@ ROLE_PERMISSIONS = {
         "view_metrics",
         "view_anomaly_table",
         "export_reports",
+        "view_audit",
     ],
     "revenue_assurance": [
         "view_live_feed",

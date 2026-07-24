@@ -30,8 +30,17 @@ class AuditLogOut(BaseModel):
 
 
 class AuditLogListResponse(BaseModel):
-    """GET /api/audit/logs"""
+    """GET /api/audit/logs, GET /api/audit/me"""
     items: list[AuditLogOut]
     total: int
     page: int
     page_size: int
+
+
+class AuditSummaryResponse(BaseModel):
+    """GET /api/audit/summary"""
+    total_actions: int
+    actions_by_type: dict[str, int]
+    actions_by_actor: dict[str, int]
+    period_days: int
+    since: datetime

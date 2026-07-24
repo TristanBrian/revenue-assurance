@@ -14,13 +14,18 @@ router = APIRouter()
 
 
 @router.get("/feed", response_model=FeedResponse)
-async def live_feed(
+def live_feed(
     limit: int = Query(20, description="Number of recent anomalies to return"),
     _=Depends(require_permission("view_live_feed")),
 ):
     """
     Returns the latest anomalies for the live feed.
     If the cache is empty, runs reconciliation to populate it.
+
+    Plain def, not async def: the cache-hit path is cheap, but a cold cache
+    falls back to run_reconciliation() — the same synchronous CPU-bound
+    pipeline flagged in routes/reconcile.py's block comment — which would
+    block the event loop on first load (or after any process restart).
     """
     try:
         feed_data = get_feed(limit)

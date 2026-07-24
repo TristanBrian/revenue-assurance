@@ -8,13 +8,15 @@ Framework-agnostic on purpose (no FastAPI, no app.schemas imports) — same
 convention as the other services (reconciliation.py, e_billing.py,
 user_service.py).
 """
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import uuid as uuid_lib
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.audit import AuditLog
+from app.models.user import User
 
 
 def log_action(
@@ -118,3 +120,39 @@ def get_audit_log(db: Session, log_id) -> AuditLog:
         if entry is not None:
             return entry
     raise ValueError(f"No audit log with id: {log_id}")
+
+
+def get_audit_summary(db: Session, days: int = 7) -> dict:
+    """Aggregate stats over the last `days` days: total actions, a count
+    per action type, and a count per actor (keyed by email where the
+    actor is known, bucketed under "(system)" for null-actor entries —
+    failed logins, or requests the AuditMiddleware fallback logged before
+    any auth check ran)."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    total = db.query(AuditLog).filter(AuditLog.created_at >= since).count()
+
+    by_type = dict(
+        db.query(AuditLog.action, func.count(AuditLog.id))
+        .filter(AuditLog.created_at >= since)
+        .group_by(AuditLog.action)
+        .all()
+    )
+
+    actor_rows = (
+        db.query(User.email, func.count(AuditLog.id))
+        .select_from(AuditLog)
+        .outerjoin(User, User.id == AuditLog.actor_user_id)
+        .filter(AuditLog.created_at >= since)
+        .group_by(User.email)
+        .all()
+    )
+    by_actor = {(email or "(system)"): count for email, count in actor_rows}
+
+    return {
+        "total_actions": total,
+        "actions_by_type": by_type,
+        "actions_by_actor": by_actor,
+        "period_days": days,
+        "since": since,
+    }

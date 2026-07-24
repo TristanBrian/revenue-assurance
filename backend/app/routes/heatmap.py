@@ -13,12 +13,17 @@ router = APIRouter()
 
 
 @router.get("/heatmap", response_model=HeatmapResponse)
-async def heatmap(
+def heatmap(
     materiality: float = Query(0, description="Min leakage to include"),
     _=Depends(require_permission("view_heatmap")),
 ):
     """
     Returns leakage heatmap data: OMC × Product matrix.
+
+    Plain def, not async def: get_heatmap_data() calls run_reconciliation(),
+    the same synchronous CPU-bound pandas pipeline used by routes/reconcile.py
+    (see the block comment there) — as async def this blocks the event loop
+    for every concurrent request across every user for the run's duration.
     """
     try:
         data = get_heatmap_data(materiality=materiality)
