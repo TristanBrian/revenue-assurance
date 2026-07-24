@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { ApiError, getMetrics, getOmcRiskProfile } from "@/lib/api";
-import type { Metrics, OmcRiskProfile, ReconcileResult } from "@/lib/types";
+import type { Metrics, OmcRiskProfile, ReconcileResult, MetricsResult } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { useMateriality } from "@/context/MaterialityContext";
 import CsvUploadPanel from "@/components/CsvUploadPanel";
@@ -63,7 +63,9 @@ export default function ExecutiveDashboardPage() {
     ];
 
     Promise.all(promises)
-      .then(([metricsData, riskData]) => {
+      .then((results) => {
+        const metricsData = results[0] as MetricsResult | null;
+        const riskData = results[1] as OmcRiskProfile[] | null;
         if (!cancelled) {
           if (metricsData) setMetrics(metricsData.metrics);
           if (riskData) setOmcProfiles(riskData);

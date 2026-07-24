@@ -24,12 +24,12 @@ function formatKesFull(value: number): string {
 }
 
 const INTENSITY_STEPS = [
-  { threshold: 0, fill: "fill-zinc-900 border-zinc-800 text-zinc-600", colorCode: "#18181b" },
-  { threshold: 0.1, fill: "fill-indigo-950/20 border-indigo-900/30 text-indigo-400", colorCode: "#1e1b4b" },
-  { threshold: 0.3, fill: "fill-indigo-900/40 border-indigo-800/50 text-indigo-300", colorCode: "#312e81" },
-  { threshold: 0.5, fill: "fill-indigo-800/60 border-indigo-700 text-indigo-200", colorCode: "#3730a3" },
-  { threshold: 0.7, fill: "fill-indigo-600 border-indigo-500 text-white font-bold", colorCode: "#4f46e5" },
-  { threshold: 0.9, fill: "fill-violet-600 border-violet-500 text-white font-bold", colorCode: "#7c3aed" },
+  { threshold: 0, fill: "fill-zinc-900 border-zinc-800", colorCode: "#18181b", text: "text-zinc-600" },
+  { threshold: 0.1, fill: "fill-indigo-950/20 border-indigo-900/30", colorCode: "#1e1b4b", text: "text-indigo-400" },
+  { threshold: 0.3, fill: "fill-indigo-900/40 border-indigo-800/50", colorCode: "#312e81", text: "text-indigo-300" },
+  { threshold: 0.5, fill: "fill-indigo-800/60 border-indigo-700", colorCode: "#3730a3", text: "text-indigo-200" },
+  { threshold: 0.7, fill: "fill-indigo-600 border-indigo-500", colorCode: "#4f46e5", text: "text-white font-bold" },
+  { threshold: 0.9, fill: "fill-violet-600 border-violet-500", colorCode: "#7c3aed", text: "text-white font-bold" },
 ];
 
 function stepFor(intensity: number) {
