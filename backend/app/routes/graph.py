@@ -20,92 +20,14 @@ from app.models.user import User
 from app.schemas.detective import OmcRiskDetail
 from app.schemas.graph import CommunityOut, FraudGraphResponse, NetworkResponse, OmcDepotEdge, OmcDepotNode
 from app.services import detective_service, graph_engine
-from app.services.graph_engine import build_fraud_graph  # fallback if needed
 from app.core.cache import get_cached_result, set_cached_result
 from app.services.reconciliation import run_reconciliation
 from app.utils.db_connection import get_engine
 import pandas as pd
-import networkx as nx
-from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-# ============================================================================
-# Local helper to build graph from anomalies (no reconciliation)
-# ============================================================================
-
-def build_fraud_graph_from_anomalies(anomalies, materiality=0):
-    """
-    Builds a fraud graph (nodes & edges) from a list of anomalies.
-    This is the same logic as build_fraud_graph() but without running reconciliation.
-    """
-    if not anomalies:
-        return {'nodes': [], 'edges': [], 'communities': [], 'summary': {'node_count': 0, 'edge_count': 0, 'community_count': 0, 'top_risk_entities': []}}
-    
-    df = pd.DataFrame(anomalies)
-    
-    # Filter by materiality if needed
-    if materiality > 0:
-        df = df[df['leakage_kes'] >= materiality]
-    
-    # Build graph: nodes are OMCs and Depots
-    G = nx.Graph()
-    
-    # Add OMC nodes
-    omcs = df['customer'].unique()
-    for omc in omcs:
-        G.add_node(omc, type='omc')
-    
-    # Add depot nodes (extract from dispatch_id or other fields? We'll use a placeholder)
-    # Since we don't have depot info in anomalies, we'll skip depot nodes for now.
-    # We'll add edges from OMC to OMC based on shared invoice or other patterns.
-    # For simplicity, we'll create edges between OMCs that share a product or invoice.
-    # This is a placeholder; you should adapt to your actual graph logic.
-    
-    # Simple: connect OMCs that have anomalies with same product
-    product_omc = df.groupby('product')['customer'].apply(list).to_dict()
-    for product, omc_list in product_omc.items():
-        for i in range(len(omc_list)):
-            for j in range(i+1, len(omc_list)):
-                u, v = omc_list[i], omc_list[j]
-                if G.has_edge(u, v):
-                    G[u][v]['weight'] += 1
-                else:
-                    G.add_edge(u, v, weight=1)
-    
-    # Build nodes list
-    nodes = [{'id': n, 'type': d.get('type', 'omc')} for n, d in G.nodes(data=True)]
-    
-    # Build edges list
-    edges = [{'source': u, 'target': v, 'weight': d.get('weight', 1)} for u, v, d in G.edges(data=True)]
-    
-    # Community detection (Louvain)
-    try:
-        import community as community_louvain
-        partition = community_louvain.best_partition(G)
-        communities = {}
-        for node, comm_id in partition.items():
-            communities.setdefault(comm_id, []).append(node)
-        community_list = [{'id': cid, 'nodes': nodes} for cid, nodes in communities.items()]
-    except ImportError:
-        community_list = []
-    
-    summary = {
-        'node_count': len(nodes),
-        'edge_count': len(edges),
-        'community_count': len(community_list),
-        'top_risk_entities': []  # you can compute top OMCs by leakage
-    }
-    
-    return {
-        'nodes': nodes,
-        'edges': edges,
-        'communities': community_list,
-        'summary': summary
-    }
 
 
 # ============================================================================
@@ -120,39 +42,47 @@ def fraud_graph(
     """
     Returns the OMC<->Depot leakage graph with Louvain community detection.
     Uses cached reconciliation data to avoid re-running reconciliation.
+
+    Reuses graph_engine.build_fraud_graph_from_dataframes() — the same
+    pure builder build_fraud_graph() delegates to — on both the cache-hit
+    and cache-miss paths, rather than a separate reimplementation. An
+    earlier version of this cache-sharing optimization built its own
+    OMC-to-OMC "shared product" graph with no depot nodes at all as a
+    stand-in ("we'll skip depot nodes for now... placeholder; you should
+    adapt to your actual graph logic"), and that shape didn't satisfy
+    FraudGraphResponse's schema (edges need anomaly_count, communities need
+    node_ids/member_count/total_leakage_kes/risk_level) — every call 500'd.
+    dispatches_df is a cheap single-table read either way, so reusing the
+    real builder costs nothing extra on the cache-hit path.
     """
     try:
-        # Try to get full reconciliation result from cache
         cache_key = f"metrics_{materiality}"
         cached = get_cached_result(cache_key)
-        
+
         if cached and 'anomalies' in cached:
             logger.info(f"✅ Graph using cached anomalies for materiality={materiality}")
             anomalies = cached['anomalies']
-            # Build graph from anomalies
-            data = build_fraud_graph_from_anomalies(anomalies, materiality)
-            return {'status': 'success', 'data': data}
-        
-        # If not cached, run reconciliation once and store
-        logger.info(f"🔄 Graph cache miss – running reconciliation...")
-        result = run_reconciliation(materiality=materiality)
-        anomalies = result.get('anomalies', [])
-        
-        # Cache full result
-        metrics_data = {
-            'metrics': result['metrics'],
-            'summary': result['summary'],
-            'performance': result['performance'],
-            'data_quality': result['data_quality'],
-            'ebilling_status': result.get('ebilling_status'),
-            'duplicate_anomalies': result.get('duplicate_anomalies', []),
-            'omc_risk_profile': result.get('omc_risk_profile', []),
-            'anomalies': anomalies,
-        }
-        set_cached_result(cache_key, metrics_data)
-        logger.info(f"✅ Graph cached full result for materiality={materiality}")
-        
-        data = build_fraud_graph_from_anomalies(anomalies, materiality)
+        else:
+            logger.info(f"🔄 Graph cache miss – running reconciliation...")
+            result = run_reconciliation(materiality=materiality)
+            anomalies = result.get('anomalies', [])
+
+            metrics_data = {
+                'metrics': result['metrics'],
+                'summary': result['summary'],
+                'performance': result['performance'],
+                'data_quality': result['data_quality'],
+                'ebilling_status': result.get('ebilling_status'),
+                'duplicate_anomalies': result.get('duplicate_anomalies', []),
+                'omc_risk_profile': result.get('omc_risk_profile', []),
+                'anomalies': anomalies,
+            }
+            set_cached_result(cache_key, metrics_data)
+            logger.info(f"✅ Graph cached full result for materiality={materiality}")
+
+        anomalies_df = pd.DataFrame(anomalies)
+        dispatches_df = pd.read_sql("SELECT dispatch_id, omc_id, depot FROM dispatches", get_engine())
+        data = graph_engine.build_fraud_graph_from_dataframes(anomalies_df, dispatches_df)
         return {'status': 'success', 'data': data}
 
     except Exception as e:

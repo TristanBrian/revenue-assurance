@@ -255,6 +255,41 @@ export interface AuthUser {
   permissions: string[];
 }
 
+// Mirrors backend/app/schemas/user.py's UserOut — the /api/admin/users shape.
+export interface AdminUser {
+  id: string;
+  email: string;
+  full_name: string | null;
+  is_active: boolean;
+  created_at: string;
+  roles: string[];
+  permissions: string[];
+}
+
+export interface CreateUserPayload {
+  email: string;
+  password: string;
+  full_name?: string;
+  role_name: string;
+}
+
+// Mirrors UpdateUserRequest — every field optional, only what's provided changes.
+export interface UpdateUserPayload {
+  email?: string;
+  full_name?: string;
+  role_name?: string;
+  password?: string;
+  is_active?: boolean;
+}
+
+export const ROLE_NAMES = [
+  "depot_supervisor",
+  "manager",
+  "revenue_assurance",
+  "system_admin",
+] as const;
+export type RoleName = (typeof ROLE_NAMES)[number];
+
 // Mirrors backend/app/schemas/feed.py.
 export interface FeedData {
   anomalies: Anomaly[];

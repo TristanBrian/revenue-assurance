@@ -79,6 +79,26 @@ const NAV_ITEMS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: "/dashboard/reports",
+    label: "Reports",
+    anyOf: ["export_reports"],
+    icon: (
+      <svg className="w-5 h-5 mr-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2a4 4 0 014-4h4m0 0l-3-3m3 3l-3 3M4 7h16M4 7a2 2 0 002 2h12a2 2 0 002-2M4 7a2 2 0 012-2h12a2 2 0 012 2" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/admin",
+    label: "User Management",
+    anyOf: ["manage_users"],
+    icon: (
+      <svg className="w-5 h-5 mr-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+    ),
+  },
 ];
 
 function formatKes(value: number): string {
@@ -103,27 +123,29 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!user) return;
 
-    // 1. Fetch metrics for anomaly count badge
-    getMetrics(materiality)
-      .then((data) => {
-        setAnomalyCount(data.metrics.anomaly_count);
-      })
-      .catch(() => {});
+    // Each badge's source call is gated on the same permission that gates
+    // its nav item — a role without it would otherwise 403 on every
+    // dashboard load for a badge it can't even see, on every page.
+    if (user.permissions.includes("view_metrics")) {
+      getMetrics(materiality)
+        .then((data) => setAnomalyCount(data.metrics.anomaly_count))
+        .catch(() => {});
+    }
 
-    // 2. Fetch OMC profile for High Risk OMCs badge
-    getOmcRiskProfile(materiality)
-      .then((profiles) => {
-        const highRisk = profiles.filter((p) => p.risk_level === "High").length;
-        setHighRiskCount(highRisk);
-      })
-      .catch(() => {});
+    if (user.permissions.includes("view_omc_risk_profile")) {
+      getOmcRiskProfile(materiality)
+        .then((profiles) => {
+          const highRisk = profiles.filter((p) => p.risk_level === "High").length;
+          setHighRiskCount(highRisk);
+        })
+        .catch(() => {});
+    }
 
-    // 3. Fetch E-Billing status for failed sync logs count badge
-    getEbillingStatus()
-      .then((status) => {
-        setFailedSyncCount(status.failed_count);
-      })
-      .catch(() => {});
+    if (user.permissions.includes("manage_ebilling")) {
+      getEbillingStatus()
+        .then((status) => setFailedSyncCount(status.failed_count))
+        .catch(() => {});
+    }
   }, [user, materiality]);
 
   function handleLogout() {

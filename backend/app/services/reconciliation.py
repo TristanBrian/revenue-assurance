@@ -120,18 +120,27 @@ def calculate_data_quality(df: pd.DataFrame, customer_col: str, value_col: str) 
     )
 
 
+MAX_DUPLICATE_DETAILS = 100
+
+
 def detect_duplicates(df: pd.DataFrame, column: str, label: str) -> List[Dict]:
     if column not in df.columns:
         return []
     dupes = df[df.duplicated(subset=[column], keep=False)]
     if dupes.empty:
         return []
+    # 'details' is capped, not the full duplicate set: on this dataset a single
+    # noisy column can mark 17,000+ rows as "duplicated", and dumping every one
+    # of them (full row, every column) turned a <1KB metrics response into a
+    # 3.2MB one — nothing in the frontend renders this list at all, it's a
+    # sample for the Excel export's "Duplicates" sheet. duplicate_count still
+    # reports the true total; only the row sample is bounded.
     return [{
         'type': 'Duplicate Detection',
         'column': column,
         'label': label,
         'duplicate_count': len(dupes),
-        'details': dupes.to_dict(orient='records')
+        'details': dupes.head(MAX_DUPLICATE_DETAILS).to_dict(orient='records')
     }]
 
 
