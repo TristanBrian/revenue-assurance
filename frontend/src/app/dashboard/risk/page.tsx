@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ApiError, reconcile } from "@/lib/api";
+import { ApiError, getOmcRiskProfile } from "@/lib/api";
 import type { OmcRiskProfile as OmcRiskProfileEntry } from "@/lib/types";
 import Heatmap from "@/components/Heatmap";
 import OmcRiskProfile from "@/components/OmcRiskProfile";
@@ -16,9 +16,9 @@ function RiskProfileSection() {
   useEffect(() => {
     let cancelled = false;
 
-    reconcile(0)
+    getOmcRiskProfile(0)
       .then((data) => {
-        if (!cancelled) setProfiles(data.omc_risk_profile);
+        if (!cancelled) setProfiles(data);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -62,7 +62,7 @@ export default function RiskPage() {
 
       <hr className="border-zinc-200 dark:border-zinc-800" />
 
-      <RequirePermission code="view_risk_profile">
+      <RequirePermission code="view_omc_risk_profile">
         <RiskProfileSection />
       </RequirePermission>
 

@@ -32,13 +32,19 @@ router = APIRouter()
 
 
 @router.get("", response_model=FraudGraphResponse)
-async def fraud_graph(
+def fraud_graph(
     materiality: float = Query(0, description="Min leakage to include"),
     user: User = Depends(require_permission("view_fraud_graph")),
 ):
     """
     Returns the OMC<->Depot leakage graph with Louvain community detection —
     clusters of correlated revenue leakage worth a closer audit.
+
+    Plain def, not async def, same reasoning as routes/reconcile.py's block
+    comment — build_fraud_graph() runs the same synchronous reconciliation
+    pipeline plus NetworkX/Louvain on top, all CPU-bound. Same for the three
+    routes below it in this file (build_omc_depot_graph, detect_risk_communities,
+    get_omc_risk all being equally synchronous and non-trivial).
     """
     try:
         data = build_fraud_graph(materiality=materiality)
@@ -56,7 +62,7 @@ async def fraud_graph(
 
 
 @router.get("/network", response_model=NetworkResponse)
-async def get_network(user: User = Depends(require_permission("view_fraud_graph"))):
+def get_network(user: User = Depends(require_permission("view_fraud_graph"))):
     g = graph_engine.build_omc_depot_graph(get_engine())
     nodes = [OmcDepotNode(id=n, type=d.get("type", "unknown")) for n, d in g.nodes(data=True)]
     edges = [
@@ -73,12 +79,12 @@ async def get_network(user: User = Depends(require_permission("view_fraud_graph"
 
 
 @router.get("/communities", response_model=list[CommunityOut])
-async def get_communities(user: User = Depends(require_permission("view_fraud_graph"))):
+def get_communities(user: User = Depends(require_permission("view_fraud_graph"))):
     return graph_engine.detect_risk_communities(get_engine())
 
 
 @router.get("/omc/{omc_id}", response_model=OmcRiskDetail)
-async def get_omc_detail(omc_id: str, user: User = Depends(require_permission("view_fraud_graph"))):
+def get_omc_detail(omc_id: str, user: User = Depends(require_permission("view_fraud_graph"))):
     engine = get_engine()
     try:
         features = detective_service.get_omc_risk(engine, omc_id)

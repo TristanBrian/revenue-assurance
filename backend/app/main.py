@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
+from app.middleware.audit import AuditMiddleware
 from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit  # <-- ADDED feed, heatmap, auth, detective, graph, admin, audit
 # import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
@@ -14,8 +15,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger("kpc.startup")
 
 
+# ============================================================================
+# LIFESPAN (Runs on startup)
+# ============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Check database connection
     engine = get_engine()
     safe_url = engine.url.render_as_string(hide_password=True)
     try:
@@ -24,9 +29,13 @@ async def lifespan(app: FastAPI):
         logger.info(f"✅ Database connected successfully ({safe_url})")
     except Exception as e:
         logger.error(f"❌ Database connection failed ({safe_url}): {e}")
+
     yield
 
 
+# ============================================================================
+# FASTAPI APP
+# ============================================================================
 app = FastAPI(
     title="KPC Revenue Assurance API",
     description="Order-to-Cash Leakage Detection & E-Billing Integration",
@@ -35,10 +44,12 @@ app = FastAPI(
 )
 
 # Standardized {Success, Message, Data, Timestamp} response envelope for
-# every route. Added before CORSMiddleware so CORS ends up outermost in
-# the middleware stack and still applies its headers to the wrapped
-# response (and to error responses from this middleware itself).
+# every route, plus the fallback audit-logging middleware — both added
+# before CORSMiddleware so CORS ends up outermost in the middleware stack
+# and still applies its headers to the wrapped/audited response (and to
+# error responses from either middleware itself).
 app.add_middleware(ResponseEnvelopeMiddleware)
+app.add_middleware(AuditMiddleware)
 
 # CORS
 app.add_middleware(
@@ -86,8 +97,8 @@ async def root():
             "POST /api/e-billing/webhook - KRA webhook callback",
             "GET /api/e-billing/reconcile - E-Billing reconciliation dashboard",
             "GET /api/e-billing/monitor - Failure rate monitoring",
-            "GET /api/feed - Live anomaly feed",          # <-- NEW
-            "GET /api/heatmap - Leakage heatmap (OMC × Product)",  # <-- NEW
+            "GET /api/feed - Live anomaly feed",
+            "GET /api/heatmap - Leakage heatmap (OMC × Product)",
             "GET /api/detective/risk-features - OMC risk features (all OMCs)",
             "GET /api/detective/risk-features/{omc_id} - OMC risk features (single OMC)",
             "GET /api/detective/risk-features/export - Download risk features as CSV",
@@ -100,12 +111,13 @@ async def root():
             "DELETE /api/admin/users/{user_id} - Delete a user",
             "GET /api/audit/logs - Paginated, filterable audit trail",
             "GET /api/audit/logs/{log_id} - Single audit log entry",
+            "GET /api/audit/summary - Aggregate audit stats for the last N days",
+            "GET /api/audit/me - Current user's own audit trail",
             "GET /health - Health check"
         ]
     }
 
 
-# 🆕 VERSION ENDPOINT
 @app.get("/version")
 async def version():
     """
@@ -126,7 +138,7 @@ async def health_check():
     """
     db_status = "disconnected"
     start_time = time.time()
-    
+
     try:
         engine = get_engine()
         with engine.connect() as conn:
@@ -134,7 +146,7 @@ async def health_check():
         db_status = "connected"
     except Exception as e:
         db_status = f"error: {str(e)}"
-    
+
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
         "database": db_status,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ApiError, reconcile, updateAnomalyStatus } from "@/lib/api";
+import { ApiError, getAnomalies, updateAnomalyStatus } from "@/lib/api";
 import type { Anomaly } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import AnomalyTable from "@/components/AnomalyTable";
@@ -22,7 +22,10 @@ function AnomaliesContent() {
   useEffect(() => {
     let cancelled = false;
 
-    reconcile(materiality)
+    // page_size 100 (the backend's max) rather than the default 20 — this
+    // page has no pager UI yet, so it shows as many rows as one page can
+    // hold instead of silently truncating to 20.
+    getAnomalies(materiality, 1, 100)
       .then((data) => {
         if (!cancelled) setAnomalies(data.anomalies);
       })
@@ -114,7 +117,7 @@ function AnomaliesContent() {
 
 export default function AnomaliesPage() {
   return (
-    <RequirePermission code="view_anomalies">
+    <RequirePermission code="view_anomaly_table">
       <AnomaliesContent />
     </RequirePermission>
   );
