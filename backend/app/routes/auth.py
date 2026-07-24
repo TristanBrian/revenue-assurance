@@ -5,6 +5,7 @@ from app.core.dependencies import get_current_user, get_db, require_permission
 from app.core.security import create_access_token, verify_password
 from app.models.user import User
 from app.schemas.user import LoginRequest, LoginResponse, RegisterRequest, UserOut
+from app.services.audit_service import log_action
 from app.services.user_service import EmailAlreadyRegisteredError, RoleNotFoundError, register_user
 
 router = APIRouter()  # prefix="/api/auth" and tags=["Auth"] are supplied by main.py's include_router(), matching every other route file
@@ -14,7 +15,7 @@ router = APIRouter()  # prefix="/api/auth" and tags=["Auth"] are supplied by mai
 def register(
     payload: RegisterRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("manage_users")),
+    admin: User = Depends(require_permission("manage_users")),
 ):
     """
     Creates a new user and assigns a role. Requires the caller to already
@@ -30,6 +31,7 @@ def register(
             password=payload.password,
             full_name=payload.full_name,
             role_name=payload.role_name,
+            actor_user_id=admin.id,
         )
     except EmailAlreadyRegisteredError:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -42,13 +44,33 @@ def register(
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.hashed_password):
+        log_action(
+            db,
+            actor_user_id=None,
+            action="auth.login_failure",
+            target_type="user",
+            metadata={"attempted_email": payload.email},
+        )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     if not user.is_active:
+        log_action(
+            db,
+            actor_user_id=None,
+            action="auth.login_failure",
+            target_type="user",
+            target_id=str(user.id),
+            metadata={"attempted_email": payload.email, "reason": "inactive"},
+        )
+        db.commit()
         raise HTTPException(status_code=403, detail="User is inactive")
+
+    log_action(db, actor_user_id=user.id, action="auth.login_success", target_type="user", target_id=str(user.id))
+    db.commit()
 
     token = create_access_token(subject=user.email)
     return {"access_token": token, "token_type": "bearer"}

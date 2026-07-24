@@ -119,8 +119,8 @@ Every API route except `POST /api/auth/login`, `POST /api/auth/register` (bootst
 | Role | Description | Key Features |
 | :--- | :--- | :--- |
 | **Depot Supervisor** | Operations Lead – manages daily depot activities. | Live Feed, Upload CSV & Templates, Executive Metrics |
-| **Manager** | Strategic Decision Maker – oversees regional operations. | Live Feed, Heatmap, OMC Risk Profile, Executive Metrics, Anomaly Table, Export Reports |
-| **Revenue Assurance** | Financial Analyst – investigates and resolves anomalies. | All Manager features + Upload CSV/Templates, Resolve/Review/Assign, E-Billing Sync, Fraud Graph, Risk Analytics |
+| **Manager** | Strategic Decision Maker – oversees regional operations. | Live Feed, Heatmap, OMC Risk Profile, Executive Metrics, Anomaly Table, Export Reports, Audit Trail |
+| **Revenue Assurance** | Financial Analyst – investigates and resolves anomalies. | All Manager features + Upload CSV/Templates, Resolve/Review/Assign, E-Billing Sync, Fraud Graph, Risk Analytics, Audit Trail |
 | **System Admin** | Platform administrator. Scoped only to user management — no access to any revenue-assurance feature below. | Create/list/edit/delete users, assign roles |
 
 Role names are matched loosely at registration/edit time rather than requiring an exact string: `"supervisor"`, `"depot"`, `"depo"` all map to `depot_supervisor`; `"man"`, `"manager"`, `"MANAGER"` map to `manager`; anything containing `"revenue"` or `"assurance"` maps to `revenue_assurance`.
@@ -248,8 +248,10 @@ Every row below except `/api/auth/login`, `/api/auth/register`, and `/api/e-bill
 | GET    | `/api/admin/users`                | `manage_users`              | List all users                                                    |
 | PATCH  | `/api/admin/users/{user_id}`      | `manage_users`              | Edit a user's email/name/role/password/active status              |
 | DELETE | `/api/admin/users/{user_id}`      | `manage_users`              | Delete a user (blocked for self and the last `system_admin`)     |
-| GET    | `/api/audit/logs`                 | `view_audit`                | Paginated audit log (who did what, when)                          |
-| GET    | `/api/audit/summary`              | `view_audit`                | Audit summary for the last N days                                 |
+| GET    | `/api/audit/logs`                 | `view_audit`                | Paginated, filterable audit trail (actor/action/target/date range) |
+| GET    | `/api/audit/logs/{log_id}`        | `view_audit`                | Single audit log entry                                            |
+| GET    | `/api/audit/summary`              | `view_audit`                | Aggregate audit stats (by action/actor) for the last N days       |
+| GET    | `/api/audit/me`                   | `view_audit`                | Current user's own audit trail                                    |
 | GET    | `/health`                         | —                           | Service health check (DB + API status)                            |
 
 
