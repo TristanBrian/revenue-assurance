@@ -5,7 +5,7 @@ from app.models.user import User
 from app.services.audit_service import log_action
 from app.services.e_billing import (
     sync_invoices_to_ebilling,
-    get_ebilling_status,          # kept for connection info
+    get_ebilling_status,          # This already returns the correct schema fields
     get_ebilling_sync_logs,
     retry_failed_sync,
     get_pending_invoices,
@@ -83,24 +83,10 @@ def _get_anomalies(materiality: float = 100000):
 @router.get("/e-billing/status", response_model=EBillingStatusResponse)
 async def ebilling_status(_=Depends(require_permission("manage_ebilling"))):
     """
-    Get E-Billing integration status (uses cached reconciliation data).
+    Get E-Billing integration status – uses the service function which matches the schema.
     """
     try:
-        anomalies = _get_anomalies(materiality=100000)
-        pending = [a for a in anomalies if a.get('ebilling_status') == 'Pending']
-        synced = [a for a in anomalies if a.get('ebilling_status') == 'Synced']
-        total = len(anomalies)
-
-        # Keep the original system connection status
-        legacy_status = get_ebilling_status()
-        status = {
-            'system': legacy_status.get('system', 'KRA iCMS (Simulated)'),
-            'connected': legacy_status.get('connected', True),
-            'total_pending': len(pending),
-            'total_synced': len(synced),
-            'total_anomalies': total,
-            'last_sync': None  # could pull from logs if needed
-        }
+        status = get_ebilling_status()
         return {'status': 'success', 'integration': status}
     except Exception as e:
         logger.error(f"E-Billing status error: {e}")
@@ -194,9 +180,6 @@ def sync_ebilling(
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("manage_ebilling")),
 ):
-    """
-    Trigger synchronous sync of invoices. (Unchanged)
-    """
     try:
         result = sync_invoices_to_ebilling(invoice_ids)
         log_action(
@@ -220,9 +203,6 @@ async def sync_ebilling_async(
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("manage_ebilling")),
 ):
-    """
-    Trigger ASYNC sync of pending invoices. (Unchanged)
-    """
     try:
         task_id = str(uuid.uuid4())
         background_tasks.add_task(run_sync_task, task_id, invoice_ids)
@@ -247,9 +227,6 @@ async def sync_ebilling_async(
 
 @router.get("/e-billing/task/{task_id}", response_model=EBillingTaskStatus)
 async def get_task(task_id: str, _=Depends(require_permission("manage_ebilling"))):
-    """
-    Get the status of a background sync task. (Unchanged)
-    """
     status = get_task_status(task_id)
     if status.get("status") == "not_found":
         raise HTTPException(status_code=404, detail="Task not found")
@@ -261,9 +238,6 @@ async def ebilling_logs(
     limit: int = Query(50, description="Number of log entries to return", ge=1, le=100),
     _=Depends(require_permission("manage_ebilling")),
 ):
-    """
-    Get recent sync logs (capped at 100). (Unchanged)
-    """
     try:
         logs = get_ebilling_sync_logs(limit)
         return {'status': 'success', 'logs': logs, 'count': len(logs)}
@@ -278,9 +252,6 @@ def retry_ebilling(
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("manage_ebilling")),
 ):
-    """
-    Retry a failed sync for a specific invoice. (Unchanged)
-    """
     try:
         result = retry_failed_sync(invoice_id)
         log_action(
@@ -300,9 +271,6 @@ def retry_ebilling(
 
 @router.post("/e-billing/webhook", response_model=EBillingWebhookResponse)
 async def kra_webhook(payload: dict = Body(...)):
-    """
-    Simulate KRA's webhook callback. (Unchanged)
-    """
     try:
         result = handle_webhook(payload)
         return result
@@ -312,7 +280,7 @@ async def kra_webhook(payload: dict = Body(...)):
 
 
 # ============================================================================
-# PAGINATED ENDPOINTS (unchanged)
+# PAGINATED ENDPOINTS
 # ============================================================================
 
 @router.get("/e-billing/logs/paginated", response_model=EBillingLogsPaginatedResponse)
@@ -321,9 +289,6 @@ async def ebilling_logs_paginated(
     page_size: int = Query(20, description="Items per page", ge=1, le=100),
     _=Depends(require_permission("manage_ebilling")),
 ):
-    """
-    Get paginated sync logs. (Unchanged)
-    """
     try:
         result = get_ebilling_sync_logs_paginated(page, page_size)
         return {'status': 'success', **result}
@@ -338,9 +303,6 @@ async def ebilling_pending_paginated(
     page_size: int = Query(20, description="Items per page", ge=1, le=100),
     _=Depends(require_permission("manage_ebilling")),
 ):
-    """
-    Get paginated list of pending invoices with details. (Unchanged)
-    """
     try:
         result = get_pending_invoices_paginated(page, page_size)
         return {'status': 'success', **result}
@@ -351,9 +313,6 @@ async def ebilling_pending_paginated(
 
 @router.post("/e-billing/cache/refresh", response_model=EBillingCacheRefreshResponse)
 async def refresh_ebilling_cache(_=Depends(require_permission("manage_ebilling"))):
-    """
-    Manually refresh the total count cache. (Unchanged)
-    """
     try:
         invalidate_total_count_cache()
         return {'status': 'success', 'message': 'Cache invalidated'}
