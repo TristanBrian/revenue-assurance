@@ -143,7 +143,7 @@ export default function EbillingPanel() {
     setWebhookSubmitting(true);
     setWebhookFeedback(null);
     try {
-      const res = await sendEbillingWebhook({
+      await sendEbillingWebhook({
         invoice_id: webhookInvoiceId,
         status: webhookStatus,
         message: webhookMessage,
