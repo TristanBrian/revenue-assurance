@@ -24,6 +24,7 @@ import io
 import logging
 import math
 from app.utils.db_connection import get_engine
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -139,8 +140,15 @@ def reconcile_anomalies(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     page: int = Query(1, description="Page number", ge=1),
     page_size: int = Query(20, description="Items per page", ge=1, le=100),
+    break_type: Optional[str] = Query(None, description="Filter by break type (e.g. Overpayment, Underpayment, Missing Invoice, Missing Payment)"),
+    status: Optional[str] = Query(None, description="Filter by status (e.g. Critical, Pending, Review Required, Reconciled)"),
+    search: Optional[str] = Query(None, description="Search across OMC, dispatch ID, product, invoice ID"),
     _: User = Depends(require_permission("view_anomaly_table")),
 ):
+    """
+    Anomaly Table feature: paginated raw anomaly rows with filtering.
+    Uses cached reconciliation data to avoid re-running full reconciliation.
+    """
     try:
         cache_key = f"metrics_{materiality}"
         cached = get_cached_result(cache_key)
@@ -164,6 +172,21 @@ def reconcile_anomalies(
             metrics_data = deep_sanitize(metrics_data)
             set_cached_result(cache_key, metrics_data)
             all_anomalies = result.get('anomalies', [])
+
+        # --- Apply filters (if provided) ---
+        if break_type:
+            all_anomalies = [a for a in all_anomalies if a.get('break_type') == break_type]
+        if status:
+            all_anomalies = [a for a in all_anomalies if a.get('status') == status]
+        if search:
+            search_lower = search.lower()
+            all_anomalies = [
+                a for a in all_anomalies
+                if search_lower in str(a.get('dispatch_id', '')).lower()
+                or search_lower in str(a.get('customer', '')).lower()
+                or search_lower in str(a.get('product', '')).lower()
+                or search_lower in str(a.get('invoice_id', '')).lower()
+            ]
 
         total_anomalies = int(len(all_anomalies))
         total_pages = int((total_anomalies + page_size - 1) // page_size) if total_anomalies > 0 else 1
