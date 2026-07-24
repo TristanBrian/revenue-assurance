@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import Link from "next/link";
 import { ApiError, getMetrics, getOmcRiskProfile } from "@/lib/api";
 import type {
   Metrics,
@@ -149,45 +148,20 @@ export default function ExecutiveDashboardPage() {
           </h1>
         </header>
 
-        <div className="bg-zinc-900/35 border border-zinc-900 rounded-xl p-6 flex flex-col gap-4 shadow-lg">
-          <h2 className="text-base font-bold text-white">
+        <div className="bg-white dark:bg-zinc-900/35 border border-zinc-200 dark:border-zinc-900 rounded-xl p-6 flex flex-col gap-4 shadow-sm">
+          <h2 className="text-base font-bold text-zinc-800 dark:text-white">
             Welcome, {user.email}
           </h2>
-          <p className="text-xs text-zinc-400 leading-relaxed">
-            You are logged in as a{" "}
-            <strong className="font-bold text-zinc-200">
-              System Administrator
-            </strong>
-            . This account is designated for role management, user
-            administration, and system-level configuration rather than financial
-            operations.
+          <p className="text-xs text-zinc-550 dark:text-zinc-400 leading-relaxed">
+            You are logged in as a **System Administrator**. This account is
+            designated for role management, user administration, and
+            system-level configuration rather than financial operations.
           </p>
           <p className="text-xs text-indigo-650 dark:text-indigo-400 font-semibold bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30 rounded p-3">
             💡 To inspect financial leakages, executive dashboards, or webhooks,
             please sign in with an operational account (e.g. Revenue Assurance
             or Manager).
           </p>
-          {user.permissions.includes("manage_users") && (
-            <Link
-              href="/dashboard/admin"
-              className="self-start flex items-center gap-1.5 px-3.5 py-2 rounded bg-indigo-600 hover:bg-indigo-500 transition-colors text-xs font-bold text-white shadow-[0_0_15px_rgba(99,102,241,0.25)]"
-            >
-              Go to User Management
-              <svg
-                className="w-3.5 h-3.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M17 8l4 4m0 0l-4 4m4-4H3"
-                />
-              </svg>
-            </Link>
-          )}
         </div>
       </div>
     );
