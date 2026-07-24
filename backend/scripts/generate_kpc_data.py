@@ -29,14 +29,36 @@ np.random.seed(42)
 
 # --- GLOBAL CONFIGURATION & CONSTANTS ---
 CONFIG = {
-    "num_dispatches": 50000,
-    "unmetered_loading_leak": 0.03,  # Loading events with missing/bypassed dispatch
-    "dispatch_loading_skew": 0.05,   # Discrepancy between physical loaded vs dispatch volumes
-    "invoice_leak": 0.08,            # Dispatches that are never invoiced
-    "payment_leak": 0.06,            # Invoices that receive no payments
-    "underpay_rate": 0.18,           # Payments that are less than invoice value
-    "installment_rate": 0.30,        # Payments split into multiple transactions
-    "fraud_ring_size": 3,            # OMCs involved in anomalous high-volume patterns
+    "num_dispatches": 10000,
+    "fraud_ring_size": 3  # Added this key to fix the KeyError
+}
+
+# --- NEW: OMC RISK PROFILES ---
+LEAKAGE_PROFILES = {
+    "Good": { # 3 OMCs: Zero leakages (Perfect baseline)
+        "unmetered_loading_leak": 0.00, "dispatch_loading_skew": 0.00,
+        "invoice_leak": 0.00, "payment_leak": 0.00, "underpay_rate": 0.00,
+        "overpay_rate": 0.00,  # <-- NEW
+        "installment_rate": 0.00, "tariff_error_rate": 0.00
+    },
+    "Small": { # 10 OMCs: Very minor, occasional errors
+        "unmetered_loading_leak": 0.01, "dispatch_loading_skew": 0.02,
+        "invoice_leak": 0.02, "payment_leak": 0.01, "underpay_rate": 0.05,
+        "overpay_rate": 0.02,  # <-- NEW
+        "installment_rate": 0.10, "tariff_error_rate": 0.01
+    },
+    "Medium": { # 4 OMCs: Standard operational messiness
+        "unmetered_loading_leak": 0.05, "dispatch_loading_skew": 0.08,
+        "invoice_leak": 0.08, "payment_leak": 0.05, "underpay_rate": 0.20,
+        "overpay_rate": 0.05,  # <-- NEW
+        "installment_rate": 0.30, "tariff_error_rate": 0.05
+    },
+    "High": { # 3 OMCs: Massive leakages & targeted for fraud ring
+        "unmetered_loading_leak": 0.15, "dispatch_loading_skew": 0.20,
+        "invoice_leak": 0.20, "payment_leak": 0.15, "underpay_rate": 0.40,
+        "overpay_rate": 0.10,  # <-- NEW
+        "installment_rate": 0.50, "tariff_error_rate": 0.15
+    }
 }
 
 DEPOT_DISTANCES_KM = {
@@ -136,8 +158,13 @@ def generate_tariff_master():
 
 # --- 2. GENERATE OMC MASTER ---
 def generate_omc_master():
-    """Generates customer master records."""
+    """Generates customer master records with specific risk tiers."""
     omcs = []
+    
+    # Exactly 20 profiles to match the 20 OMC_NAMES
+    profiles = (["Good"] * 3) + (["Small"] * 10) + (["Medium"] * 4) + (["High"] * 3)
+    random.shuffle(profiles)
+    
     for idx, name in enumerate(OMC_NAMES, 1):
         omcs.append({
             'omc_id': f'OMC-{idx:03d}',
@@ -146,6 +173,7 @@ def generate_omc_master():
             'payment_terms_days': random.choice([15, 30, 45, 60]),
             'credit_limit_kes': random.randint(20000000, 80000000),
             'risk_rating': random.choices(['Low', 'Medium', 'High'], weights=[0.50, 0.35, 0.15])[0],
+            'risk_profile': profiles[idx-1], # Assign the assigned risk tier
             'contact_email': fake.company_email(),
             'phone': fake.phone_number(),
             'is_active': True
@@ -156,6 +184,9 @@ def generate_omc_master():
 # --- 3. GENERATE DEPOT LOADING LOGS & DISPATCHES ---
 def generate_loading_and_dispatches(omcs_df, tariffs_df):
     """Generates physical loading meter events and links them to commercial dispatches."""
+    # Map OMC IDs to their assigned risk profile
+    omc_profiles = dict(zip(omcs_df['omc_id'], omcs_df['risk_profile']))
+    
     dispatches = []
     loading_logs = []
     start_date = datetime(2025, 1, 1)
@@ -163,6 +194,8 @@ def generate_loading_and_dispatches(omcs_df, tariffs_df):
 
     for i in range(CONFIG["num_dispatches"]):
         omc = omcs_df.sample(1).iloc[0]
+        profile = LEAKAGE_PROFILES[omc_profiles[omc['omc_id']]] # Fetch specific rules
+        
         event_dt = start_date + timedelta(days=random.randint(0, (end_date - start_date).days),
                                          seconds=random.randint(0, 86400))
         date_str = event_dt.strftime('%Y-%m-%d')
@@ -186,8 +219,8 @@ def generate_loading_and_dispatches(omcs_df, tariffs_df):
         loading_id = f"LOAD-{i+1:06d}"
         dispatch_id = f"DISP-{i+1:05d}"
 
-        # Inject discrepancy between physical loading vs commercial dispatch log
-        if random.random() < CONFIG["dispatch_loading_skew"]:
+        # Inject discrepancy between physical loading vs commercial dispatch log based on profile
+        if random.random() < profile["dispatch_loading_skew"]:
             disp_vol = physical_loaded_liters * random.uniform(0.92, 0.98) # Under-recorded dispatch volume
         else:
             disp_vol = physical_loaded_liters
@@ -202,7 +235,7 @@ def generate_loading_and_dispatches(omcs_df, tariffs_df):
             'loading_id': loading_id,
             'gantry_bay_id': f"BAY-{random.randint(1, 12):02d}",
             'meter_id': f"MTR-{random.randint(100, 999)}",
-            'dispatch_id': None if random.random() < CONFIG["unmetered_loading_leak"] else dispatch_id,
+            'dispatch_id': None if random.random() < profile["unmetered_loading_leak"] else dispatch_id,
             'omc_id': omc['omc_id'],
             'depot': depot,
             'product': product,
@@ -257,16 +290,21 @@ def inject_fraud_ring(dispatches_df, omcs_df):
 
 
 # --- 5. GENERATE INVOICES ---
-def generate_invoices(dispatches_df):
+def generate_invoices(dispatches_df, omcs_df):
     """Generates invoices based on commercial dispatches, injecting unbilled leakage."""
+    omc_profiles = dict(zip(omcs_df['omc_id'], omcs_df['risk_profile']))
     invoices = []
+    
     for _, r in dispatches_df.iterrows():
-        if random.random() < CONFIG["invoice_leak"]:
+        profile = LEAKAGE_PROFILES[omc_profiles[r['omc_id']]]
+        
+        if random.random() < profile["invoice_leak"]:
             continue  # Uninvoiced dispatch (Revenue Leak)
 
         inv_dt = datetime.strptime(r['date'], '%Y-%m-%d') + timedelta(days=random.randint(1, 7))
         val = r['value_kes'] * random.uniform(0.98, 1.02)
-        if random.random() < 0.05:
+        
+        if random.random() < profile["tariff_error_rate"]:
             val *= random.uniform(0.70, 1.30)  # Tariff/calculation error
 
         invoices.append({
@@ -282,17 +320,21 @@ def generate_invoices(dispatches_df):
 
 
 # --- 6. GENERATE PAYMENTS ---
-def generate_payments(invoices_df):
+def generate_payments(invoices_df, omcs_df):
     """Generates payment records including underpayments and split installments."""
+    omc_profiles = dict(zip(omcs_df['omc_id'], omcs_df['risk_profile']))
     payments = []
+    
     for _, r in invoices_df.iterrows():
-        if random.random() < CONFIG["payment_leak"]:
+        profile = LEAKAGE_PROFILES[omc_profiles[r['omc_id']]]
+        
+        if random.random() < profile["payment_leak"]:
             continue  # Unpaid Invoice (Bad Debt / Payment Leak)
 
         pay_dt = datetime.strptime(r['date'], '%Y-%m-%d') + timedelta(days=random.randint(10, 60))
         val = r['value_kes']
 
-        if random.random() < CONFIG["installment_rate"]:
+        if random.random() < profile["installment_rate"]:
             p1 = val * random.uniform(0.50, 0.80)
             payments.append({
                 'payment_id': f'PAY-{random.randint(10000, 99999)}',
@@ -316,8 +358,11 @@ def generate_payments(invoices_df):
                     'installment_no': 2
                 })
         else:
-            if random.random() < CONFIG["underpay_rate"]:
+            if random.random() < profile["underpay_rate"]:
                 val *= random.uniform(0.75, 0.99)  # Partial payment / Underpayment
+            elif random.random() < profile["overpay_rate"]:
+                val *= random.uniform(1.01, 1.15)  # NEW: Overpayment (1% to 15% extra)
+                
             payments.append({
                 'payment_id': f'PAY-{random.randint(10000, 99999)}',
                 'invoice_id': r['invoice_id'],
@@ -419,8 +464,8 @@ if __name__ == "__main__":
     dispatches_df = inject_fraud_ring(dispatches_df, omcs_df)
 
     # Step 3: Order-to-Cash Invoicing & Payments
-    invoices_df = generate_invoices(dispatches_df)
-    payments_df = generate_payments(invoices_df)
+    invoices_df = generate_invoices(dispatches_df, omcs_df)
+    payments_df = generate_payments(invoices_df, omcs_df)
 
     # Step 4: Physical Tank Inventory Ledger
     inventory_df = generate_depot_inventory(dispatches_df)
