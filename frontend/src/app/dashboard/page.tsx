@@ -50,8 +50,12 @@ export default function ExecutiveDashboardPage() {
     if (!user || source === "upload") return;
 
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        setLoading(true);
+        setError(null);
+      }
+    });
 
     const promises = [
       canViewMetrics ? getMetrics(materiality) : Promise.resolve(null),

@@ -35,8 +35,12 @@ function AnomaliesContent() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        setLoading(true);
+        setError(null);
+      }
+    });
 
     getAnomalies(materiality, 1, 100)
       .then((data) => {
@@ -66,6 +70,7 @@ function AnomaliesContent() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [materiality, reloadToken]);
 
   async function handleResolve(dispatchId: string) {

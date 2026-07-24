@@ -63,8 +63,12 @@ export default function Heatmap() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        setLoading(true);
+        setError(null);
+      }
+    });
 
     getHeatmap(materiality)
       .then((data) => {

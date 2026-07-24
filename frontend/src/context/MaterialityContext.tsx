@@ -18,7 +18,9 @@ export function MaterialityProvider({ children }: { children: React.ReactNode })
     if (saved) {
       const parsed = Number(saved);
       if (!Number.isNaN(parsed) && parsed >= 0) {
-        setMaterialityState(parsed);
+        Promise.resolve().then(() => {
+          setMaterialityState(parsed);
+        });
       }
     }
   }, []);

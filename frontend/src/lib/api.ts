@@ -275,12 +275,12 @@ export async function sendEbillingWebhook(payload: {
   invoice_id: string;
   status: string;
   message?: string;
-}): Promise<any> {
+}): Promise<Record<string, unknown>> {
   const res = await fetch(new URL("/api/e-billing/webhook", API_URL), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return unwrap<any>(res);
+  return unwrap<Record<string, unknown>>(res);
 }
 

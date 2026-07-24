@@ -251,12 +251,11 @@ export default function FraudGraph() {
                   return (
                     <g
                       key={node.id}
-                      className="cursor-pointer"
                       onMouseEnter={(e) => handleNodeEnter(node, e)}
                       onMouseLeave={() => setHover(null)}
                       onClick={() => setSelectedId((prev) => (prev === node.id ? null : node.id))}
                       style={{ opacity: isDimmed ? 0.35 : 1 }}
-                      className="transition-all duration-300"
+                      className="cursor-pointer transition-all duration-300"
                     >
                       {/* Transparent hit area */}
                       <circle cx={node.x} cy={node.y} r={Math.max(node.r, 12) + 8} fill="transparent" />
