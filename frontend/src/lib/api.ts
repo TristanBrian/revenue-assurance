@@ -270,3 +270,17 @@ export async function updateAnomalyStatus(
   const res = await authFetch(url, { method: "POST" });
   return unwrap<UpdateAnomalyResponse>(res);
 }
+
+export async function sendEbillingWebhook(payload: {
+  invoice_id: string;
+  status: string;
+  message?: string;
+}): Promise<any> {
+  const res = await fetch(new URL("/api/e-billing/webhook", API_URL), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return unwrap<any>(res);
+}
+
