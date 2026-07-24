@@ -1,0 +1,21 @@
+omc_id,customer_name,kra_pin,payment_terms_days,credit_limit_kes,risk_rating,contact_email,phone,is_active
+OMC-001,TotalEnergies Kenya,P786579303Z,15,21678443,Medium,johnsonjoshua@taylor.net,296-500-1338,True
+OMC-002,Vivo Energy,P868820204Z,30,34979419,Low,lrobinson@pacheco-smith.com,001-765-642-3511x615,True
+OMC-003,Rubis Energy,P966647391Z,15,65412533,Medium,blairamanda@miller-carter.org,(993)710-3413x164,True
+OMC-004,Gulf Energy,P274648506Z,15,59627281,Low,michael41@reid.info,(748)535-0305x6413,True
+OMC-005,PetroOil Kenya,P803771909Z,15,26287781,Low,pfoster@thomas-taylor.net,+1-949-369-6532,True
+OMC-006,Hashi Energy,P911514914Z,15,57664518,Low,callahaneric@conner.org,366-697-8480,True
+OMC-007,Kobil,P925276600Z,60,34793519,Low,daniel62@smith-bowen.com,728.914.8932x52880,True
+OMC-008,National Oil,P120912992Z,45,74319958,High,hickmannatasha@allen-allen.org,417-618-2278,True
+OMC-009,Dalbit Petroleum,P666585408Z,30,66851341,Low,ibrandt@vaughn.com,587.213.3150x983,True
+OMC-010,Tamoil,P176228245Z,45,30434052,Low,perezrebecca@jones-young.info,582.399.7376,True
+OMC-011,Hass Petroleum,P204078666Z,45,26859215,Low,agomez@shields-brown.com,4658133387,True
+OMC-012,Galana Energies,P297018781Z,15,44090698,Medium,steven17@garcia.com,432-867-7360,True
+OMC-013,Lake Oil,P102314313Z,45,74165461,Low,ybaker@mitchell-horton.net,+1-972-434-3098x05009,True
+OMC-014,Texol Energies,P161073976Z,60,55985658,Low,yorkcasey@leonard.biz,793-699-0916,True
+OMC-015,Mombasa Petroleum,P319321646Z,60,25288191,Medium,john62@brewer.com,6794911838,True
+OMC-016,KPA Marine,P474745382Z,45,58745446,Low,suarezmike@kim.com,+1-680-684-1241x182,True
+OMC-017,KAA Aviation,P749431082Z,15,23075222,Medium,jenniferharris@farrell.com,964-800-5242,True
+OMC-018,Uganda National Oil,P702269164Z,45,25354748,High,rodriguezsierra@mckee.org,+1-526-520-4505,True
+OMC-019,Tanzania Petroleum,P816114302Z,15,45509839,Low,gomezanita@dickson-brady.com,(426)302-5634,True
+OMC-020,Ethiopian Oil,P510751046Z,45,30915531,Low,garrisonjeffrey@bailey-hoover.com,803.765.4145,True

@@ -36,11 +36,20 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path
 # ==========================================
 # 1. LOGGING & CONFIGURATION
 # ==========================================
+# Environment DB URIs & Directories
+RAW_DATA_DIR = "data/raw"
+CLEAN_DATA_DIR = "data/clean"
+LOG_DIR = "logs"
+
+# Ensure log directory exists before setting up file logging
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE_PATH = os.path.join(LOG_DIR, "kpc_etl_execution.log")
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler("kpc_etl_execution.log", encoding="utf-8"),
+        logging.FileHandler(LOG_FILE_PATH, encoding="utf-8"),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -211,6 +220,9 @@ def main():
     logger.info(" STARTING KPC REVENUE ASSURANCE ETL PIPELINE")
     logger.info("==================================================")
 
+    # Ensure clean data directory exists for SQLite database storage
+    os.makedirs(CLEAN_DATA_DIR, exist_ok=True)
+
     qm = AuditQuarantineManager()
     dq = DataQualitySuite(qm)
 
@@ -299,7 +311,11 @@ def main():
         DatabaseLoader.load_to_sqlite(datasets_clean)
 
     if TARGET_ENV in ["postgres", "both"]:
-        DatabaseLoader.load_to_postgres(datasets_clean)
+        # NEW SECURITY CHECK ADDED HERE
+        if not POSTGRES_URI:
+            logger.error("DATABASE_URL environment variable is not set. Cannot connect to PostgreSQL.")
+        else:
+            DatabaseLoader.load_to_postgres(datasets_clean)
 
     logger.info("==================================================")
     logger.info(" KPC REVENUE ETL PIPELINE EXECUTION COMPLETE")
