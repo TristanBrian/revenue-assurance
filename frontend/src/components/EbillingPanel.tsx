@@ -187,21 +187,41 @@ export default function EbillingPanel() {
       )}
 
       {task && (
-        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-55/40 dark:bg-zinc-900/40 px-4 py-3 text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></span>
-            {task.status === "running" && (
-              <span className="text-zinc-600 dark:text-zinc-300 font-medium">Sync task in progress...</span>
-            )}
-            {task.status === "completed" && task.result && (
-              <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                Last sync complete: {task.result.synced} success, {task.result.failed} failed.
-              </span>
-            )}
-            {task.status === "failed" && (
-              <span className="text-rose-600 dark:text-rose-400 font-medium">Sync failed: {task.error}</span>
+        <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-55/40 dark:bg-zinc-900/40 px-4 py-3 text-xs flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></span>
+              {task.status === "running" && (
+                <span className="text-zinc-600 dark:text-zinc-300 font-medium">
+                  Sync task in progress
+                  {typeof task.total === "number" &&
+                    ` — ${task.synced_so_far ?? 0} synced, ${task.failed_so_far ?? 0} failed of ${task.total}`}
+                </span>
+              )}
+              {task.status === "completed" && task.result && (
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                  Last sync complete: {task.result.synced} success, {task.result.failed} failed.
+                </span>
+              )}
+              {task.status === "failed" && (
+                <span className="text-rose-600 dark:text-rose-400 font-medium">Sync failed: {task.error}</span>
+              )}
+            </div>
+            {typeof task.progress === "number" && task.status === "running" && (
+              <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">{task.progress}%</span>
             )}
           </div>
+
+          {typeof task.progress === "number" && (
+            <div className="h-1.5 w-full rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ease-out ${
+                  task.status === "failed" ? "bg-rose-500" : task.status === "completed" ? "bg-emerald-500" : "bg-indigo-500"
+                }`}
+                style={{ width: `${Math.min(Math.max(task.progress, 0), 100)}%` }}
+              />
+            </div>
+          )}
         </div>
       )}
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { ApiError, getFraudGraph } from "@/lib/api";
-import type { FraudGraphData, FraudNode } from "@/lib/types";
+import type { FraudGraphData, GraphNode } from "@/lib/types";
 
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", {
@@ -12,7 +12,7 @@ function formatKes(value: number): string {
   }).format(value);
 }
 
-function riskFillClass(risk: FraudNode["risk_level"]): string {
+function riskFillClass(risk: GraphNode["risk_level"]): string {
   switch (risk) {
     case "High":
       return "fill-rose-500/90";
@@ -23,7 +23,7 @@ function riskFillClass(risk: FraudNode["risk_level"]): string {
   }
 }
 
-function riskBadgeClass(risk: FraudNode["risk_level"]): string {
+function riskBadgeClass(risk: GraphNode["risk_level"]): string {
   switch (risk) {
     case "High":
       return "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20";
@@ -35,10 +35,15 @@ function riskBadgeClass(risk: FraudNode["risk_level"]): string {
 }
 
 interface HoverState {
-  node: FraudNode;
+  node: GraphNode;
   x: number;
   y: number;
 }
+
+const WIDTH = 680;
+const HEIGHT = 460;
+const CENTER_X = WIDTH / 2;
+const CENTER_Y = HEIGHT / 2;
 
 export default function FraudGraph() {
   const [graph, setGraph] = useState<FraudGraphData | null>(null);
@@ -69,22 +74,32 @@ export default function FraudGraph() {
     };
   }, []);
 
-  const WIDTH = 680;
-  const HEIGHT = 460;
-
-  // Simple Force-Directed layout mapping
+  // GraphNode carries no coordinates — the API returns identity/risk data
+  // only, not a layout. Deterministic two-ring placement instead of a real
+  // force simulation: depots (few, structurally central) on an inner ring,
+  // OMCs (many, the leaves) on an outer ring, both ordered for a stable
+  // render across re-fetches.
   const laidOutNodes = useMemo(() => {
     if (!graph) return [];
-    
-    // Seed positions deterministically using layout coordinates
-    const nodes = graph.nodes.map((n) => ({
-      ...n,
-      x: n.x_coord * (WIDTH - 120) + 60,
-      y: n.y_coord * (HEIGHT - 120) + 60,
-      r: n.type === "depot" ? 10 : 8,
-    }));
 
-    return nodes;
+    const depots = graph.nodes.filter((n) => n.type === "depot");
+    const omcs = graph.nodes.filter((n) => n.type === "omc");
+    const innerRadius = Math.min(WIDTH, HEIGHT) * 0.2;
+    const outerRadius = Math.min(WIDTH, HEIGHT) * 0.42;
+
+    function ring(nodes: GraphNode[], radius: number, r: number) {
+      return nodes.map((n, i) => {
+        const angle = (i / Math.max(nodes.length, 1)) * 2 * Math.PI - Math.PI / 2;
+        return {
+          ...n,
+          x: CENTER_X + radius * Math.cos(angle),
+          y: CENTER_Y + radius * Math.sin(angle),
+          r,
+        };
+      });
+    }
+
+    return [...ring(depots, innerRadius, 10), ...ring(omcs, outerRadius, 8)];
   }, [graph]);
 
   const nodeById = useMemo(() => {
@@ -104,7 +119,7 @@ export default function FraudGraph() {
     return new Set(sorted.slice(0, 5).map((n) => n.id));
   }, [graph]);
 
-  function handleNodeEnter(node: FraudNode, e: React.MouseEvent) {
+  function handleNodeEnter(node: GraphNode, e: React.MouseEvent) {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     setHover({
@@ -243,7 +258,6 @@ export default function FraudGraph() {
                           cx={node.x}
                           cy={node.y}
                           r={node.r}
-                          className={riskFillClass(node.risk_level)}
                           stroke={isSelected ? "#6366f1" : "currentColor"}
                           strokeWidth={isSelected ? 3.5 : 1.5}
                           className={`transition-all duration-300 ${

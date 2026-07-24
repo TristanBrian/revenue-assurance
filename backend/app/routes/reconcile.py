@@ -177,7 +177,17 @@ def reconcile_anomalies(
         if break_type:
             all_anomalies = [a for a in all_anomalies if a.get('break_type') == break_type]
         if status:
-            all_anomalies = [a for a in all_anomalies if a.get('status') == status]
+            # "Resolved" is never a value of the primary `status` field —
+            # that one only ever holds Critical/Pending/Review Required/
+            # Reconciled, straight from run_reconciliation(). Resolution is
+            # a separate overlay (`resolution_status`, set by
+            # POST /reconcile/update and persisted in anomaly_resolutions),
+            # so status=Resolved has to check that field instead or it
+            # would silently match zero rows forever.
+            if status == "Resolved":
+                all_anomalies = [a for a in all_anomalies if a.get('resolution_status') == 'Resolved']
+            else:
+                all_anomalies = [a for a in all_anomalies if a.get('status') == status]
         if search:
             search_lower = search.lower()
             all_anomalies = [

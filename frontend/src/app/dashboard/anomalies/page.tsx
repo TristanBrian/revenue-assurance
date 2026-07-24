@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { useMateriality } from "@/context/MaterialityContext";
 import { getAnomalies, updateAnomalyStatus, ApiError } from "@/lib/api";
 import type { Anomaly } from "@/lib/types";
 import AnomalyTable from "@/components/AnomalyTable";
@@ -17,28 +18,54 @@ function formatKes(value: number): string {
 
 function AnomaliesContent() {
   const { user } = useAuth();
+  const { materiality } = useMateriality();
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [selectedAnomaly, setSelectedAnomaly] = useState<Anomaly | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filter states
+  // Search & Filter State
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [breakTypeFilter, setBreakTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
 
   const [resolving, setResolving] = useState(false);
 
+  // Debounce the search box so it doesn't fire a request per keystroke —
+  // the dropdowns change infrequently enough to not need this.
   useEffect(() => {
-    loadAnomalies();
-  }, []);
+    const handle = setTimeout(() => setSearchQuery(searchInput), 300);
+    return () => clearTimeout(handle);
+  }, [searchInput]);
 
+  // Filtering happens server-side: this page only ever fetches the first
+  // 100 (of up to ~14,000) anomalies, and they arrive sorted by
+  // leakage_kes descending — on this dataset that means every row in that
+  // page is "Overpayment" / "Review Required", so filtering that slice
+  // client-side made every other dropdown option look broken (correctly
+  // filtering down to zero matches within an unrepresentative 100-row
+  // sample). /reconcile/anomalies supports break_type/status/search query
+  // params precisely so filtering happens across the full set instead.
   async function loadAnomalies() {
+    // Deferred a microtask so the setState calls below never land
+    // synchronously inside the effect's call to loadAnomalies() —
+    // react-hooks/set-state-in-effect flags that as a cascading-render risk.
+    await Promise.resolve();
     setLoading(true);
     setError(null);
     try {
-      const data = await getAnomalies();
-      setAnomalies(data);
+      const data = await getAnomalies(materiality, 1, 100, {
+        breakType: breakTypeFilter === "All" ? undefined : breakTypeFilter,
+        status: statusFilter === "All" ? undefined : statusFilter,
+        search: searchQuery || undefined,
+      });
+      setAnomalies(data.anomalies);
+      // If we had a selected anomaly, update it with fresh data
+      if (selectedAnomaly) {
+        const fresh = data.anomalies.find((x) => x.dispatch_id === selectedAnomaly.dispatch_id);
+        if (fresh) setSelectedAnomaly(fresh);
+      }
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -50,12 +77,20 @@ function AnomaliesContent() {
     }
   }
 
+  useEffect(() => {
+    // Wrapped in .then() rather than called bare: react-hooks/set-state-in-effect
+    // flags a directly-invoked function as the effect's synchronous body
+    // regardless of what it does internally — this matches the .then/.catch/
+    // .finally deferral pattern used everywhere else in this codebase.
+    Promise.resolve().then(() => loadAnomalies());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materiality, breakTypeFilter, statusFilter, searchQuery]);
+
   async function handleResolve(dispatchId: string) {
     if (!confirm("Are you sure you want to mark this anomaly as resolved?")) return;
     setResolving(true);
     try {
       await updateAnomalyStatus(dispatchId, "Resolved");
-      // Reload page state
       await loadAnomalies();
       setSelectedAnomaly(null);
     } catch (err) {
@@ -64,29 +99,6 @@ function AnomaliesContent() {
       setResolving(false);
     }
   }
-
-  // Filter logic
-  const filteredAnomalies = useMemo(() => {
-    return anomalies.filter((a) => {
-      // 1. Search Query
-      const q = searchQuery.toLowerCase();
-      const matchSearch =
-        a.customer.toLowerCase().includes(q) ||
-        a.dispatch_id.toLowerCase().includes(q) ||
-        (a.invoice_id && a.invoice_id.toLowerCase().includes(q)) ||
-        a.product.toLowerCase().includes(q);
-
-      // 2. Break Type Filter
-      const matchBreakType =
-        breakTypeFilter === "All" || a.break_type === breakTypeFilter;
-
-      // 3. Status Filter
-      const matchStatus =
-        statusFilter === "All" || a.status === statusFilter;
-
-      return matchSearch && matchBreakType && matchStatus;
-    });
-  }, [anomalies, searchQuery, breakTypeFilter, statusFilter]);
 
   const canResolve = user?.permissions.includes("resolve_anomaly");
 
@@ -105,8 +117,8 @@ function AnomaliesContent() {
           <input
             type="text"
             placeholder="Search by OMC, waybill ID, product, or invoice ID..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-250 dark:border-zinc-800 hover:border-zinc-350 dark:hover:border-zinc-700 focus:border-indigo-500 focus:bg-white rounded-lg px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 placeholder-zinc-450 dark:placeholder-zinc-500 focus:outline-none transition-all shadow-inner"
           />
         </div>
@@ -154,7 +166,7 @@ function AnomaliesContent() {
 
       {!loading && !error && (
         <AnomalyTable
-          anomalies={filteredAnomalies}
+          anomalies={anomalies}
           onSelectAnomaly={setSelectedAnomaly}
           selectedAnomalyId={selectedAnomaly?.dispatch_id}
         />
