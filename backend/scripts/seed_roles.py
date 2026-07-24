@@ -1,10 +1,7 @@
 """
-Seeds the 3 roles named in your README (Depot Supervisor, Manager, Revenue
-Assurance) and a starter permission set.
-
-*** The permission-to-role mapping below is a PLACEHOLDER guess based only on
-the role names — I don't have your actual README permission matrix text.
-Edit ROLE_PERMISSIONS to match it before running this against real data. ***
+Seeds the 3 roles named in the README (Depot Supervisor, Manager, Revenue
+Assurance) plus system_admin, and the full permission set backing the
+feature permission matrix.
 
 Run with (from backend/, same as etl_pipeline.py):
     python scripts/seed_roles.py
@@ -14,36 +11,73 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.models.user import Permission, Role
+from app.models.permission import Permission
+from app.models.role import Role
 from app.utils.db_connection import SessionLocal
 
 PERMISSIONS = [
-    ("view_dashboard", "View reconciliation dashboard"),
-    ("upload_csv", "Upload dispatch/invoice/payment CSVs"),
+    ("view_live_feed", "View the live anomaly feed"),
+    ("upload_csv", "Upload dispatch/invoice/payment CSVs, and download CSV templates"),
+    ("view_heatmap", "View the OMC x Product leakage heatmap"),
+    ("view_omc_risk_profile", "View the OMC risk profile drill-down"),
+    ("view_metrics", "View executive/summary reconciliation metrics"),
+    ("view_anomaly_table", "View the full anomaly table"),
     ("resolve_anomaly", "Resolve/review/assign anomalies"),
-    ("view_audit", "View audit trail"),
-    ("manage_ebilling", "Trigger/retry e-billing sync"),
+    ("manage_ebilling", "Trigger/retry e-billing sync, view sync logs and monitoring"),
     ("export_reports", "Export Excel/CSV reports"),
-    ("view_fraud_graph", "View fraud/graph detection view"),
+    ("view_audit", "View the audit trail (who did what, when)"),
+    ("view_fraud_graph", "View fraud/graph detection view (structural/network analysis)"),
+    ("view_risk_analytics", "View OMC risk features (statistical/EDA analysis, no graph concept)"),
     ("manage_users", "Create, edit, deactivate users and assign roles to them"),
     ("manage_permissions", "Create/edit permissions and assign them to roles"),
 ]
 
-# PLACEHOLDER — replace with your actual matrix.
-# system_admin is scoped ONLY to user/permission control, not revenue-assurance
-# features — per your instruction that "his work is user control".
+# Feature permission matrix:
+#
+# | Feature                | Depot Supervisor | Manager | Revenue Assurance |
+# |-------------------------|:---:|:---:|:---:|
+# | Live Feed                | Y | Y | Y |
+# | Upload CSV / Templates    | Y | N | Y |
+# | Heatmap                  | N | Y | Y |
+# | OMC Risk Profile          | N | Y | Y |
+# | Executive Metrics         | Y | Y | Y |
+# | Anomaly Table             | N | Y | Y |
+# | Resolve/Review/Assign     | N | N | Y |
+# | E-Billing Sync            | N | N | Y |
+# | Export Reports            | N | Y | Y |
+# | Audit Trail               | N | Y | Y |
+#
+# system_admin is scoped ONLY to user/permission control, not
+# revenue-assurance features.
 ROLE_PERMISSIONS = {
     "system_admin": ["manage_users", "manage_permissions"],
-    "depot_supervisor": ["view_dashboard", "upload_csv"],
-    "manager": ["view_dashboard", "upload_csv", "resolve_anomaly", "export_reports"],
-    "revenue_assurance": [
-        "view_dashboard",
+    "depot_supervisor": [
+        "view_live_feed",
         "upload_csv",
-        "resolve_anomaly",
+        "view_metrics",
+    ],
+    "manager": [
+        "view_live_feed",
+        "view_heatmap",
+        "view_omc_risk_profile",
+        "view_metrics",
+        "view_anomaly_table",
+        "export_reports",
         "view_audit",
+    ],
+    "revenue_assurance": [
+        "view_live_feed",
+        "upload_csv",
+        "view_heatmap",
+        "view_omc_risk_profile",
+        "view_metrics",
+        "view_anomaly_table",
+        "resolve_anomaly",
         "manage_ebilling",
         "export_reports",
         "view_fraud_graph",
+        "view_risk_analytics",
+        "view_audit",
     ],
 }
 

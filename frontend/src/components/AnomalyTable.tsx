@@ -23,15 +23,25 @@ const columns: { key: SortKey; label: string }[] = [
 function statusClass(status: Anomaly["status"]): string {
   switch (status) {
     case "Critical":
-      return "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300";
+      return "bg-rose-500/10 text-rose-400 border border-rose-500/20";
     case "Review Required":
-      return "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300";
+      return "bg-amber-500/10 text-amber-400 border border-amber-500/20";
     default:
-      return "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300";
+      return "bg-zinc-800 text-zinc-300 border border-zinc-700/50";
   }
 }
 
-export default function AnomalyTable({ anomalies }: { anomalies: Anomaly[] }) {
+interface AnomalyTableProps {
+  anomalies: Anomaly[];
+  onSelectAnomaly?: (anomaly: Anomaly) => void;
+  selectedAnomalyId?: string | null;
+}
+
+export default function AnomalyTable({
+  anomalies,
+  onSelectAnomaly,
+  selectedAnomalyId,
+}: AnomalyTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("leakage_kes");
   const [sortDesc, setSortDesc] = useState(true);
 
@@ -40,9 +50,10 @@ export default function AnomalyTable({ anomalies }: { anomalies: Anomaly[] }) {
     copy.sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
-      const cmp = typeof av === "number" && typeof bv === "number"
-        ? av - bv
-        : String(av).localeCompare(String(bv));
+      const cmp =
+        typeof av === "number" && typeof bv === "number"
+          ? av - bv
+          : String(av).localeCompare(String(bv));
       return sortDesc ? -cmp : cmp;
     });
     return copy;
@@ -59,55 +70,73 @@ export default function AnomalyTable({ anomalies }: { anomalies: Anomaly[] }) {
 
   if (anomalies.length === 0) {
     return (
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        No anomalies at or above the current materiality threshold.
-      </p>
+      <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-8 text-center">
+        <p className="text-sm text-zinc-500">
+          No anomalies match the current filters or materiality threshold.
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
+    <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950/40">
       <table className="w-full min-w-[640px] text-left text-sm">
-        <thead className="border-b border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900">
+        <thead className="border-b border-zinc-800 bg-zinc-900/60 text-zinc-400 font-medium">
           <tr>
-            <th className="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">
+            <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">
               Dispatch ID
             </th>
             {columns.map((col) => (
               <th
                 key={col.key}
-                className="cursor-pointer select-none px-4 py-2 font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                className="cursor-pointer select-none px-4 py-3 text-xs uppercase tracking-wider font-semibold hover:text-white transition-colors"
                 onClick={() => toggleSort(col.key)}
               >
-                {col.label}
-                {sortKey === col.key ? (sortDesc ? " ↓" : " ↑") : ""}
+                <div className="flex items-center gap-1">
+                  <span>{col.label}</span>
+                  {sortKey === col.key && (
+                    <span className="text-indigo-400">{sortDesc ? "↓" : "↑"}</span>
+                  )}
+                </div>
               </th>
             ))}
-            <th className="px-4 py-2 font-medium text-zinc-500 dark:text-zinc-400">
+            <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">
               Status
             </th>
           </tr>
         </thead>
-        <tbody>
-          {sorted.map((a) => (
-            <tr
-              key={a.dispatch_id}
-              className="border-b border-zinc-100 last:border-0 dark:border-zinc-900"
-            >
-              <td className="px-4 py-2 font-mono text-xs">{a.dispatch_id}</td>
-              <td className="px-4 py-2">{a.customer}</td>
-              <td className="px-4 py-2">{a.break_type}</td>
-              <td className="px-4 py-2">{formatKes(a.leakage_kes)}</td>
-              <td className="px-4 py-2">{a.age_days}</td>
-              <td className="px-4 py-2">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusClass(a.status)}`}
-                >
-                  {a.status}
-                </span>
-              </td>
-            </tr>
-          ))}
+        <tbody className="divide-y divide-zinc-900 text-zinc-300">
+          {sorted.map((a, i) => {
+            const isSelected = selectedAnomalyId === a.dispatch_id;
+            return (
+              <tr
+                key={`${a.dispatch_id}-${i}`}
+                onClick={() => onSelectAnomaly?.(a)}
+                className={`group cursor-pointer border-zinc-900 transition-all duration-150 ${
+                  isSelected
+                    ? "bg-indigo-950/20 text-indigo-300"
+                    : "hover:bg-zinc-900/40"
+                }`}
+              >
+                <td className="px-4 py-3.5 font-mono text-xs font-semibold text-zinc-400 group-hover:text-zinc-200">
+                  {a.dispatch_id}
+                </td>
+                <td className="px-4 py-3.5 font-medium">{a.customer}</td>
+                <td className="px-4 py-3.5 text-zinc-400">{a.break_type}</td>
+                <td className="px-4 py-3.5 font-semibold font-mono text-white">
+                  {formatKes(a.leakage_kes)}
+                </td>
+                <td className="px-4 py-3.5 text-zinc-400">{a.age_days}</td>
+                <td className="px-4 py-3.5">
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusClass(a.status)}`}
+                  >
+                    {a.status}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

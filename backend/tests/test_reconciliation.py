@@ -83,16 +83,21 @@ def db_with_data(sample_data):
     omcs.to_sql('omcs', conn, if_exists='replace', index=False)
     
     conn.close()
-    
-    # Patch DB_PATH for this test
+
+    # Point run_reconciliation() at this throwaway SQLite file instead of the
+    # real kpc.db (DB_PATH no longer exists — services/reconciliation.py talks
+    # to the DB via get_engine() since the SQLAlchemy migration).
     import app.services.reconciliation as recon_module
-    original_path = recon_module.DB_PATH
-    recon_module.DB_PATH = db_path
-    
+    from sqlalchemy import create_engine
+    test_engine = create_engine(f'sqlite:///{db_path}')
+    original_get_engine = recon_module.get_engine
+    recon_module.get_engine = lambda: test_engine
+
     yield db_path
-    
+
     # Cleanup
-    recon_module.DB_PATH = original_path
+    recon_module.get_engine = original_get_engine
+    test_engine.dispose()
     os.remove(db_path)
 
 

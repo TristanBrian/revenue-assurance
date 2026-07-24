@@ -12,7 +12,10 @@ class TestETL(unittest.TestCase):
         self.assertTrue(os.path.exists('kpc.db'), "Database file missing!")
 
     def test_tables_exist(self):
-        tables = ['omcs', 'dispatches', 'invoices', 'payments', 'depot_ledger']
+        # depot_ledger was renamed to depot_daily_inventory by the ETL rewrite
+        # in commit 813c301 ("initial commit of KPC revenue ETL pipeline and
+        # data generator").
+        tables = ['omcs', 'dispatches', 'invoices', 'payments', 'depot_daily_inventory']
         for table in tables:
             df = load_table(table)
             self.assertGreater(len(df), 0, f"Table {table} is empty!")

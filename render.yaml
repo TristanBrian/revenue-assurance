@@ -1,0 +1,25 @@
+# Render Blueprint for the backend API.
+#
+# Inert until you connect this repo on Render (https://dashboard.render.com/blueprints)
+# — nothing here provisions anything on its own. DATABASE_URL and SECRET_KEY
+# are marked sync: false so Render prompts you for them in its dashboard
+# rather than storing secrets in this file.
+services:
+  - type: web
+    name: kpc-revenue-assurance-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "60"
+      - key: CORS_ORIGINS
+        value: https://*.vercel.app

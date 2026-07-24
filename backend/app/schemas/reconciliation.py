@@ -20,8 +20,12 @@ from typing import Any, Optional
 
 from pydantic import BaseModel
 
-from app.schemas.e_billing import EBillingSyncResult
+from app.schemas.e_billing import EBillingSyncResult, Pagination
 
+
+# ============================================================================
+# RECONCILIATION SCHEMAS
+# ============================================================================
 
 class Anomaly(BaseModel):
     dispatch_id: str
@@ -38,6 +42,13 @@ class Anomaly(BaseModel):
     ebilling_sync_date: Optional[str] = None
     age_days: int
     created_at: str
+    # Persisted overlay from anomaly_resolutions (app/models/anomaly_resolution.py) —
+    # None until someone calls POST /reconcile/update for this dispatch_id.
+    # Doesn't affect whether this anomaly appears at all; see
+    # services/reconciliation.py's resolution-overlay comment.
+    resolution_status: Optional[str] = None
+    resolution_notes: Optional[str] = None
+    resolution_updated_at: Optional[str] = None
 
 
 class Metrics(BaseModel):
@@ -113,7 +124,7 @@ class OmcRiskProfile(BaseModel):
 
 class ReconciliationData(BaseModel):
     metrics: Metrics
-    anomalies: list[Anomaly]
+    anomalies: list[Anomaly]  # This is now the PAGINATED list
     summary: ReconciliationSummary
     performance: PerformanceStats
     data_quality: DataQuality
@@ -122,16 +133,41 @@ class ReconciliationData(BaseModel):
     omc_risk_profile: list[OmcRiskProfile]
 
 
-class ReconciliationResponse(BaseModel):
-    """POST /reconcile"""
+# ============================================================================
+# RESPONSE SCHEMAS (WITH PAGINATION)
+# ============================================================================
+
+class MetricsResponse(BaseModel):
+    """POST /reconcile/metrics – Executive Metrics feature (gated view_metrics).
+    Everything from ReconciliationData except the anomaly table and OMC risk
+    profile, which are gated separately and live in their own endpoints."""
     status: str
-    data: ReconciliationData
+    metrics: Metrics
+    summary: ReconciliationSummary
+    performance: PerformanceStats
+    data_quality: DataQuality
+    ebilling_status: ReconciliationEbillingStatus
+    duplicate_anomalies: list[DuplicateAnomaly]
+
+
+class AnomalyTableResponse(BaseModel):
+    """GET /reconcile/anomalies – Anomaly Table feature (gated view_anomaly_table)."""
+    status: str
+    anomalies: list[Anomaly]
+    pagination: Pagination
+
+
+class OmcRiskProfileResponse(BaseModel):
+    """GET /reconcile/omc-risk-profile – OMC Risk Profile feature (gated view_omc_risk_profile)."""
+    status: str
+    omc_risk_profile: list[OmcRiskProfile]
 
 
 class ReconciliationUploadResponse(BaseModel):
-    """POST /reconcile/upload"""
+    """POST /reconcile/upload – returns reconciliation data with pagination."""
     status: str
     data: ReconciliationData
+    pagination: Pagination  # <-- Explicitly included
     message: str
 
 
