@@ -29,7 +29,8 @@ np.random.seed(42)
 
 # --- GLOBAL CONFIGURATION & CONSTANTS ---
 CONFIG = {
-    "num_dispatches": 50000
+    "num_dispatches": 10000,
+    "fraud_ring_size": 3  # Added this key to fix the KeyError
 }
 
 # --- NEW: OMC RISK PROFILES ---
@@ -37,21 +38,25 @@ LEAKAGE_PROFILES = {
     "Good": { # 3 OMCs: Zero leakages (Perfect baseline)
         "unmetered_loading_leak": 0.00, "dispatch_loading_skew": 0.00,
         "invoice_leak": 0.00, "payment_leak": 0.00, "underpay_rate": 0.00,
+        "overpay_rate": 0.00,  # <-- NEW
         "installment_rate": 0.00, "tariff_error_rate": 0.00
     },
     "Small": { # 10 OMCs: Very minor, occasional errors
         "unmetered_loading_leak": 0.01, "dispatch_loading_skew": 0.02,
         "invoice_leak": 0.02, "payment_leak": 0.01, "underpay_rate": 0.05,
+        "overpay_rate": 0.02,  # <-- NEW
         "installment_rate": 0.10, "tariff_error_rate": 0.01
     },
     "Medium": { # 4 OMCs: Standard operational messiness
         "unmetered_loading_leak": 0.05, "dispatch_loading_skew": 0.08,
         "invoice_leak": 0.08, "payment_leak": 0.05, "underpay_rate": 0.20,
+        "overpay_rate": 0.05,  # <-- NEW
         "installment_rate": 0.30, "tariff_error_rate": 0.05
     },
     "High": { # 3 OMCs: Massive leakages & targeted for fraud ring
         "unmetered_loading_leak": 0.15, "dispatch_loading_skew": 0.20,
         "invoice_leak": 0.20, "payment_leak": 0.15, "underpay_rate": 0.40,
+        "overpay_rate": 0.10,  # <-- NEW
         "installment_rate": 0.50, "tariff_error_rate": 0.15
     }
 }
@@ -355,6 +360,9 @@ def generate_payments(invoices_df, omcs_df):
         else:
             if random.random() < profile["underpay_rate"]:
                 val *= random.uniform(0.75, 0.99)  # Partial payment / Underpayment
+            elif random.random() < profile["overpay_rate"]:
+                val *= random.uniform(1.01, 1.15)  # NEW: Overpayment (1% to 15% extra)
+                
             payments.append({
                 'payment_id': f'PAY-{random.randint(10000, 99999)}',
                 'invoice_id': r['invoice_id'],
