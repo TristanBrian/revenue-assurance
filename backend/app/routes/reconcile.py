@@ -1,3 +1,4 @@
+# backend/app/routes/reconcile.py
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -7,6 +8,7 @@ from app.services.reconciliation import run_reconciliation, run_reconciliation_o
 from app.services.e_billing import sync_anomalies_to_ebilling, update_anomaly_status
 from app.services.feed import update_feed
 from app.services.audit_service import log_action
+from app.core.cache import get_cached_result, set_cached_result, invalidate_cache
 from app.schemas.reconciliation import (
     MetricsResponse,
     AnomalyTableResponse,
@@ -16,30 +18,73 @@ from app.schemas.reconciliation import (
     UpdateAnomalyResponse,
 )
 import pandas as pd
+import numpy as np
 import io
 import logging
+import math
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 # ============================================================================
-# 1. RECONCILIATION (Database) – split by feature permission.
-# Each endpoint independently re-runs reconciliation from the DB; there's no
-# shared cache between them, so a full page load that hits all three costs
-# the compute 3x. Acceptable trade-off for keeping each feature's visibility
-# independently gated without a caching layer.
-#
-# All three below are plain def, not async def: run_reconciliation() is a
-# synchronous, CPU-bound pandas pipeline over the full dataset (multi-second
-# even on this synthetic ~49k-row set). As async def, that blocks the whole
-# event loop for every concurrent request — across every user — for the
-# entire run; two of these firing together (e.g. the executive dashboard's
-# Promise.all of metrics + omc-risk-profile) serialize back-to-back on one
-# blocked loop and everything else queues behind them, which is exactly
-# what /reconcile/sync's own comment below already flags for the e-billing
-# path. FastAPI runs plain def routes in a threadpool automatically, which
-# keeps the event loop free for other requests while these run.
+# ULTIMATE SANITIZER – handles arrays, scalars, Timestamps, whole floats
+# ============================================================================
+
+def deep_sanitize(obj):
+    """
+    Recursively convert:
+      - numpy array / pandas Series with shape > 0 → list
+      - numpy scalars → Python primitive (via .item())
+      - pandas Timestamp → ISO‑format string
+      - pandas NaT / NaN → None
+      - float that is a whole number → int
+      - any other unsupported type → returned as is
+    """
+    # 1. Handle array‑like objects with at least one dimension (shape non‑empty)
+    if hasattr(obj, 'shape') and len(obj.shape) > 0:
+        # It's an ndarray, Series, etc. – convert to list
+        if hasattr(obj, 'tolist'):
+            obj = obj.tolist()
+        else:
+            obj = list(obj)
+        return [deep_sanitize(item) for item in obj]
+
+    # 2. Handle numpy scalars (e.g., np.float64, np.int64)
+    if isinstance(obj, np.generic):
+        obj = obj.item() if hasattr(obj, 'item') else obj
+
+    # 3. Try to check for NaN – catch any exception safely
+    try:
+        if pd.isna(obj):
+            return None
+    except (ValueError, TypeError):
+        # If pd.isna fails, just continue (it's likely not a scalar)
+        pass
+
+    # 4. Convert timestamps
+    if isinstance(obj, (pd.Timestamp, pd.DatetimeIndex)):
+        return obj.isoformat()
+
+    # 5. Convert floats
+    if isinstance(obj, float):
+        if math.isnan(obj):
+            return None
+        if obj.is_integer():
+            return int(obj)
+        return obj
+
+    # 6. Recurse into containers
+    if isinstance(obj, dict):
+        return {k: deep_sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [deep_sanitize(item) for item in obj]
+
+    # 7. Everything else (str, int, bool, etc.) – return unchanged
+    return obj
+
+# ============================================================================
+# 1. RECONCILIATION (Database) – WITH CACHING
 # ============================================================================
 
 @router.post("/reconcile/metrics", response_model=MetricsResponse)
@@ -47,18 +92,41 @@ def reconcile_metrics(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     _: User = Depends(require_permission("view_metrics")),
 ):
-    """Executive Metrics feature: KPI/summary data only, no raw anomaly rows."""
     try:
+        cache_key = f"metrics_{materiality}"
+        cached = get_cached_result(cache_key)
+        if cached:
+            logger.info(f"✅ Metrics cache hit for materiality={materiality}")
+            return {
+                'status': 'success',
+                'metrics': cached['metrics'],
+                'summary': cached['summary'],
+                'performance': cached['performance'],
+                'data_quality': cached['data_quality'],
+                'ebilling_status': cached.get('ebilling_status'),
+                'duplicate_anomalies': cached.get('duplicate_anomalies', []),
+            }
+
+        logger.info(f"🔄 Metrics cache miss for materiality={materiality}, running reconciliation...")
         result = run_reconciliation(materiality=materiality)
         update_feed(result.get('anomalies', []))
-        return {
-            'status': 'success',
+
+        metrics_data = {
             'metrics': result['metrics'],
             'summary': result['summary'],
             'performance': result['performance'],
             'data_quality': result['data_quality'],
             'ebilling_status': result.get('ebilling_status'),
             'duplicate_anomalies': result.get('duplicate_anomalies', []),
+        }
+
+        metrics_data = deep_sanitize(metrics_data)
+        set_cached_result(cache_key, metrics_data)
+        logger.info(f"✅ Metrics cached for materiality={materiality}")
+
+        return {
+            'status': 'success',
+            **metrics_data
         }
     except Exception as e:
         logger.error(f"Reconciliation metrics failed: {e}")
@@ -72,26 +140,27 @@ def reconcile_anomalies(
     page_size: int = Query(20, description="Items per page", ge=1, le=100),
     _: User = Depends(require_permission("view_anomaly_table")),
 ):
-    """Anomaly Table feature: paginated raw anomaly rows."""
     try:
         result = run_reconciliation(materiality=materiality)
         all_anomalies = result.get('anomalies', [])
-        total_anomalies = len(all_anomalies)
-        total_pages = (total_anomalies + page_size - 1) // page_size if total_anomalies > 0 else 1
+        total_anomalies = int(len(all_anomalies))
+        total_pages = int((total_anomalies + page_size - 1) // page_size) if total_anomalies > 0 else 1
         offset = (page - 1) * page_size
         paginated_anomalies = all_anomalies[offset:offset + page_size]
-        return {
+
+        response = {
             'status': 'success',
-            'anomalies': paginated_anomalies,
+            'anomalies': deep_sanitize(paginated_anomalies),
             'pagination': {
-                'page': page,
-                'page_size': page_size,
+                'page': int(page),
+                'page_size': int(page_size),
                 'total': total_anomalies,
                 'total_pages': total_pages,
-                'has_next': page * page_size < total_anomalies,
-                'has_prev': page > 1
+                'has_next': int(page) * int(page_size) < total_anomalies,
+                'has_prev': int(page) > 1
             }
         }
+        return response
     except Exception as e:
         logger.error(f"Reconciliation anomalies failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -102,12 +171,19 @@ def reconcile_omc_risk_profile(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     _: User = Depends(require_permission("view_omc_risk_profile")),
 ):
-    """OMC Risk Profile feature."""
     try:
+        cache_key = f"metrics_{materiality}"
+        cached = get_cached_result(cache_key)
+        if cached and 'omc_risk_profile' in cached:
+            logger.info(f"✅ OMC Risk Profile cache hit for materiality={materiality}")
+            return {
+                'status': 'success',
+                'omc_risk_profile': cached.get('omc_risk_profile', [])
+            }
         result = run_reconciliation(materiality=materiality)
         return {
             'status': 'success',
-            'omc_risk_profile': result.get('omc_risk_profile', [])
+            'omc_risk_profile': deep_sanitize(result.get('omc_risk_profile', []))
         }
     except Exception as e:
         logger.error(f"Reconciliation OMC risk profile failed: {e}")
@@ -115,7 +191,7 @@ def reconcile_omc_risk_profile(
 
 
 # ============================================================================
-# 2. UPLOAD (CSV) – WITH PAGINATION
+# 2. UPLOAD (CSV) 
 # ============================================================================
 
 @router.post("/reconcile/upload", response_model=ReconciliationUploadResponse)
@@ -128,70 +204,53 @@ def reconcile_upload(
     page_size: int = Query(20, description="Items per page", ge=1, le=100),
     user: User = Depends(require_permission("upload_csv")),
 ):
-    """
-    Upload custom CSVs with paginated anomalies. The anomaly table and OMC
-    risk profile within the response are additionally stripped to empty
-    lists if the caller lacks view_anomaly_table / view_omc_risk_profile
-    respectively — upload_csv alone doesn't imply visibility into those
-    (e.g. Depot Supervisor can upload but shouldn't see the anomaly table).
-
-    Plain def, not async def, same reasoning as the block comment above —
-    run_reconciliation_on_dataframes() is the same synchronous pandas
-    pipeline. file.file.read() (the underlying SpooledTemporaryFile) is
-    used instead of the async UploadFile.read() since this handler no
-    longer has an event loop to await on.
-    """
     try:
-        # --- 1. Read CSVs ---
+        # --- Read CSVs ---
         dispatches_df = pd.read_csv(io.StringIO(dispatches_file.file.read().decode('utf-8')))
         invoices_df = pd.read_csv(io.StringIO(invoices_file.file.read().decode('utf-8')))
         payments_df = pd.read_csv(io.StringIO(payments_file.file.read().decode('utf-8')))
 
-        # --- 2. Validate ---
+        # --- Convert numeric columns ---
+        for col in ['value_kes', 'volume_liters', 'transport_tariff_kes', 'storage_tariff_kes']:
+            if col in dispatches_df.columns:
+                dispatches_df[col] = pd.to_numeric(dispatches_df[col], errors='coerce').fillna(0)
+        for col in ['value_kes']:
+            if col in invoices_df.columns:
+                invoices_df[col] = pd.to_numeric(invoices_df[col], errors='coerce').fillna(0)
+            if col in payments_df.columns:
+                payments_df[col] = pd.to_numeric(payments_df[col], errors='coerce').fillna(0)
+
+        # --- Validate columns ---
         required_disp = ['dispatch_id', 'value_kes']
-        missing_disp = [c for c in required_disp if c not in dispatches_df.columns]
-        if missing_disp:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Dispatches CSV missing columns: {missing_disp}. Required: 'dispatch_id', 'value_kes', and either 'customer_name' or 'customer'."
-            )
+        missing = [c for c in required_disp if c not in dispatches_df.columns]
+        if missing:
+            raise HTTPException(400, f"Dispatches missing: {missing}")
         if not any(col in dispatches_df.columns for col in ['customer_name', 'customer']):
-            raise HTTPException(
-                status_code=400,
-                detail="Dispatches CSV must contain either 'customer_name' or 'customer' column."
-            )
-
+            raise HTTPException(400, "Dispatches must have 'customer_name' or 'customer'.")
         required_inv = ['invoice_id', 'dispatch_id', 'value_kes']
-        missing_inv = [c for c in required_inv if c not in invoices_df.columns]
-        if missing_inv:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invoices CSV missing columns: {missing_inv}. Required: 'invoice_id', 'dispatch_id', 'value_kes'."
-            )
-
+        missing = [c for c in required_inv if c not in invoices_df.columns]
+        if missing:
+            raise HTTPException(400, f"Invoices missing: {missing}")
         required_pay = ['invoice_id', 'value_kes']
-        missing_pay = [c for c in required_pay if c not in payments_df.columns]
-        if missing_pay:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Payments CSV missing columns: {missing_pay}. Required: 'invoice_id' and 'value_kes'. You may have uploaded the wrong file."
-            )
+        missing = [c for c in required_pay if c not in payments_df.columns]
+        if missing:
+            raise HTTPException(400, f"Payments missing: {missing}")
 
-        # --- 3. Run Reconciliation ---
+        # --- Run reconciliation ---
         result = run_reconciliation_on_dataframes(dispatches_df, invoices_df, payments_df, materiality)
-        
-        # Update live feed cache with ALL anomalies
         update_feed(result.get('anomalies', []))
-        
-        # Paginate anomalies
+        invalidate_cache()
+        logger.info("✅ Cache invalidated after upload")
+
+        # --- Paginate anomalies ---
         all_anomalies = result.get('anomalies', [])
-        total_anomalies = len(all_anomalies)
-        total_pages = (total_anomalies + page_size - 1) // page_size if total_anomalies > 0 else 1
+        total_anomalies = int(len(all_anomalies))
+        total_pages = int((total_anomalies + page_size - 1) // page_size) if total_anomalies > 0 else 1
         offset = (page - 1) * page_size
         paginated_anomalies = all_anomalies[offset:offset + page_size] if user.has_permission("view_anomaly_table") else []
 
-        # Reconstruct result with paginated anomalies
-        paginated_result = {
+        # --- Build the raw response dict ---
+        raw_response = {
             'metrics': result['metrics'],
             'anomalies': paginated_anomalies,
             'summary': result['summary'],
@@ -202,29 +261,53 @@ def reconcile_upload(
             'omc_risk_profile': result.get('omc_risk_profile', []) if user.has_permission("view_omc_risk_profile") else []
         }
 
-        return {
-            'status': 'success',
-            'data': paginated_result,
-            'pagination': {
-                'page': page,
-                'page_size': page_size,
-                'total': total_anomalies,
-                'total_pages': total_pages,
-                'has_next': page * page_size < total_anomalies,
-                'has_prev': page > 1
-            },
-            'message': f'Processed {len(dispatches_df)} dispatches from uploaded CSVs'
+        # --- DEEP SANITIZE (handles arrays, scalars, Timestamps, whole floats) ---
+        sanitized_data = deep_sanitize(raw_response)
+
+        # --- Explicitly cast known integer fields ---
+        if 'metrics' in sanitized_data:
+            for key in ['total_anomalies', 'critical_count', 'high_risk_count', 'total_dispatches', 'total_invoices', 'total_payments']:
+                if key in sanitized_data['metrics']:
+                    sanitized_data['metrics'][key] = int(sanitized_data['metrics'][key])
+        if 'summary' in sanitized_data:
+            for key in ['total_dispatches', 'total_invoices', 'total_payments', 'total_anomalies']:
+                if key in sanitized_data['summary']:
+                    sanitized_data['summary'][key] = int(sanitized_data['summary'][key])
+
+        # --- Pagination ---
+        pagination = {
+            'page': int(page),
+            'page_size': int(page_size),
+            'total': total_anomalies,
+            'total_pages': total_pages,
+            'has_next': int(page) * int(page_size) < total_anomalies,
+            'has_prev': int(page) > 1
         }
 
+        processing_time = result['performance']['processing_time_seconds']
+
+        # --- Build final response ---
+        final_response = {
+            'status': 'success',
+            'data': sanitized_data,
+            'pagination': pagination,
+            'message': f'✅ Processed {len(dispatches_df)} dispatches in {processing_time:.2f}s. Found {total_anomalies} anomalies, {sanitized_data["metrics"]["critical_count"]} critical.'
+        }
+
+        # --- One final sanitize pass ---
+        final_response = deep_sanitize(final_response)
+
+        return final_response
+
     except pd.errors.EmptyDataError:
-        raise HTTPException(status_code=400, detail="One of the uploaded files is empty.")
+        raise HTTPException(400, "One of the uploaded files is empty.")
     except pd.errors.ParserError as e:
-        raise HTTPException(status_code=400, detail=f"CSV parsing error: {str(e)}")
+        raise HTTPException(400, f"CSV parsing error: {e}")
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Upload reconciliation failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Upload reconciliation failed: {e}", exc_info=True)
+        raise HTTPException(500, detail=str(e))
 
 
 # ============================================================================
@@ -232,19 +315,9 @@ def reconcile_upload(
 # ============================================================================
 
 @router.get("/reconcile/template/{file_type}")
-async def download_template(
-    file_type: str,
-    _: User = Depends(require_permission("upload_csv")),
-):
-    """
-    Download a CSV template for Dispatches, Invoices, or Payments.
-    """
+async def download_template(file_type: str, _: User = Depends(require_permission("upload_csv"))):
     if file_type not in ["dispatches", "invoices", "payments"]:
-        raise HTTPException(
-            status_code=400,
-            detail="File type must be 'dispatches', 'invoices', or 'payments'."
-        )
-
+        raise HTTPException(400, "Invalid file type.")
     if file_type == "dispatches":
         df = pd.DataFrame({
             "dispatch_id": ["DISP-0001"],
@@ -273,11 +346,9 @@ async def download_template(
             "installment_number": [1],
             "total_installments": [1]
         })
-
     output = io.StringIO()
     df.to_csv(output, index=False)
     output.seek(0)
-
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
@@ -290,41 +361,18 @@ async def download_template(
 # ============================================================================
 
 @router.post("/reconcile/sync", response_model=SyncAnomaliesResponse)
-def sync_anomalies(
-    db: Session = Depends(get_db),
-    user: User = Depends(require_permission("manage_ebilling")),
-):
-    # Plain def, not async def: sync_anomalies_to_ebilling() calls
-    # call_kra_api(), which sleeps synchronously (time.sleep, not
-    # asyncio.sleep) per invoice plus retry backoff. As async def, that
-    # blocks the entire event loop for every concurrent request across
-    # every user until this one finishes. FastAPI runs plain def routes
-    # in a threadpool automatically, which keeps the event loop free.
+def sync_anomalies(db: Session = Depends(get_db), user: User = Depends(require_permission("manage_ebilling"))):
     try:
         result = run_reconciliation()
-        anomalies = result.get('anomalies', [])
-        pending = [a for a in anomalies if a.get('ebilling_status') == 'Pending']
+        pending = [a for a in result.get('anomalies', []) if a.get('ebilling_status') == 'Pending']
         sync_result = sync_anomalies_to_ebilling(pending)
-        # sync_anomalies_to_ebilling() writes through its own raw-engine
-        # transaction (already committed by the time we get here), not
-        # this request's ORM session — so this commit is only for the
-        # audit row itself, not joint atomicity with the sync it describes.
-        log_action(
-            db,
-            actor_user_id=user.id,
-            action="ebilling.sync",
-            target_type="sync_task",
-            after={"pending_count": len(pending), "sync_result": sync_result},
-        )
+        log_action(db, actor_user_id=user.id, action="ebilling.sync", target_type="sync_task",
+                   after={"pending_count": len(pending), "sync_result": sync_result})
         db.commit()
-        return {
-            'status': 'success',
-            'sync_result': sync_result,
-            'pending_count': len(pending)
-        }
+        return {'status': 'success', 'sync_result': sync_result, 'pending_count': len(pending)}
     except Exception as e:
         logger.error(f"Sync failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, detail=str(e))
 
 
 @router.post("/reconcile/update", response_model=UpdateAnomalyResponse)
@@ -336,21 +384,14 @@ async def update_anomaly(
     user: User = Depends(require_permission("resolve_anomaly")),
 ):
     try:
-        result = update_anomaly_status(db, dispatch_id, status, notes, actor_user_id=user.id)
-        return result
+        return update_anomaly_status(db, dispatch_id, status, notes, actor_user_id=user.id)
     except Exception as e:
         logger.error(f"Update failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, detail=str(e))
 
 
 @router.get("/reconcile/export")
-def export_report(
-    materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
-    _: User = Depends(require_permission("export_reports")),
-):
-    # Plain def, not async def — same reasoning as the block comment above
-    # (run_reconciliation()) plus the ExcelWriter/openpyxl write itself,
-    # both synchronous and CPU-bound.
+def export_report(materiality: float = Query(100000), _: User = Depends(require_permission("export_reports"))):
     try:
         result = run_reconciliation(materiality=materiality)
         output = io.BytesIO()
@@ -370,4 +411,4 @@ def export_report(
         )
     except Exception as e:
         logger.error(f"Export failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, detail=str(e))
