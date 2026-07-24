@@ -60,14 +60,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include Routers
-app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
-app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
-app.include_router(feed.router, prefix="/api", tags=["Live Feed"])      # <-- NEW
-app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
+# Include Routers — order here also drives the grouping/order Swagger UI
+# displays tags in, so it's kept in sync with the strategic ordering in
+# root()'s "endpoints" list below: Auth first (everything else needs a
+# token), then Live Feed, Reconciliation, Heatmap, E-Billing, Graph,
+# Detective (risk analytics), Admin, Audit.
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])  # <-- ADDED auth router
-app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
+app.include_router(feed.router, prefix="/api", tags=["Live Feed"])      # <-- NEW
+app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
+app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
+app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
 app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])  # <-- NEW
+app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
 app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
 
