@@ -24,6 +24,7 @@ from app.schemas.detective import OmcRiskDetail
 from app.schemas.graph import CommunityOut, FraudGraphResponse, NetworkResponse, OmcDepotEdge, OmcDepotNode
 from app.services import detective_service, graph_engine
 from app.services.graph_engine import build_fraud_graph
+from app.core.cache import get_cached_result, set_cached_result
 from app.utils.db_connection import get_engine
 
 logger = logging.getLogger(__name__)
@@ -39,19 +40,25 @@ def fraud_graph(
     """
     Returns the OMC<->Depot leakage graph with Louvain community detection —
     clusters of correlated revenue leakage worth a closer audit.
-
-    Plain def, not async def, same reasoning as routes/reconcile.py's block
-    comment — build_fraud_graph() runs the same synchronous reconciliation
-    pipeline plus NetworkX/Louvain on top, all CPU-bound. Same for the three
-    routes below it in this file (build_omc_depot_graph, detect_risk_communities,
-    get_omc_risk all being equally synchronous and non-trivial).
+    Cached for 60 seconds.
     """
     try:
+        cache_key = f"fraud_graph_{materiality}"
+        cached = get_cached_result(cache_key)
+        if cached:
+            logger.info(f"✅ Fraud graph cache hit for materiality={materiality}")
+            return cached
+
+        logger.info(f"🔄 Fraud graph cache miss – running reconciliation...")
         data = build_fraud_graph(materiality=materiality)
-        return {
+        response = {
             'status': 'success',
             'data': data
         }
+        set_cached_result(cache_key, response)
+        logger.info(f"✅ Fraud graph cached for materiality={materiality}")
+        return response
+
     except Exception as e:
         logger.error(f"Fraud graph error: {e}")
         return {

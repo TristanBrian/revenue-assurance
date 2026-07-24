@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
 from app.middleware.audit import AuditMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit
+from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit  # <-- ADDED feed, heatmap, auth, detective, graph, admin, audit
+# import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
 from contextlib import asynccontextmanager
@@ -15,80 +16,10 @@ logger = logging.getLogger("kpc.startup")
 
 
 # ============================================================================
-# CREATE AUDIT TABLE ON STARTUP (AUTOMATIC!)
-# ============================================================================
-def create_audit_table_if_not_exists():
-    """Create the audit_logs table if it doesn't exist.
-
-    Raw SQL rather than an Alembic migration, matching how this table
-    shipped upstream — flagged as worth migrating to Alembic later for
-    consistency with every other table in this app, not changed here.
-    """
-    engine = get_engine()
-    try:
-        with engine.connect() as conn:
-            # Check if table exists (SQLite/PostgreSQL compatible)
-            if engine.dialect.name == "sqlite":
-                result = conn.execute(text(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name='audit_logs'"
-                ))
-                exists = result.fetchone() is not None
-            else:  # PostgreSQL
-                result = conn.execute(text(
-                    "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='audit_logs')"
-                ))
-                exists = result.fetchone()[0]
-
-            if not exists:
-                logger.info("📋 Creating audit_logs table...")
-                # AUTOINCREMENT is SQLite-only syntax — invalid on Postgres,
-                # the DB this app requires for auth/RBAC (UUID columns on
-                # users/roles/permissions). Postgres's equivalent is SERIAL.
-                id_column = (
-                    "id INTEGER PRIMARY KEY AUTOINCREMENT"
-                    if engine.dialect.name == "sqlite"
-                    else "id SERIAL PRIMARY KEY"
-                )
-                conn.execute(text(f"""
-                    CREATE TABLE audit_logs (
-                        {id_column},
-                        user_id         INTEGER,
-                        user_username   TEXT,
-                        action          TEXT NOT NULL,
-                        resource        TEXT,
-                        resource_id     TEXT,
-                        method          TEXT,
-                        endpoint        TEXT,
-                        ip_address      TEXT,
-                        user_agent      TEXT,
-                        status_code     INTEGER,
-                        success         INTEGER DEFAULT 1,
-                        error_message   TEXT,
-                        details         TEXT,
-                        previous_state  TEXT,
-                        new_state       TEXT,
-                        created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """))
-                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_audit_user_id ON audit_logs (user_id)"))
-                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs (action)"))
-                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs (created_at)"))
-                conn.commit()
-                logger.info("✅ audit_logs table created successfully!")
-            else:
-                logger.info("✅ audit_logs table already exists.")
-    except Exception as e:
-        logger.error(f"❌ Failed to create audit_logs table: {e}")
-
-
-# ============================================================================
 # LIFESPAN (Runs on startup)
 # ============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create audit table on startup
-    create_audit_table_if_not_exists()
-
     # Check database connection
     engine = get_engine()
     safe_url = engine.url.render_as_string(hide_password=True)
@@ -113,10 +44,10 @@ app = FastAPI(
 )
 
 # Standardized {Success, Message, Data, Timestamp} response envelope for
-# every route, plus the audit-logging middleware — both added before
-# CORSMiddleware so CORS ends up outermost in the middleware stack and
-# still applies its headers to the wrapped/audited response (and to error
-# responses from either middleware itself).
+# every route, plus the fallback audit-logging middleware — both added
+# before CORSMiddleware so CORS ends up outermost in the middleware stack
+# and still applies its headers to the wrapped/audited response (and to
+# error responses from either middleware itself).
 app.add_middleware(ResponseEnvelopeMiddleware)
 app.add_middleware(AuditMiddleware)
 
@@ -129,16 +60,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include Routers
+# Include Routers — order here also drives the grouping/order Swagger UI
+# displays tags in, so it's kept in sync with the strategic ordering in
+# root()'s "endpoints" list below: Auth first (everything else needs a
+# token), then Live Feed, Reconciliation, Heatmap, E-Billing, Graph,
+# Detective (risk analytics), Admin, Audit.
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])  # <-- ADDED auth router
+app.include_router(feed.router, prefix="/api", tags=["Live Feed"])      # <-- NEW
 app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
+app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
 app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
-app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
-app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])
-app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
-app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])
-app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
-app.include_router(audit.router, prefix="/api", tags=["Audit"])
+app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])  # <-- NEW
+app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
+app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
 
 
 @app.get("/")
@@ -148,14 +83,28 @@ async def root():
         "status": "running",
         "version": "2.0.0",
         "endpoints": [
+            # -- Auth: everything else needs a token from here first --
+            "POST /api/auth/login - Log in, returns a JWT",
+            "POST /api/auth/register - Create a user and assign a role (manage_users)",
+            "GET /api/auth/me - Current user's profile, roles, permissions",
+
+            # -- Live Feed: real-time entry point, every role sees it --
+            "GET /api/feed - Live anomaly feed",
+
+            # -- Reconciliation: the core leakage-detection workflow --
             "POST /api/reconcile/metrics - Executive metrics (DB)",
             "GET /api/reconcile/anomalies - Paginated anomaly table (DB)",
             "GET /api/reconcile/omc-risk-profile - OMC risk profile (DB)",
             "POST /api/reconcile/upload - Run reconciliation (CSV Upload)",
-            "POST /api/reconcile/sync - Sync anomalies to E-Billing",
+            "GET /api/reconcile/template/{type} - Download CSV template",
             "POST /api/reconcile/update - Update anomaly status",
             "GET /api/reconcile/export - Download Excel report",
-            "GET /api/reconcile/template/{type} - Download CSV template",
+            "POST /api/reconcile/sync - Sync anomalies to E-Billing",
+
+            # -- Heatmap: visual complement to reconciliation --
+            "GET /api/heatmap - Leakage heatmap (OMC × Product)",
+
+            # -- E-Billing: downstream KRA iCMS integration --
             "GET /api/e-billing/status - E-Billing integration status",
             "POST /api/e-billing/sync - Sync invoices to KRA iCMS",
             "POST /api/e-billing/sync/async - Async sync (returns task_id)",
@@ -166,20 +115,30 @@ async def root():
             "POST /api/e-billing/webhook - KRA webhook callback",
             "GET /api/e-billing/reconcile - E-Billing reconciliation dashboard",
             "GET /api/e-billing/monitor - Failure rate monitoring",
-            "GET /api/feed - Live anomaly feed",
-            "GET /api/heatmap - Leakage heatmap (OMC × Product)",
-            "GET /api/detective/risk-features - OMC risk features (all OMCs)",
-            "GET /api/detective/risk-features/{omc_id} - OMC risk features (single OMC)",
-            "GET /api/detective/risk-features/export - Download risk features as CSV",
+
+            # -- Fraud Graph: network/structural leakage analysis --
             "GET /api/graph - Anomaly-based fraud graph (OMC<->Depot leakage, Louvain communities)",
             "GET /api/graph/network - OMC/depot structural network graph",
             "GET /api/graph/communities - Detected risk communities (structural graph)",
             "GET /api/graph/omc/{omc_id} - Risk features + community info for one OMC",
+
+            # -- Risk Analytics: statistical/EDA counterpart to the graph --
+            "GET /api/detective/risk-features - OMC risk features (all OMCs)",
+            "GET /api/detective/risk-features/{omc_id} - OMC risk features (single OMC)",
+            "GET /api/detective/risk-features/export - Download risk features as CSV",
+
+            # -- Admin: user/permission management, not a revenue-assurance feature --
             "GET /api/admin/users - List all users",
             "PATCH /api/admin/users/{user_id} - Edit a user (email/name/role/password/is_active)",
             "DELETE /api/admin/users/{user_id} - Delete a user",
-            "GET /api/audit/logs - Paginated audit log (view_audit)",
-            "GET /api/audit/summary - Audit summary for the last N days (view_audit)",
+
+            # -- Audit: who did what, across everything above --
+            "GET /api/audit/logs - Paginated, filterable audit trail",
+            "GET /api/audit/logs/{log_id} - Single audit log entry",
+            "GET /api/audit/summary - Aggregate audit stats for the last N days",
+            "GET /api/audit/me - Current user's own audit trail",
+
+            # -- Infra --
             "GET /health - Health check"
         ]
     }

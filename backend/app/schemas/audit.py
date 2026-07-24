@@ -1,73 +1,46 @@
 """
-Pydantic schemas for audit logs
+Pydantic schemas for routes/audit.py, backed by app/models/audit.py's
+AuditLog SQLAlchemy model.
 """
-from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any, Optional
+
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
-# --- Request Schemas ---
-class AuditFilter(BaseModel):
-    user_id: Optional[int] = None
-    action: Optional[str] = None
-    resource: Optional[str] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    success: Optional[bool] = None
-    status_code: Optional[int] = None
-
-
-class AuditCreate(BaseModel):
-    user_id: Optional[int] = None
-    user_username: Optional[str] = None
-    action: str
-    resource: Optional[str] = None
-    resource_id: Optional[str] = None
-    method: Optional[str] = None
-    endpoint: Optional[str] = None
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    status_code: Optional[int] = None
-    success: int = 1
-    error_message: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
-    previous_state: Optional[Dict[str, Any]] = None
-    new_state: Optional[Dict[str, Any]] = None
-
-
-# --- Response Schemas ---
 class AuditLogOut(BaseModel):
-    id: int
-    user_id: Optional[int] = None
-    user_username: Optional[str] = None
+    id: str
+    actor_user_id: Optional[str] = None
     action: str
-    resource: Optional[str] = None
-    resource_id: Optional[str] = None
-    method: Optional[str] = None
-    endpoint: Optional[str] = None
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    status_code: Optional[int] = None
-    success: int
-    error_message: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
-    previous_state: Optional[Dict[str, Any]] = None
-    new_state: Optional[Dict[str, Any]] = None
+    target_type: Optional[str] = None
+    target_id: Optional[str] = None
+    before_value: Optional[Any] = None
+    after_value: Optional[Any] = None
+    extra_metadata: Optional[Any] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("id", "actor_user_id", mode="before")
+    @classmethod
+    def _stringify_uuid(cls, v: Any) -> Optional[str]:
+        # ORM id / actor_user_id are uuid.UUID; Pydantic's plain `str`
+        # type does not auto-coerce UUID -> str, so do it explicitly.
+        return str(v) if v is not None else v
 
 
-class AuditLogsResponse(BaseModel):
-    status: str
-    logs: List[AuditLogOut]
-    pagination: Dict[str, Any]
+class AuditLogListResponse(BaseModel):
+    """GET /api/audit/logs, GET /api/audit/me"""
+    items: list[AuditLogOut]
+    total: int
+    page: int
+    page_size: int
 
 
-class AuditSummary(BaseModel):
+class AuditSummaryResponse(BaseModel):
+    """GET /api/audit/summary"""
     total_actions: int
-    actions_by_type: Dict[str, int]
-    actions_by_user: Dict[str, int]
-    success_rate: float
-    period: Dict[str, str]
+    actions_by_type: dict[str, int]
+    actions_by_actor: dict[str, int]
+    period_days: int
+    since: datetime

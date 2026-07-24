@@ -1,93 +1,76 @@
-"""
-Audit Routes – Endpoints for viewing audit logs
+from datetime import datetime
+from typing import Optional
 
-Gated on view_audit (Manager + Revenue Assurance per the README's
-permission matrix) — these came over from upstream with no auth at all,
-which would let anyone read every user's activity, IPs, and endpoints hit
-with no token required. view_audit already exists in scripts/seed_roles.py
-for exactly this "Audit Trail" feature row; it just wasn't wired to
-anything until now.
-"""
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+
 from app.core.dependencies import get_db, require_permission
 from app.models.user import User
-from app.services.audit import get_audit_logs, get_audit_summary
+from app.schemas.audit import AuditLogListResponse, AuditLogOut, AuditSummaryResponse
+from app.services.audit_service import get_audit_log, get_audit_logs, get_audit_summary
 
-router = APIRouter()
+router = APIRouter()  # prefix="/api/audit" and tags=["Audit"] are supplied by main.py's include_router(), matching every other route file
 
 
-@router.get("/audit/logs")
-async def get_audit_logs_endpoint(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    user_id: int = Query(None),
-    action: str = Query(None),
-    resource: str = Query(None),
-    success: bool = Query(None),
+@router.get("/logs", response_model=AuditLogListResponse)
+def list_audit_logs(
+    actor_user_id: Optional[str] = Query(None),
+    action: Optional[str] = Query(None),
+    target_type: Optional[str] = Query(None),
+    target_id: Optional[str] = Query(None),
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    page: int = Query(1, description="Page number", ge=1),
+    page_size: int = Query(50, description="Items per page", ge=1, le=100),
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("view_audit")),
 ):
-    """
-    Get paginated audit logs with optional filters.
-    """
-    try:
-        result = get_audit_logs(db, page, page_size, user_id, action, resource, success)
-        
-        return {
-            "status": "success",
-            "logs": [{
-                "id": log.id,
-                "user": log.user_username,
-                "action": log.action,
-                "resource": log.resource,
-                "resource_id": log.resource_id,
-                "endpoint": log.endpoint,
-                "status_code": log.status_code,
-                "success": log.success,
-                "created_at": log.created_at.isoformat() if log.created_at else None
-            } for log in result["logs"]],
-            "pagination": result["pagination"]
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    items, total = get_audit_logs(
+        db,
+        actor_user_id=actor_user_id,
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        page_size=page_size,
+    )
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
-@router.get("/audit/summary")
-async def get_audit_summary_endpoint(
-    days: int = Query(7, ge=1, le=90, description="Number of days to summarize"),
+@router.get("/logs/{log_id}", response_model=AuditLogOut)
+def read_audit_log(
+    log_id: str,
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("view_audit")),
 ):
-    """
-    Get audit summary for the last N days.
-    """
     try:
-        result = get_audit_summary(db, days)
-        return {"status": "success", **result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return get_audit_log(db, log_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit log not found")
 
 
-@router.get("/audit/me")
-async def get_my_audit_logs(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=50),
+@router.get("/summary", response_model=AuditSummaryResponse)
+def audit_summary(
+    days: int = Query(7, description="Number of days to summarize", ge=1, le=90),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_permission("view_audit")),
+):
+    return get_audit_summary(db, days=days)
+
+
+@router.get("/me", response_model=AuditLogListResponse)
+def my_audit_logs(
+    page: int = Query(1, description="Page number", ge=1),
+    page_size: int = Query(50, description="Items per page", ge=1, le=100),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("view_audit")),
 ):
     """
-    Get audit logs for the current user.
-
-    Still returns an empty list in practice: AuditMiddleware never
-    populates request.state.user_id (nothing in the auth flow sets it), so
-    every row in audit_logs has user_id NULL regardless of who made the
-    request. Gated on view_audit rather than left open now, but the
-    per-user filtering itself needs that wiring to actually do anything —
-    flagging as a follow-up rather than fixing here.
+    Unlike GET /logs, this is scoped to the caller's own activity rather
+    than filterable by any actor — actor_user_id is fixed to the current
+    user, not accepted as a query param.
     """
-    return {
-        "status": "success",
-        "message": "Per-user audit attribution isn't wired up yet — see the docstring above.",
-        "logs": []
-    }
+    items, total = get_audit_logs(db, actor_user_id=str(user.id), page=page, page_size=page_size)
+    return {"items": items, "total": total, "page": page, "page_size": page_size}

@@ -70,7 +70,7 @@ ROLE_PERMISSIONS = {
         "view_live_feed", "view_heatmap", "view_omc_risk_profile",
         "view_metrics", "view_anomaly_table", "upload_csv",
         "resolve_anomaly", "manage_ebilling", "export_reports",
-        "view_fraud_graph", "view_risk_analytics",
+        "view_fraud_graph", "view_risk_analytics", "view_audit",
     },
     "system_admin": {
         "manage_users", "manage_permissions",
@@ -135,6 +135,11 @@ ENDPOINTS = [
          path_params={"user_id": rid()}, json={"full_name": "Probe"}),
     dict(method="DELETE", path="/api/admin/users/{user_id}", permission="manage_users",
          path_params={"user_id": rid()}),
+
+    # -- audit --
+    dict(method="GET", path="/api/audit/logs", permission="view_audit"),
+    dict(method="GET", path="/api/audit/logs/{log_id}", permission="view_audit",
+         path_params={"log_id": rid()}),
 
     # -- graph / detective --
     dict(method="GET", path="/api/graph/network", permission="view_fraud_graph"),
