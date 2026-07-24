@@ -118,6 +118,8 @@ def reconcile_metrics(
             'data_quality': result['data_quality'],
             'ebilling_status': result.get('ebilling_status'),
             'duplicate_anomalies': result.get('duplicate_anomalies', []),
+            'omc_risk_profile': result.get('omc_risk_profile', []),
+            'anomalies': result.get('anomalies', []),
         }
 
         metrics_data = deep_sanitize(metrics_data)
@@ -140,9 +142,40 @@ def reconcile_anomalies(
     page_size: int = Query(20, description="Items per page", ge=1, le=100),
     _: User = Depends(require_permission("view_anomaly_table")),
 ):
+    """
+    Anomaly Table feature: paginated raw anomaly rows.
+    Uses cached reconciliation data to avoid re-running full reconciliation.
+    """
     try:
-        result = run_reconciliation(materiality=materiality)
-        all_anomalies = result.get('anomalies', [])
+        cache_key = f"metrics_{materiality}"
+        cached = get_cached_result(cache_key)
+        
+        # If cache exists, use it
+        if cached:
+            logger.info(f"✅ Anomalies cache hit for materiality={materiality}")
+            all_anomalies = cached.get('anomalies', [])
+        else:
+            # If not cached, run reconciliation and cache it
+            logger.info(f"🔄 Anomalies cache miss – running reconciliation...")
+            result = run_reconciliation(materiality=materiality)
+            update_feed(result.get('anomalies', []))
+            
+            # Cache the full result
+            metrics_data = {
+                'metrics': result['metrics'],
+                'summary': result['summary'],
+                'performance': result['performance'],
+                'data_quality': result['data_quality'],
+                'ebilling_status': result.get('ebilling_status'),
+                'duplicate_anomalies': result.get('duplicate_anomalies', []),
+                'omc_risk_profile': result.get('omc_risk_profile', []),
+                'anomalies': result.get('anomalies', []),
+            }
+            metrics_data = deep_sanitize(metrics_data)
+            set_cached_result(cache_key, metrics_data)
+            all_anomalies = result.get('anomalies', [])
+
+        # Paginate from cached data
         total_anomalies = int(len(all_anomalies))
         total_pages = int((total_anomalies + page_size - 1) // page_size) if total_anomalies > 0 else 1
         offset = (page - 1) * page_size
@@ -171,19 +204,44 @@ def reconcile_omc_risk_profile(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     _: User = Depends(require_permission("view_omc_risk_profile")),
 ):
+    """
+    OMC Risk Profile feature.
+    Uses cached metrics data to avoid re-running reconciliation.
+    """
     try:
         cache_key = f"metrics_{materiality}"
         cached = get_cached_result(cache_key)
-        if cached and 'omc_risk_profile' in cached:
+        
+        if cached:
             logger.info(f"✅ OMC Risk Profile cache hit for materiality={materiality}")
+            omc_profile = cached.get('omc_risk_profile', [])
             return {
                 'status': 'success',
-                'omc_risk_profile': cached.get('omc_risk_profile', [])
+                'omc_risk_profile': omc_profile
             }
+
+        # If not cached, run reconciliation once and cache everything
+        logger.info(f"🔄 OMC Risk Profile cache miss – running reconciliation...")
         result = run_reconciliation(materiality=materiality)
+        
+        # Cache the full result
+        metrics_data = {
+            'metrics': result['metrics'],
+            'summary': result['summary'],
+            'performance': result['performance'],
+            'data_quality': result['data_quality'],
+            'ebilling_status': result.get('ebilling_status'),
+            'duplicate_anomalies': result.get('duplicate_anomalies', []),
+            'omc_risk_profile': result.get('omc_risk_profile', []),
+            'anomalies': result.get('anomalies', []),
+        }
+        metrics_data = deep_sanitize(metrics_data)
+        set_cached_result(cache_key, metrics_data)
+        logger.info(f"✅ OMC Risk Profile cached for materiality={materiality}")
+        
         return {
             'status': 'success',
-            'omc_risk_profile': deep_sanitize(result.get('omc_risk_profile', []))
+            'omc_risk_profile': result.get('omc_risk_profile', [])
         }
     except Exception as e:
         logger.error(f"Reconciliation OMC risk profile failed: {e}")
@@ -191,7 +249,7 @@ def reconcile_omc_risk_profile(
 
 
 # ============================================================================
-# 2. UPLOAD (CSV) 
+# 2. UPLOAD (CSV) – FINAL VERSION WITH ULTIMATE SANITIZATION
 # ============================================================================
 
 @router.post("/reconcile/upload", response_model=ReconciliationUploadResponse)
