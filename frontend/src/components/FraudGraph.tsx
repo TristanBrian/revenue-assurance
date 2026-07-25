@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from "react";
 import { ApiError, getFraudGraph } from "@/lib/api";
+import { useMateriality } from "@/context/MaterialityContext";
 import type { FraudGraphData, GraphNode } from "@/lib/types";
 
 function formatKes(value: number): string {
@@ -61,13 +62,11 @@ interface HoverState {
   y: number;
 }
 
-// ✅ Keep these at the top level – they're used in the layout logic
 const WIDTH = 680;
 const HEIGHT = 460;
-const CENTER_X = WIDTH / 2;
-const CENTER_Y = HEIGHT / 2;
 
 export default function FraudGraph() {
+  const { materiality } = useMateriality(); // ✅ Get from context
   const [graph, setGraph] = useState<FraudGraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +78,7 @@ export default function FraudGraph() {
   useEffect(() => {
     let cancelled = false;
 
-    getFraudGraph()
+    getFraudGraph(materiality) // ✅ Pass the materiality
       .then((data) => {
         if (!cancelled) setGraph(data);
       })
@@ -98,16 +97,8 @@ export default function FraudGraph() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [materiality]); // ✅ Re-run when slider changes
 
-  // ✅ Remove duplicate WIDTH/HEIGHT declarations (lines 48-49 in original)
-  // They're already defined at the top level
-
-  // The backend never returns per-node coordinates, so lay nodes out
-  // deterministically here: all OMC nodes on one outer ring, and depot
-  // nodes clustered on a small ring at the canvas center. OMCs are ordered
-  // around the ring by risk severity (High first) so risky accounts cluster
-  // into a contiguous, scannable arc instead of falling in random order.
   const laidOutNodes = useMemo(() => {
     if (!graph) return [];
 
@@ -255,23 +246,13 @@ export default function FraudGraph() {
           <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3">
             <span className="flex items-center gap-1.5 font-medium">
               <svg width="10" height="10">
-                <circle
-                  cx="5"
-                  cy="5"
-                  r="5"
-                  className="fill-zinc-500 dark:fill-zinc-400"
-                />
+                <circle cx="5" cy="5" r="5" className="fill-zinc-500 dark:fill-zinc-400" />
               </svg>
               OMC (Circle)
             </span>
             <span className="flex items-center gap-1.5 font-medium">
               <svg width="10" height="10">
-                <rect
-                  width="10"
-                  height="10"
-                  rx="2"
-                  className="fill-zinc-500 dark:fill-zinc-400"
-                />
+                <rect width="10" height="10" rx="2" className="fill-zinc-500 dark:fill-zinc-400" />
               </svg>
               Depot (Square)
             </span>
@@ -333,9 +314,7 @@ export default function FraudGraph() {
                       strokeWidth={strokeWidthFor(edge.weight)}
                       strokeOpacity={isHighlighted ? 0.7 : 0.15}
                       className={`transition-all duration-300 ${
-                        isHighlighted
-                          ? ""
-                          : "text-zinc-200 dark:text-zinc-800"
+                        isHighlighted ? "" : "text-zinc-200 dark:text-zinc-800"
                       }`}
                     />
                   );
