@@ -34,9 +34,6 @@ function riskBadgeClass(risk: GraphNode["risk_level"]): string {
   }
 }
 
-// Same rose/amber/emerald triad as riskFillClass/riskBadgeClass, as hex —
-// used for edge strokes and the high-risk halo, where SVG needs a real
-// color value rather than a Tailwind fill class.
 function riskHex(risk: GraphNode["risk_level"]): string {
   switch (risk) {
     case "High":
@@ -54,8 +51,6 @@ const RISK_RANK: Record<GraphNode["risk_level"], number> = {
   Low: 0,
 };
 
-// An edge's color follows the worse-risk endpoint, so the busiest/riskiest
-// leakage flows read as a heatmap at a glance instead of uniform indigo.
 function edgeRiskColor(a: GraphNode["risk_level"], b: GraphNode["risk_level"]): string {
   return riskHex(RISK_RANK[a] >= RISK_RANK[b] ? a : b);
 }
@@ -66,6 +61,7 @@ interface HoverState {
   y: number;
 }
 
+// ✅ Keep these at the top level – they're used in the layout logic
 const WIDTH = 680;
 const HEIGHT = 460;
 const CENTER_X = WIDTH / 2;
@@ -104,8 +100,8 @@ export default function FraudGraph() {
     };
   }, []);
 
-  const WIDTH = 680;
-  const HEIGHT = 460;
+  // ✅ Remove duplicate WIDTH/HEIGHT declarations (lines 48-49 in original)
+  // They're already defined at the top level
 
   // The backend never returns per-node coordinates, so lay nodes out
   // deterministically here: all OMC nodes on one outer ring, and depot
@@ -150,9 +146,6 @@ export default function FraudGraph() {
       });
     });
 
-    // Radius encodes leakage magnitude (area-proportional via sqrt), scaled
-    // within each node type separately — depot totals aggregate many OMCs'
-    // leakage, so a shared scale would flatten OMC-to-OMC differences.
     const maxOmcLeakage = Math.max(1, ...omcNodes.map((n) => n.leakage_kes));
     const maxDepotLeakage = Math.max(1, ...depotNodes.map((n) => n.leakage_kes));
 
@@ -182,8 +175,6 @@ export default function FraudGraph() {
     return Math.min(Math.max(weight * 2.2, 1.2), 6.5);
   }
 
-  // Label the top-5 by leakage, plus every High-risk node — an investigator
-  // scanning for fraud should never have to hover to find a red node's name.
   const topLabelIds = useMemo(() => {
     if (!graph) return new Set<string>();
     const sorted = [...graph.nodes].sort(
@@ -261,7 +252,6 @@ export default function FraudGraph() {
 
       {graph && !loading && graph.nodes.length > 0 && (
         <>
-          {/* Legend and stats */}
           <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3">
             <span className="flex items-center gap-1.5 font-medium">
               <svg width="10" height="10">
@@ -309,7 +299,6 @@ export default function FraudGraph() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            {/* SVG Graph View */}
             <div
               ref={containerRef}
               className="lg:col-span-2 relative overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/40"
@@ -319,13 +308,11 @@ export default function FraudGraph() {
                 className="h-auto w-full"
                 onMouseMove={handleNodeMove}
               >
-                {/* Edges */}
                 {graph.edges.map((edge, i) => {
                   const source = nodeById.get(edge.source);
                   const target = nodeById.get(edge.target);
                   if (!source || !target) return null;
 
-                  // Dim non-connected edges when a node is selected
                   const isHighlighted =
                     !selectedId ||
                     edge.source === selectedId ||
@@ -354,7 +341,6 @@ export default function FraudGraph() {
                   );
                 })}
 
-                {/* Nodes */}
                 {laidOutNodes.map((node) => {
                   const isSelected = selectedId === node.id;
                   const isDimmed =
@@ -377,7 +363,6 @@ export default function FraudGraph() {
                       style={{ opacity: isDimmed ? 0.35 : 1 }}
                       className="cursor-pointer transition-all duration-300"
                     >
-                      {/* Transparent hit area */}
                       <circle
                         cx={node.x}
                         cy={node.y}
@@ -385,9 +370,6 @@ export default function FraudGraph() {
                         fill="transparent"
                       />
 
-                      {/* Subtle attention halo for High-risk nodes — a
-                          secondary cue beyond fill color, so severity is
-                          legible even without color vision. */}
                       {node.risk_level === "High" && !isDimmed && (
                         <circle
                           cx={node.x}
@@ -435,7 +417,6 @@ export default function FraudGraph() {
                         />
                       )}
 
-                      {/* Label for top nodes */}
                       {(topLabelIds.has(node.id) || isSelected) && (
                         <text
                           x={node.x}
@@ -451,7 +432,6 @@ export default function FraudGraph() {
                 })}
               </svg>
 
-              {/* Float Hover Details */}
               {hover && (
                 <div
                   className="pointer-events-none absolute z-50 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3.5 py-2.5 text-xs shadow-2xl flex flex-col gap-1 transition-opacity duration-150 animate-fade-in"
@@ -477,9 +457,7 @@ export default function FraudGraph() {
               )}
             </div>
 
-            {/* Inspection / Communities Sidebar */}
             <div className="flex flex-col gap-6">
-              {/* Inspection Details Panel */}
               <div className="bg-white dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm flex flex-col gap-3 min-h-[160px]">
                 <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
                   Node Inspector
@@ -557,7 +535,6 @@ export default function FraudGraph() {
                 )}
               </div>
 
-              {/* Communities Summary Table */}
               <div className="bg-white dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
                 <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
                   Louvain Risk Communities

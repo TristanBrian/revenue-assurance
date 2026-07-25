@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { ApiError, downloadExport, getMetrics, getEbillingLogs } from "@/lib/api";
 import { useMateriality } from "@/context/MaterialityContext";
 import RequirePermission from "@/components/RequirePermission";
@@ -44,6 +44,17 @@ function ReportsContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
+  // Reset page when search or report type changes
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleReportTypeChange = useCallback((type: ReportType) => {
+    setReportType(type);
+    setCurrentPage(1);
+  }, []);
+
   // Load metrics & anomalies
   useEffect(() => {
     let cancelled = false;
@@ -54,8 +65,8 @@ function ReportsContent() {
         const metricsRes = await getMetrics(materiality);
         if (cancelled) return;
         setMetrics(metricsRes.metrics);
-        // ✅ FIX: Access anomalies from the response safely
-        const anomaliesData = (metricsRes as any).anomalies || [];
+        // ✅ Fix: Use proper type assertion instead of 'any'
+        const anomaliesData = (metricsRes as { anomalies?: Anomaly[] }).anomalies || [];
         setAnomalies(anomaliesData);
 
         if (reportType === "icms") {
@@ -75,11 +86,6 @@ function ReportsContent() {
       cancelled = true;
     };
   }, [materiality, reportType]);
-
-  // Reset page when search or report type changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, reportType]);
 
   // Funnel calculations
   const funnelData = useMemo(() => {
@@ -392,7 +398,7 @@ function ReportsContent() {
             <div className="flex flex-col gap-2">
               <button
                 type="button"
-                onClick={() => setReportType("operational")}
+                onClick={() => handleReportTypeChange("operational")}
                 className={`w-full text-left p-3 rounded-lg border text-xs transition-all flex flex-col gap-1 ${
                   reportType === "operational"
                     ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-bold"
@@ -410,7 +416,7 @@ function ReportsContent() {
 
               <button
                 type="button"
-                onClick={() => setReportType("financial")}
+                onClick={() => handleReportTypeChange("financial")}
                 className={`w-full text-left p-3 rounded-lg border text-xs transition-all flex flex-col gap-1 ${
                   reportType === "financial"
                     ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-bold"
@@ -428,7 +434,7 @@ function ReportsContent() {
 
               <button
                 type="button"
-                onClick={() => setReportType("icms")}
+                onClick={() => handleReportTypeChange("icms")}
                 className={`w-full text-left p-3 rounded-lg border text-xs transition-all flex flex-col gap-1 ${
                   reportType === "icms"
                     ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-bold"
@@ -508,7 +514,7 @@ function ReportsContent() {
               type="text"
               placeholder="Search active table..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={handleSearchChange}
               className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:bg-white rounded-lg px-3 py-1.5 text-xs text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none transition-all shadow-inner"
             />
           </div>
