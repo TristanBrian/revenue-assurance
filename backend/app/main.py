@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
 from app.middleware.audit import AuditMiddleware
 from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit
@@ -11,6 +12,20 @@ import time
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("kpc.startup")
+
+# ============================================================================
+# CUSTOM CORS MIDDLEWARE (ensures headers are always set)
+# ============================================================================
+class ForceCorsMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        # Let the request proceed
+        response = await call_next(request)
+        # Override CORS headers to ensure they are present
+        response.headers["Access-Control-Allow-Origin"] = "https://flowguardd.vercel.app"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
 
 # ============================================================================
 # LIFESPAN (Runs on startup)
@@ -37,7 +52,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Middleware order: CORS must be outermost
+# ✅ CORS – add custom middleware FIRST to guarantee headers
+app.add_middleware(ForceCorsMiddleware)
+
+# Standard CORSMiddleware (handles preflight and adds its own headers)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "https://flowguardd.vercel.app", "https://*.railway.app", "https://*.onrender.com"],
@@ -45,6 +63,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 app.add_middleware(ResponseEnvelopeMiddleware)
 app.add_middleware(AuditMiddleware)
 
@@ -113,7 +132,6 @@ async def root():
         ]
     }
 
-# ✅ HEAD handler for root – Render sometimes uses HEAD /
 @app.head("/")
 async def head_root():
     return Response(status_code=200)
