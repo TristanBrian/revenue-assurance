@@ -4,44 +4,26 @@ KPC Revenue Assurance - Foundational ETL Pipeline (Stage 1)
 Extracts messy raw O2C datasets, runs strict data quality gates,
 routes corrupted records to an audit quarantine table, and loads
 clean foundational tables into SQLite and/or PostgreSQL.
-
-Datasets Processed:
-  - products.csv
-  - depots.csv
-  - tariffs.csv
-  - omcs.csv
-  - depot_loading_logs.csv
-  - dispatches.csv
-  - invoices.csv
-  - payments.csv
-  - depot_daily_inventory.csv
 """
-
 import os
 import sys
 import logging
 from datetime import datetime
 from typing import Dict
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 
-# This script (like generate_kpc_data.py) is run standalone, not through
-# app.config — os.getenv("DATABASE_URL") alone only sees real exported
-# shell env vars, never the repo-root .env file. Without this, DATABASE_URL
-# silently falls through to None here even when .env has it set correctly,
-# and the Postgres load below gets skipped with no obvious reason why.
+# Load .env from repo root
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '.env'))
 
 # ==========================================
 # 1. LOGGING & CONFIGURATION
 # ==========================================
-# Environment DB URIs & Directories
 RAW_DATA_DIR = "data/raw"
 CLEAN_DATA_DIR = "data/clean"
 LOG_DIR = "logs"
 
-# Ensure log directory exists before setting up file logging
 os.makedirs(LOG_DIR, exist_ok=True)
 LOG_FILE_PATH = os.path.join(LOG_DIR, "kpc_etl_execution.log")
 
@@ -55,27 +37,30 @@ logging.basicConfig(
 )
 logger = logging.getLogger("KPC_ETL")
 
-# Environment DB URIs
-# kpc.db (not kpc_revenue_assurance.db) — matches app/config.py's default
-# DATABASE_URL, docker-compose.yml, CI, and test_etl.py's hardcoded path check.
+# Database URIs
 POSTGRES_URI = os.getenv("DATABASE_URL")
 SQLITE_DB_PATH = "kpc.db"
-RAW_DATA_DIR = "data/raw"
+
+# ✅ Check if PostgreSQL is enabled
+if POSTGRES_URI and POSTGRES_URI.startswith("postgresql"):
+    logger.info(f"✅ PostgreSQL mode enabled via DATABASE_URL")
+elif POSTGRES_URI and POSTGRES_URI.startswith("postgres://"):
+    # Convert to postgresql:// for SQLAlchemy
+    POSTGRES_URI = POSTGRES_URI.replace("postgres://", "postgresql://", 1)
+    logger.info(f"✅ PostgreSQL mode enabled (converted from postgres://)")
+else:
+    logger.info("ℹ️  SQLite mode (DATABASE_URL not set to PostgreSQL)")
 
 # ==========================================
 # 2. AUDIT QUARANTINE MANAGER
 # ==========================================
 class AuditQuarantineManager:
-    """Collects and standardizes rejected records for governance & auditing."""
-
     def __init__(self):
         self.quarantine_records = []
 
     def log_quarantine(self, dataset_name: str, failed_gate: str, reason: str, corrupted_df: pd.DataFrame):
-        """Appends failed records to the quarantine list."""
         if corrupted_df.empty:
             return
-
         for _, row in corrupted_df.iterrows():
             self.quarantine_records.append({
                 "quarantine_id": f"QRT-{len(self.quarantine_records)+1:06d}",
@@ -87,7 +72,6 @@ class AuditQuarantineManager:
             })
 
     def get_quarantine_dataframe(self) -> pd.DataFrame:
-        """Returns the quarantine log as a DataFrame for DB loading."""
         if not self.quarantine_records:
             return pd.DataFrame(columns=[
                 "quarantine_id", "dataset_name", "failed_gate",
@@ -97,37 +81,30 @@ class AuditQuarantineManager:
 
 
 # ==========================================
-# 3. DATA QUALITY SUITE (TRANSFORMATIONS)
+# 3. DATA QUALITY SUITE
 # ==========================================
 class DataQualitySuite:
-    """Modular Data Quality Gates enforcing foundational data hygiene."""
-
     def __init__(self, quarantine_mgr: AuditQuarantineManager):
         self.qm = quarantine_mgr
 
     def gate_a_deduplicate(self, df: pd.DataFrame, dataset_name: str) -> pd.DataFrame:
-        """Gate A: Identifies, logs, and removes exact duplicate records."""
         dupes_mask = df.duplicated()
         dupes_count = dupes_mask.sum()
-
         if dupes_count > 0:
             corrupted = df[dupes_mask].copy()
             self.qm.log_quarantine(dataset_name, "Gate A (Deduplication)", "Duplicate record detected", corrupted)
             df_clean = df.drop_duplicates().copy()
             logger.warning(f"[{dataset_name}] Gate A: Quarantined & removed {dupes_count} duplicate rows.")
             return df_clean
-
         logger.info(f"[{dataset_name}] Gate A: Passed (0 duplicates).")
         return df
 
     def gate_b_clean_currency(self, df: pd.DataFrame, dataset_name: str, numeric_cols: list) -> pd.DataFrame:
-        """Gate B: Standardizes currency text strings (e.g., ' KES 45,000 ') into numeric floats."""
         df_clean = df.copy()
         for col in numeric_cols:
             if col in df_clean.columns:
                 str_mask = df_clean[col].apply(lambda x: isinstance(x, str))
                 corrupted_count = str_mask.sum()
-
                 if corrupted_count > 0:
                     df_clean[col] = df_clean[col].astype(str).str.replace(r'[^\d.]', '', regex=True)
                     df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce')
@@ -138,17 +115,14 @@ class DataQualitySuite:
         return df_clean
 
     def gate_c_standardize_dates(self, df: pd.DataFrame, dataset_name: str, date_cols: list) -> pd.DataFrame:
-        """Gate C: Parses mixed date formats, quarantining unparseable/missing dates."""
         df_clean = df.copy()
         for date_col in date_cols:
             if date_col in df_clean.columns:
                 parsed_dates = pd.to_datetime(df_clean[date_col], format='mixed', errors='coerce')
                 missing_mask = parsed_dates.isna()
-
                 if missing_mask.sum() > 0:
                     corrupted = df_clean[missing_mask].copy()
                     self.qm.log_quarantine(dataset_name, "Gate C (Date Standardizer)", f"Missing/Unparseable date in '{date_col}'", corrupted)
-
                     df_clean[date_col] = parsed_dates
                     df_clean = df_clean.dropna(subset=[date_col]).copy()
                     df_clean[date_col] = df_clean[date_col].dt.strftime('%Y-%m-%d')
@@ -159,27 +133,22 @@ class DataQualitySuite:
         return df_clean
 
     def gate_d_referential_integrity(self, child_df: pd.DataFrame, child_name: str, fk: str, parent_df: pd.DataFrame, pk: str) -> pd.DataFrame:
-        """Gate D: Enforces relational constraints and flags orphan records."""
         valid_keys = set(parent_df[pk].dropna().unique())
         orphan_mask = ~child_df[fk].isin(valid_keys) & child_df[fk].notna()
         orphan_count = orphan_mask.sum()
-
         if orphan_count > 0:
             corrupted = child_df[orphan_mask].copy()
             self.qm.log_quarantine(child_name, "Gate D (Referential Integrity)", f"Orphan key '{fk}' not found in parent", corrupted)
             logger.warning(f"[{child_name}] Gate D: Quarantined {orphan_count} orphan records matching '{fk}'.")
             return child_df[~orphan_mask].copy()
-
         logger.info(f"[{child_name}] Gate D: Passed referential integrity check on '{fk}'.")
         return child_df
 
 
 # ==========================================
-# 4. DATABASE LOADER ENGINE
+# 4. DATABASE LOADER ENGINE (UPDATED)
 # ==========================================
 class DatabaseLoader:
-    """Handles persistence to SQLite and PostgreSQL."""
-
     @staticmethod
     def load_to_sqlite(dataframes: Dict[str, pd.DataFrame], db_path: str = SQLITE_DB_PATH):
         import sqlite3
@@ -195,21 +164,26 @@ class DatabaseLoader:
 
     @staticmethod
     def load_to_postgres(dataframes: Dict[str, pd.DataFrame], uri: str = POSTGRES_URI):
-        if not uri or not uri.startswith("postgresql"):
-            logger.info("\n--- Skipping PostgreSQL load (DATABASE_URL not set to a postgresql:// URI) ---")
+        if not uri:
+            logger.info("\n--- Skipping PostgreSQL load (DATABASE_URL not set) ---")
             return
+        
+        # Ensure correct protocol
+        if uri.startswith("postgres://"):
+            uri = uri.replace("postgres://", "postgresql://", 1)
+        
         logger.info("\n--- Loading to PostgreSQL Database ---")
         try:
-            engine = create_engine(uri)
-            # Test connection
+            # ✅ Add connection pooling settings for Render
+            engine = create_engine(uri, pool_pre_ping=True, pool_recycle=3600)
             with engine.connect() as conn:
-                logger.info(" PostgreSQL connection established successfully.")
-
+                logger.info("✅ PostgreSQL connection established successfully.")
+            
             for table_name, df in dataframes.items():
                 df.to_sql(table_name, engine, if_exists='replace', index=False)
                 logger.info(f" [PostgreSQL] Table '{table_name}' loaded ({len(df)} rows).")
         except Exception as e:
-            logger.warning(f" [PostgreSQL] Could not load to PostgreSQL (Server offline or invalid URI): {e}")
+            logger.warning(f" [PostgreSQL] Could not load to PostgreSQL: {e}")
 
 
 # ==========================================
@@ -220,13 +194,11 @@ def main():
     logger.info(" STARTING KPC REVENUE ASSURANCE ETL PIPELINE")
     logger.info("==================================================")
 
-    # Ensure clean data directory exists for SQLite database storage
     os.makedirs(CLEAN_DATA_DIR, exist_ok=True)
 
     qm = AuditQuarantineManager()
     dq = DataQualitySuite(qm)
 
-    # 1. EXTRACT
     file_mapping = {
         "products": "products.csv",
         "depots": "depots.csv",
@@ -248,22 +220,16 @@ def main():
         raw_dfs[table_name] = pd.read_csv(path)
         logger.info(f"Extracted '{file_name}' ({len(raw_dfs[table_name])} rows).")
 
-    # 2. TRANSFORM & CLEAN
     logger.info("\n--- Applying Data Quality Suite ---")
 
-    # A. Clean Master Tables
     products_clean = dq.gate_a_deduplicate(raw_dfs["products"], "products")
     products_clean = dq.gate_b_clean_currency(products_clean, "products", ["unit_price_kes"])
-
     depots_clean = dq.gate_a_deduplicate(raw_dfs["depots"], "depots")
-
     omcs_clean = dq.gate_a_deduplicate(raw_dfs["omcs"], "omcs")
     omcs_clean = dq.gate_b_clean_currency(omcs_clean, "omcs", ["credit_limit_kes"])
-
     tariffs_clean = dq.gate_a_deduplicate(raw_dfs["tariffs"], "tariffs")
     tariffs_clean = dq.gate_c_standardize_dates(tariffs_clean, "tariffs", ["effective_start", "effective_end"])
 
-    # B. Clean Transactional Tables
     loading_clean = dq.gate_a_deduplicate(raw_dfs["depot_loading_logs"], "depot_loading_logs")
     loading_clean = dq.gate_c_standardize_dates(loading_clean, "depot_loading_logs", ["loading_timestamp"])
     loading_clean = dq.gate_d_referential_integrity(loading_clean, "depot_loading_logs", "omc_id", omcs_clean, "omc_id")
@@ -288,7 +254,6 @@ def main():
     inv_ledger_clean = dq.gate_a_deduplicate(raw_dfs["depot_daily_inventory"], "depot_daily_inventory")
     inv_ledger_clean = dq.gate_c_standardize_dates(inv_ledger_clean, "depot_daily_inventory", ["date"])
 
-    # 3. COMPILE CLEAN DATASETS
     datasets_clean = {
         "products": products_clean,
         "depots": depots_clean,
@@ -299,23 +264,18 @@ def main():
         "invoices": inv_clean,
         "payments": pay_clean,
         "depot_daily_inventory": inv_ledger_clean,
-        "quarantine_audit_log": qm.get_quarantine_dataframe() # Crucial for QA evidence
+        "quarantine_audit_log": qm.get_quarantine_dataframe()
     }
 
     logger.info(f"\n Total quarantined records captured for governance audit: {len(datasets_clean['quarantine_audit_log'])}")
 
-    # 4. LOAD TO TARGET DATABASES
-    TARGET_ENV = "both" # Options: 'sqlite', 'postgres', 'both'
+    TARGET_ENV = "both"
 
     if TARGET_ENV in ["sqlite", "both"]:
         DatabaseLoader.load_to_sqlite(datasets_clean)
 
     if TARGET_ENV in ["postgres", "both"]:
-        # NEW SECURITY CHECK ADDED HERE
-        if not POSTGRES_URI:
-            logger.error("DATABASE_URL environment variable is not set. Cannot connect to PostgreSQL.")
-        else:
-            DatabaseLoader.load_to_postgres(datasets_clean)
+        DatabaseLoader.load_to_postgres(datasets_clean)
 
     logger.info("==================================================")
     logger.info(" KPC REVENUE ETL PIPELINE EXECUTION COMPLETE")
