@@ -54,7 +54,9 @@ function ReportsContent() {
         const metricsRes = await getMetrics(materiality);
         if (cancelled) return;
         setMetrics(metricsRes.metrics);
-        setAnomalies(metricsRes.anomalies || []);
+        // ✅ FIX: Access anomalies from the response safely
+        const anomaliesData = (metricsRes as any).anomalies || [];
+        setAnomalies(anomaliesData);
 
         if (reportType === "icms") {
           const logsRes = await getEbillingLogs(100);
@@ -126,10 +128,8 @@ function ReportsContent() {
 
       // Classify by report type context
       if (reportType === "operational") {
-        // Operational focuses on dispatch discrepancies (Missing Invoice or underpayment gaps)
         return a.break_type === "Missing Invoice" || a.break_type === "Underpayment";
       } else {
-        // Financial focuses on invoice vs bank remittance
         return a.break_type === "Missing Payment" || a.break_type === "Underpayment" || a.break_type === "Overpayment";
       }
     });
@@ -176,7 +176,7 @@ function ReportsContent() {
         String(log.value_kes ?? 0),
         log.status,
         String(log.retry_count),
-        log.updated_at || "N/A",
+        log.sync_date || log.last_attempt || "N/A",
         log.error_message || "None",
       ]);
     } else if (reportType === "operational") {
@@ -619,7 +619,7 @@ function ReportsContent() {
                             </span>
                           </td>
                           <td className="px-4 py-3 font-mono">{log.retry_count}</td>
-                          <td className="px-4 py-3 font-mono text-zinc-500">{log.updated_at || "—"}</td>
+                          <td className="px-4 py-3 font-mono text-zinc-500">{log.last_attempt || "—"}</td>
                           <td className="px-4 py-3 max-w-[200px] truncate text-zinc-500" title={log.error_message ?? ""}>
                             {log.error_message || "—"}
                           </td>
