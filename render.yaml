@@ -28,6 +28,9 @@ services:
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "30"
 
+      - key: PORT
+        value: "8000"
+
       # KRA Integration
       - key: KRA_ICMS_ENDPOINT
         value: https://api.kra.go.ke/icms/v2/invoices
