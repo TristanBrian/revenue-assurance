@@ -29,7 +29,7 @@ services:
         value: "30"
 
       - key: PORT
-        value: "8000"
+        value: "10000"
 
       # KRA Integration
       - key: KRA_ICMS_ENDPOINT
