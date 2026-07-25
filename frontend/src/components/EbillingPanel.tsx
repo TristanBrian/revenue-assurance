@@ -113,8 +113,8 @@ export default function EbillingPanel() {
         if (t.status === "completed" || t.status === "failed" || t.status === "not_found") {
           if (pollRef.current) clearInterval(pollRef.current);
           setTaskId(null);
-          setTask(null); // ✅ Clear task state
-          loadAll(); // ✅ Refresh data after task completes
+          setTask(null);  
+          loadAll(); 
         }
       } catch {
         if (pollRef.current) clearInterval(pollRef.current);
