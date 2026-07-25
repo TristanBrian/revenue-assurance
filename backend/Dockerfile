@@ -19,7 +19,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
 
 EXPOSE 8000
 
-COPY backend/scripts/start.sh /app/scripts/start.sh
+COPY scripts/start.sh /app/scripts/start.sh
 RUN chmod +x /app/scripts/start.sh
 
 CMD ["/app/scripts/start.sh"]
