@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { ApiError, getHeatmap } from "@/lib/api";
+import { useMateriality } from "@/context/MaterialityContext";
 import type { HeatmapData } from "@/lib/types";
 
 function formatKes(value: number): string {
@@ -51,6 +52,7 @@ interface HoveredCell {
 }
 
 export default function Heatmap() {
+  const { materiality } = useMateriality(); // ✅ Get from context
   const [heatmap, setHeatmap] = useState<HeatmapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +62,7 @@ export default function Heatmap() {
   useEffect(() => {
     let cancelled = false;
 
-    getHeatmap()
+    getHeatmap(materiality) // ✅ Pass the materiality
       .then((data) => {
         if (!cancelled) setHeatmap(data);
       })
@@ -75,7 +77,7 @@ export default function Heatmap() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [materiality]); // ✅ Re-run when slider changes
 
   const CELL_W = 110;
   const CELL_H = 46;
@@ -127,7 +129,6 @@ export default function Heatmap() {
           <p className="text-xs text-zinc-500 dark:text-zinc-400">Leakage intensity by Oil Marketing Company and fuel category</p>
         </div>
 
-        {/* View toggle */}
         <div className="flex items-center bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-0.5 self-end">
           <button
             onClick={() => setViewMode("grid")}
@@ -179,7 +180,6 @@ export default function Heatmap() {
           {viewMode === "grid" ? (
             <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 p-4">
               <svg width={width} height={height} className="mx-auto min-w-full">
-                {/* Column Headers (Products) */}
                 {heatmap.products.map((product, ci) => (
                   <text
                     key={product}
@@ -192,10 +192,8 @@ export default function Heatmap() {
                   </text>
                 ))}
 
-                {/* Rows (OMCs and Cells) */}
                 {heatmap.omcs.map((omc, ri) => (
                   <g key={omc}>
-                    {/* Row Label */}
                     <text
                       x={LABEL_W - 12}
                       y={HEADER_H + ri * CELL_H + CELL_H / 2 + 4}
@@ -205,7 +203,6 @@ export default function Heatmap() {
                       {omc}
                     </text>
 
-                    {/* Heat Cells */}
                     {heatmap.products.map((product, ci) => {
                       const value = heatmap.data[ri]?.[ci] ?? 0;
                       const step = stepFor(value / maxValue);
@@ -254,7 +251,6 @@ export default function Heatmap() {
               </svg>
             </div>
           ) : (
-            // List View table representation
             <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/20">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/40 text-zinc-550 dark:text-zinc-400 font-medium">
@@ -281,7 +277,6 @@ export default function Heatmap() {
         </>
       )}
 
-      {/* Floating Interactive HTML Tooltip */}
       {hoveredCell && hoveredCell.value > 0 && (
         <div
           className="fixed z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3.5 py-2.5 rounded-lg shadow-2xl flex flex-col gap-1 transition-opacity duration-150 animate-fade-in"
