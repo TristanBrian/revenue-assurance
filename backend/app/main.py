@@ -1,6 +1,5 @@
 from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
 from app.middleware.audit import AuditMiddleware
 from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit
@@ -12,33 +11,6 @@ import time
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("kpc.startup")
-
-# ============================================================================
-# CORS MIDDLEWARE THAT HANDLES OPTIONS EXPLICITLY
-# ============================================================================
-class CorsMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        # If it's an OPTIONS preflight, return a response immediately with CORS headers
-        if request.method == "OPTIONS":
-            response = Response(
-                status_code=200,
-                headers={
-                    "Access-Control-Allow-Origin": "https://flowguardd.vercel.app",
-                    "Access-Control-Allow-Credentials": "true",
-                    "Access-Control-Allow-Methods": "*",
-                    "Access-Control-Allow-Headers": "*",
-                    "Access-Control-Max-Age": "86400",
-                }
-            )
-            return response
-
-        # For all other requests, proceed and add CORS headers to the response
-        response = await call_next(request)
-        response.headers["Access-Control-Allow-Origin"] = "https://flowguardd.vercel.app"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "*"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-        return response
 
 # ============================================================================
 # LIFESPAN (Runs on startup)
@@ -65,24 +37,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-app.add_middleware(CorsMiddleware)
-
+# ✅ CORS – must be the FIRST middleware (outermost)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-       app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],   
-    allow_credentials=False, 
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],                 # Allow all origins during debugging
+    allow_credentials=False,             # Must be False when using "*"
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Envelope and audit middlewares
 app.add_middleware(ResponseEnvelopeMiddleware)
 app.add_middleware(AuditMiddleware)
 
@@ -98,6 +62,21 @@ app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
 app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
+
+# ============================================================================
+# MANUAL OPTIONS HANDLER FOR LOGIN (fallback)
+# ============================================================================
+@app.options("/api/auth/login")
+async def options_login():
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Max-Age": "86400",
+        }
+    )
 
 # ============================================================================
 # ROOT AND HEALTH ENDPOINTS (with HEAD support)
