@@ -40,7 +40,7 @@ app = FastAPI(
 # Middleware order: CORS must be outermost
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://*.vercel.app", "https://*.railway.app", "https://*.onrender.com"],
+    allow_origins=["http://localhost:3000", "https://flowguardd.vercel.app/", "https://*.railway.app", "https://*.onrender.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
