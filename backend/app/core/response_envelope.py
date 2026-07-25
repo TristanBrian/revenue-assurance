@@ -44,6 +44,10 @@ class ResponseEnvelopeMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
 
+        # ✅ Skip envelope for OPTIONS (CORS preflight) – return as-is
+        if request.method == "OPTIONS":
+            return response
+
         if request.url.path in EXCLUDED_PATHS:
             return response
 
@@ -89,4 +93,20 @@ class ResponseEnvelopeMiddleware(BaseHTTPMiddleware):
             "Data": data,
             "Timestamp": _now_iso(),
         }
-        return JSONResponse(content=envelope, status_code=response.status_code)
+
+        # ✅ Create JSONResponse and preserve CORS headers
+        json_response = JSONResponse(content=envelope, status_code=response.status_code)
+
+        # ✅ Copy over CORS headers from the original response
+        cors_headers = {
+            "access-control-allow-origin",
+            "access-control-allow-credentials",
+            "access-control-allow-methods",
+            "access-control-allow-headers",
+            "access-control-max-age",
+        }
+        for key, value in response.headers.items():
+            if key.lower() in cors_headers:
+                json_response.headers[key] = value
+
+        return json_response
