@@ -166,16 +166,6 @@ export default function EbillingPanel() {
     }
   }
 
-  // ✅ Retry handler (passed to logs table)
-  const handleRetry = useCallback(async (invoiceId: string) => {
-    try {
-      await retryEbillingSync(invoiceId);
-      loadAll(); // ✅ Refresh logs after retry
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Retry failed");
-    }
-  }, [loadAll]);
-
   const syncing = taskId !== null;
 
   return (
@@ -259,7 +249,7 @@ export default function EbillingPanel() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             {/* Logs list */}
             <div className="lg:col-span-2">
-              <EbillingLogsTable logs={logs} onRetried={handleRetry} />
+              <EbillingLogsTable logs={logs} onRetried={loadAll} />
             </div>
 
             {/* Webhook sandbox simulator */}
