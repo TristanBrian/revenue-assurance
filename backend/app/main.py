@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
@@ -14,13 +14,26 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger("kpc.startup")
 
 # ============================================================================
-# CUSTOM CORS MIDDLEWARE (ensures headers are always set)
+# CORS MIDDLEWARE THAT HANDLES OPTIONS EXPLICITLY
 # ============================================================================
-class ForceCorsMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        # Let the request proceed
+class CorsMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # If it's an OPTIONS preflight, return a response immediately with CORS headers
+        if request.method == "OPTIONS":
+            response = Response(
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": "https://flowguardd.vercel.app",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Max-Age": "86400",
+                }
+            )
+            return response
+
+        # For all other requests, proceed and add CORS headers to the response
         response = await call_next(request)
-        # Override CORS headers to ensure they are present
         response.headers["Access-Control-Allow-Origin"] = "https://flowguardd.vercel.app"
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Methods"] = "*"
@@ -52,13 +65,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# ✅ CORS – add custom middleware FIRST to guarantee headers
-app.add_middleware(ForceCorsMiddleware)
+app.add_middleware(CorsMiddleware)
 
-# Standard CORSMiddleware (handles preflight and adds its own headers)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://flowguardd.vercel.app", "https://*.railway.app", "https://*.onrender.com"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://flowguardd.vercel.app",
+        "https://*.railway.app",
+        "https://*.onrender.com"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
