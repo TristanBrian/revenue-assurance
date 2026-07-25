@@ -9,6 +9,7 @@ import {
   getEbillingTask,
   startEbillingSync,
   sendEbillingWebhook,
+  retryEbillingSync,
 } from "@/lib/api";
 import type {
   EbillingIntegrationStatus,
@@ -40,6 +41,7 @@ export default function EbillingPanel() {
   const [webhookSubmitting, setWebhookSubmitting] = useState(false);
   const [webhookFeedback, setWebhookFeedback] = useState<string | null>(null);
 
+  // ✅ Refresh function – re-fetches all data
   const loadAll = useCallback(async () => {
     try {
       const [statusRes, monitorRes, logsRes] = await Promise.all([
@@ -67,6 +69,7 @@ export default function EbillingPanel() {
     }
   }, [webhookInvoiceId]);
 
+  // Initial load
   useEffect(() => {
     let cancelled = false;
 
@@ -77,7 +80,6 @@ export default function EbillingPanel() {
         setMonitor(monitorRes);
         setLogs(logsRes);
         setError(null);
-        // Pre-populate webhook invoice selector
         const firstLog = logsRes.find(l => l.status === "failed" || l.status === "pending");
         if (firstLog) {
           setWebhookInvoiceId(firstLog.invoice_id);
@@ -100,6 +102,7 @@ export default function EbillingPanel() {
     };
   }, []);
 
+  // ✅ Poll for task completion
   useEffect(() => {
     if (!taskId) return;
 
@@ -110,11 +113,13 @@ export default function EbillingPanel() {
         if (t.status === "completed" || t.status === "failed" || t.status === "not_found") {
           if (pollRef.current) clearInterval(pollRef.current);
           setTaskId(null);
-          loadAll();
+          setTask(null); // ✅ Clear task state
+          loadAll(); // ✅ Refresh data after task completes
         }
       } catch {
         if (pollRef.current) clearInterval(pollRef.current);
         setTaskId(null);
+        setTask(null);
       }
     }, POLL_INTERVAL_MS);
 
@@ -123,6 +128,7 @@ export default function EbillingPanel() {
     };
   }, [taskId, loadAll]);
 
+  // ✅ Sync handler
   async function handleSync() {
     setError(null);
     try {
@@ -136,6 +142,7 @@ export default function EbillingPanel() {
     }
   }
 
+  // ✅ Webhook handler
   async function handleWebhookSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!webhookInvoiceId) return;
@@ -149,7 +156,7 @@ export default function EbillingPanel() {
         message: webhookMessage,
       });
       setWebhookFeedback(`Success: Webhook processed. Invoice status updated to ${webhookStatus}.`);
-      loadAll(); // refresh logs instantly!
+      loadAll(); // ✅ Refresh logs instantly
     } catch (err) {
       setWebhookFeedback(
         err instanceof ApiError ? `Error: ${err.message}` : "Failed to connect to the webhook endpoint."
@@ -158,6 +165,16 @@ export default function EbillingPanel() {
       setWebhookSubmitting(false);
     }
   }
+
+  // ✅ Retry handler (passed to logs table)
+  const handleRetry = useCallback(async (invoiceId: string) => {
+    try {
+      await retryEbillingSync(invoiceId);
+      loadAll(); // ✅ Refresh logs after retry
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Retry failed");
+    }
+  }, [loadAll]);
 
   const syncing = taskId !== null;
 
@@ -242,7 +259,7 @@ export default function EbillingPanel() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             {/* Logs list */}
             <div className="lg:col-span-2">
-              <EbillingLogsTable logs={logs} onRetried={loadAll} />
+              <EbillingLogsTable logs={logs} onRetried={handleRetry} />
             </div>
 
             {/* Webhook sandbox simulator */}
