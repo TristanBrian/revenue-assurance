@@ -169,3 +169,7 @@ async def head_health():
 @app.get("/api/health")
 async def api_health():
     return await health_check()
+
+@app.get("/ping")
+async def ping():
+    return {"status": "ok"}

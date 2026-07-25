@@ -1,5 +1,7 @@
+# backend/app/routes/auth.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+import logging
 
 from app.core.dependencies import get_current_user, get_db, require_permission
 from app.core.security import create_access_token, verify_password
@@ -8,7 +10,9 @@ from app.schemas.user import LoginRequest, LoginResponse, RegisterRequest, UserO
 from app.services.audit_service import log_action
 from app.services.user_service import EmailAlreadyRegisteredError, RoleNotFoundError, register_user
 
-router = APIRouter()  # prefix="/api/auth" and tags=["Auth"] are supplied by main.py's include_router(), matching every other route file
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -17,13 +21,6 @@ def register(
     db: Session = Depends(get_db),
     admin: User = Depends(require_permission("manage_users")),
 ):
-    """
-    Creates a new user and assigns a role. Requires the caller to already
-    hold manage_users (i.e. be a system_admin) — the very first
-    system_admin is created via scripts/seed_admin.py instead, which
-    writes directly to the DB and bypasses this endpoint entirely, since
-    nothing exists yet to grant manage_users to anyone at that point.
-    """
     try:
         user = register_user(
             db,
@@ -42,38 +39,48 @@ def register(
 
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
-    if not user or not verify_password(payload.password, user.hashed_password):
-        log_action(
-            db,
-            actor_user_id=None,
-            action="auth.login_failure",
-            target_type="user",
-            metadata={"attempted_email": payload.email},
-        )
+    try:
+        user = db.query(User).filter(User.email == payload.email).first()
+        if not user or not verify_password(payload.password, user.hashed_password):
+            log_action(
+                db,
+                actor_user_id=None,
+                action="auth.login_failure",
+                target_type="user",
+                metadata={"attempted_email": payload.email},
+            )
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if not user.is_active:
+            log_action(
+                db,
+                actor_user_id=None,
+                action="auth.login_failure",
+                target_type="user",
+                target_id=str(user.id),
+                metadata={"attempted_email": payload.email, "reason": "inactive"},
+            )
+            db.commit()
+            raise HTTPException(status_code=403, detail="User is inactive")
+
+        log_action(db, actor_user_id=user.id, action="auth.login_success", target_type="user", target_id=str(user.id))
         db.commit()
+
+        token = create_access_token(subject=user.email)
+        return {"access_token": token, "token_type": "bearer"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login error: {e}", exc_info=True)
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during login",
         )
-    if not user.is_active:
-        log_action(
-            db,
-            actor_user_id=None,
-            action="auth.login_failure",
-            target_type="user",
-            target_id=str(user.id),
-            metadata={"attempted_email": payload.email, "reason": "inactive"},
-        )
-        db.commit()
-        raise HTTPException(status_code=403, detail="User is inactive")
-
-    log_action(db, actor_user_id=user.id, action="auth.login_success", target_type="user", target_id=str(user.id))
-    db.commit()
-
-    token = create_access_token(subject=user.email)
-    return {"access_token": token, "token_type": "bearer"}
 
 
 @router.get("/me", response_model=UserOut)
