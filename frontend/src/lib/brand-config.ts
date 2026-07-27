@@ -15,7 +15,7 @@ export const BRAND_CONFIG: BrandConfig = {
   shortName: "FlowGuard",
   logoUrl: "/kpc-logo.png",
   primaryColor: "#0A2E5C",   // Navy Blue
-  secondaryColor: "#C8102E", // Red (FlowGuard Revenue Assurance)
+  secondaryColor: "hsl(350, 75%, 35%)", // Darker, eye-friendly Red in HSL format
   accentColor: "#00B8D9",    // Cyan
   highlightColor: "#FFC857", // Gold
 };
