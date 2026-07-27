@@ -32,7 +32,7 @@ interface Step {
 }
 
 const colorSteps: Step[] = [
-  { threshold: 0.1, fill: "fill-zinc-100 dark:fill-zinc-800/40", colorCode: "rgba(39,39,42,0.1)", text: "text-zinc-550 dark:text-zinc-400" },
+  { threshold: 0.1, fill: "fill-teal-100 dark:fill-teal-900/80", colorCode: "rgba(39,39,42,0.1)", text: "text-teal-800 dark:text-teal-300" },
   { threshold: 0.4, fill: "fill-indigo-100 dark:fill-indigo-900/40", colorCode: "rgba(99,102,241,0.25)", text: "text-indigo-700 dark:text-indigo-300 font-semibold" },
   { threshold: 0.7, fill: "fill-indigo-600 dark:fill-indigo-600", colorCode: "#4f46e5", text: "text-white font-bold" },
   { threshold: 0.9, fill: "fill-violet-600 dark:fill-violet-600", colorCode: "#7c3aed", text: "text-white font-bold" },
@@ -290,7 +290,7 @@ export default function Heatmap() {
             
             <div className="flex flex-col gap-3 text-xs">
               <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded border border-zinc-200 dark:border-zinc-700/60 bg-zinc-100 dark:bg-zinc-800/40 shrink-0"></div>
+                <div className="w-4 h-4 rounded border border-teal-200 dark:border-teal-800 bg-teal-100 dark:bg-teal-900/80 shrink-0"></div>
                 <div className="flex flex-col">
                   <span className="font-semibold text-zinc-750 dark:text-zinc-300">&lt; 10%</span>
                   <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">Negligible Loss</span>
