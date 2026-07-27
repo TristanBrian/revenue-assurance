@@ -32,6 +32,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=postgresql+psycopg2://kpc_app:kpc_local_dev@db:5432/kpc_db
+      - PORT=8000
     depends_on:
       db:
         condition: service_healthy
@@ -47,10 +48,6 @@ services:
     container_name: kpc-frontend
     ports:
       - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
     env_file:
       - .env
     environment:
