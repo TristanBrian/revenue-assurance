@@ -256,12 +256,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         {/* Brand Logo Card (Centered & Expanded) */}
         <div className="mb-6 flex justify-center w-full">
           {BRAND_CONFIG.logoUrl ? (
-            <div className="w-full h-24 p-1 flex items-center justify-center relative">
+            <div className="w-auto -mx-4 h-28 p-1 flex items-center justify-center relative">
               <Image
                 src={BRAND_CONFIG.logoUrl}
                 alt={`${BRAND_CONFIG.companyName} logo`}
-                width={200}
-                height={96}
+                width={220}
+                height={88}
                 className="w-full h-full object-contain"
                 priority={false}
               />
