@@ -6,10 +6,10 @@ import type { ReconcileResult } from "@/lib/types";
 
 type UploadPhase = "idle" | "uploading" | "reconciling";
 
-const FILE_FIELDS: { key: TemplateType; label: string }[] = [
-  { key: "dispatches", label: "Dispatches" },
-  { key: "invoices", label: "Invoices" },
-  { key: "payments", label: "Payments" },
+const FILE_FIELDS: { key: TemplateType; label: string; hint: string }[] = [
+  { key: "dispatches", label: "Dispatches", hint: "Gantry waybills — dispatch_id, customer, volume, value" },
+  { key: "invoices", label: "Invoices", hint: "Commercial invoices raised against dispatches" },
+  { key: "payments", label: "Payments", hint: "OMC remittances against invoices" },
 ];
 
 export default function CsvUploadPanel({
@@ -35,9 +35,7 @@ export default function CsvUploadPanel({
     try {
       await downloadTemplate(key);
     } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : "Could not download the template.",
-      );
+      setError(err instanceof ApiError ? err.message : "Could not download the template.");
     }
   }
 
@@ -50,27 +48,17 @@ export default function CsvUploadPanel({
     setError(null);
     try {
       const result = await reconcileUploadWithProgress(
-        {
-          dispatches: files.dispatches,
-          invoices: files.invoices,
-          payments: files.payments,
-        },
+        { dispatches: files.dispatches, invoices: files.invoices, payments: files.payments },
         materiality,
         (percent) => {
           setUploadPercent(percent);
-          // The XHR fires its final onprogress at 100 the instant bytes
-          // finish sending, well before the response (the reconciliation
-          // run) comes back — flip the UI to "reconciling" so 100% upload
-          // doesn't read as "done" while the server is still working.
           if (percent >= 100) setPhase("reconciling");
         },
       );
       onUploaded(result);
     } catch (err) {
       setError(
-        err instanceof ApiError
-          ? err.message
-          : "Could not reach the reconciliation API. Is the backend running?",
+        err instanceof ApiError ? err.message : "Could not reach the reconciliation API. Is the backend running?",
       );
     } finally {
       setPhase("idle");
@@ -78,76 +66,86 @@ export default function CsvUploadPanel({
   }
 
   return (
-    <section className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-      <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-        Test with your own CSVs
-      </h2>
-      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-        Upload Dispatches, Invoices, and Payments CSVs to reconcile them instantly,
-        without touching the database.
-      </p>
-
-      <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
-        {FILE_FIELDS.map((f) => (
-          <div key={f.key} className="flex items-center gap-3 text-sm">
-            <label className="w-24 shrink-0 text-zinc-600 dark:text-zinc-400">
-              {f.label}
-            </label>
-            <input
-              type="file"
-              accept=".csv"
-              onChange={(e) => handleFileChange(f.key, e.target.files)}
-              className="flex-1 text-xs text-zinc-600 file:mr-3 file:rounded file:border-0 file:bg-zinc-200 file:px-2 file:py-1 file:text-xs dark:text-zinc-400 dark:file:bg-zinc-800"
-            />
-            <button
-              type="button"
-              onClick={() => handleTemplateDownload(f.key)}
-              className="shrink-0 text-xs text-zinc-500 underline hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {FILE_FIELDS.map((f) => {
+          const selected = files[f.key];
+          return (
+            <div
+              key={f.key}
+              className={`rounded-lg border p-3 flex flex-col gap-2 transition-colors ${
+                selected ? "border-status-low/40 bg-status-low-bg" : "border-border bg-muted/40"
+              }`}
             >
-              template
-            </button>
-          </div>
-        ))}
-
-        <button
-          type="submit"
-          disabled={!allSelected || submitting}
-          className="mt-1 self-start rounded bg-zinc-900 px-3 py-1.5 text-sm text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900"
-        >
-          {phase === "uploading"
-            ? `Uploading… ${uploadPercent}%`
-            : phase === "reconciling"
-              ? "Reconciling…"
-              : "Upload & Reconcile"}
-        </button>
-
-        {phase !== "idle" && (
-          <div className="flex flex-col gap-1">
-            <div className="h-1.5 w-full max-w-xs rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
-              {phase === "uploading" ? (
-                <div
-                  className="h-full rounded-full bg-zinc-900 dark:bg-zinc-100 transition-all duration-150 ease-out"
-                  style={{ width: `${uploadPercent}%` }}
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-foreground">{f.label}</span>
+                <button
+                  type="button"
+                  onClick={() => handleTemplateDownload(f.key)}
+                  className="text-[10px] font-medium text-muted-foreground underline hover:text-foreground"
+                >
+                  template
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-snug">{f.hint}</p>
+              <label className="mt-1 flex items-center justify-center rounded-md border border-dashed border-border bg-card py-2 text-[11px] font-medium text-muted-foreground hover:border-ring cursor-pointer transition-colors">
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => handleFileChange(f.key, e.target.files)}
+                  className="hidden"
                 />
-              ) : (
-                // Reconciling has no real progress signal — POST /reconcile/upload
-                // is one synchronous response, not a polled task like e-billing
-                // sync — so this is an indeterminate sweep, not a fabricated %.
-                <div className="h-full w-1/3 rounded-full bg-zinc-900 dark:bg-zinc-100 animate-indeterminate" />
-              )}
+                {selected ? (
+                  <span className="text-status-low font-semibold truncate px-2">{selected.name}</span>
+                ) : (
+                  "Choose CSV file"
+                )}
+              </label>
             </div>
-            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-              {phase === "uploading"
-                ? `Sending files: ${uploadPercent}%`
-                : "Files received — running reconciliation on the server…"}
-            </span>
+          );
+        })}
+      </div>
+
+      <button
+        type="submit"
+        disabled={!allSelected || submitting}
+        className="self-start rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40 transition-opacity hover:opacity-90"
+      >
+        {phase === "uploading"
+          ? `Uploading… ${uploadPercent}%`
+          : phase === "reconciling"
+            ? "Reconciling…"
+            : "Upload & Reconcile"}
+      </button>
+
+      {phase !== "idle" && (
+        <div className="flex flex-col gap-1 max-w-xs">
+          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+            {phase === "uploading" ? (
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-150 ease-out"
+                style={{ width: `${uploadPercent}%` }}
+              />
+            ) : (
+              // Reconciling has no real progress signal — POST /reconcile/upload
+              // is one synchronous response, not a polled task like e-billing
+              // sync — so this is an indeterminate sweep, not a fabricated %.
+              <div className="h-full w-1/3 rounded-full bg-primary animate-indeterminate" />
+            )}
           </div>
-        )}
-      </form>
+          <span className="text-[11px] text-muted-foreground">
+            {phase === "uploading"
+              ? `Sending files: ${uploadPercent}%`
+              : "Files received — running reconciliation on the server…"}
+          </span>
+        </div>
+      )}
 
       {error && (
-        <p className="mt-3 text-sm text-red-700 dark:text-red-400">{error}</p>
+        <p className="text-sm text-status-critical bg-status-critical-bg border border-status-critical/20 rounded-lg p-3">
+          {error}
+        </p>
       )}
-    </section>
+    </form>
   );
 }

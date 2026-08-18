@@ -2,161 +2,191 @@
 
 @variant dark (&:where(.dark, .dark *));
 
-/* 
-  Kenya Pipeline Company (KPC) FlowGuard Design System Palette
-  ============================================================
-  Brand Core:
-  - Red (Primary Accent): #B3312C — used for buttons, active states, links, focus rings, badges
-  - Black (Brand Dark Surface): #1F1B19 (warm near-black)
-  - White: #FFFFFF
-
-  Light Mode (Default):
-  - Background: #F7F6F4 (warm off-white)
-  - Foreground/text: #26221F (warm near-black)
-  - Card surface: #FFFFFF
-  - Muted surface: #F1EDE9
-  - Muted text: #736C67
-  - Border: #E8E3DE
-  - Primary: #B3312C on white text #FFFFFF
-*/
+/* ============================================================================
+   Design tokens
+   Surface/ink scale matches the reference app (sentinel-liard-beta.vercel.app)
+   pixel-for-pixel: shadcn's "neutral" palette — white/near-black cards on a
+   barely-off-white page, black-on-white primary buttons, hairline borders.
+   Status/categorical colors are the dataviz skill's validated palette
+   (references/palette.md) — chosen so severity is never carried by hue alone
+   (every status color ships with an icon + label) and so adjacent categorical
+   colors clear CVD/contrast gates in both modes, not eyeballed.
+   ============================================================================ */
 
 :root {
-  /* Brand Core Tokens */
-  --kpc-red: #B3312C;
-  --kpc-red-hover: #962824;
-  --kpc-red-light: #FDF2F2;
-  --kpc-black: #1F1B19;
-  --kpc-white: #FFFFFF;
+  --background: #fafafa;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #171717;
+  --primary-foreground: #fafafa;
+  --secondary: #f3f3f3;
+  --secondary-foreground: #171717;
+  --muted: #f2f2f2;
+  --muted-foreground: #6b6b6b;
+  --accent: #f2f2f2;
+  --accent-foreground: #171717;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #a1a1a1;
 
-  /* Light Mode Palette */
-  --background: #F7F6F4;
-  --foreground: #26221F;
-  --card-bg: #FFFFFF;
-  --card-border: #E8E3DE;
-  --muted-surface: #F1EDE9;
-  --muted-text: #736C67;
+  /* Sidebar — deliberately its own reddish-dark surface, distinct from the
+     neutral main layout (brand direction: KPC's red, not a themed neutral). */
+  --sidebar: #1c1010;
+  --sidebar-foreground: #f6ecec;
+  --sidebar-muted-foreground: #b08a8a;
+  --sidebar-border: #3a1f1f;
+  --sidebar-accent: #2c1616;
+  --sidebar-primary: #e0483f;
+  --sidebar-primary-foreground: #fff5f5;
 
-  --primary: #B3312C;
-  --primary-hover: #962824;
-  --primary-foreground: #FFFFFF;
-  --accent: #B3312C;
+  /* Status palette (fixed, never themed) — dataviz skill reference palette.
+     Never carries meaning alone: every use pairs the color with an icon/label. */
+  --status-critical: #d03b3b;
+  --status-critical-bg: #fdecec;
+  --status-high: #ec835a;
+  --status-high-bg: #fdf0e9;
+  --status-medium: #b6790a;
+  --status-medium-bg: #fdf3de;
+  --status-low: #0ca30c;
+  --status-low-bg: #eaf7ea;
+  --status-info: #2a78d6;
+  --status-info-bg: #eaf2fc;
 
-  /* Status Feedback Tokens */
-  --status-success: #15803D;
-  --status-warning: #D97706;
-  --status-danger: #B3312C;
-  --status-info: #1F1B19;
+  /* Chart chrome (dataviz skill) */
+  --chart-surface: #fcfcfb;
+  --chart-ink: #0b0b0b;
+  --chart-ink-secondary: #52514e;
+  --chart-ink-muted: #898781;
+  --chart-gridline: #e1e0d9;
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
 }
 
 .dark {
-  /* Dark Mode Palette */
-  --background: #191614;
-  --foreground: #F7F6F4;
-  --card-bg: #1F1B19;
-  --card-border: rgba(232, 227, 222, 0.15);
-  --muted-surface: #2A2523;
-  --muted-text: #A39B95;
-  --primary: #B3312C;
-  --primary-hover: #C93B35;
-  --accent: #B3312C;
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --card: #171717;
+  --card-foreground: #fafafa;
+  --popover: #171717;
+  --popover-foreground: #fafafa;
+  --primary: #e5e5e5;
+  --primary-foreground: #171717;
+  --secondary: #262626;
+  --secondary-foreground: #fafafa;
+  --muted: #262626;
+  --muted-foreground: #a1a1a1;
+  --accent: #262626;
+  --accent-foreground: #fafafa;
+  --border: #ffffff1a;
+  --input: #ffffff26;
+  --ring: #737373;
+
+  --sidebar: #170c0c;
+  --sidebar-foreground: #f6ecec;
+  --sidebar-muted-foreground: #9c7a7a;
+  --sidebar-border: #331b1b;
+  --sidebar-accent: #2a1414;
+  --sidebar-primary: #ef5b52;
+  --sidebar-primary-foreground: #fff5f5;
+
+  --status-critical: #e66767;
+  --status-critical-bg: #2a1414;
+  --status-high: #f0a37e;
+  --status-high-bg: #2a1d13;
+  --status-medium: #e0ab3b;
+  --status-medium-bg: #2a2312;
+  --status-low: #4fc652;
+  --status-low-bg: #12261a;
+  --status-info: #3987e5;
+  --status-info-bg: #12203a;
+
+  --chart-surface: #1a1a19;
+  --chart-ink: #ffffff;
+  --chart-ink-secondary: #c3c2b7;
+  --chart-ink-muted: #898781;
+  --chart-gridline: #2c2c2a;
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  
-  /* Brand Core Tokens for Tailwind */
-  --color-kpc-red: #B3312C;
-  --color-kpc-red-hover: #962824;
-  --color-kpc-black: #1F1B19;
-  --color-kpc-offwhite: #F7F6F4;
-  --color-kpc-text: #26221F;
-  --color-kpc-muted: #736C67;
-  --color-kpc-muted-surface: #F1EDE9;
-  --color-kpc-border: #E8E3DE;
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
-  /* Typography */
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  
-  /* Micro-animations */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+
+  --color-status-critical: var(--status-critical);
+  --color-status-critical-bg: var(--status-critical-bg);
+  --color-status-high: var(--status-high);
+  --color-status-high-bg: var(--status-high-bg);
+  --color-status-medium: var(--status-medium);
+  --color-status-medium-bg: var(--status-medium-bg);
+  --color-status-low: var(--status-low);
+  --color-status-low-bg: var(--status-low-bg);
+  --color-status-info: var(--status-info);
+  --color-status-info-bg: var(--status-info-bg);
+
+  --color-chart-surface: var(--chart-surface);
+  --color-chart-ink: var(--chart-ink);
+  --color-chart-ink-secondary: var(--chart-ink-secondary);
+  --color-chart-ink-muted: var(--chart-ink-muted);
+  --color-chart-gridline: var(--chart-gridline);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+  --radius-card: 0.75rem;
   --animate-indeterminate: indeterminate 1.2s ease-in-out infinite;
-  --animate-fade-in: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  --animate-pulse-glow: pulseGlow 2s infinite ease-in-out;
 }
 
-/* HCI Animation Keyframes */
+/* Sweeping bar for progress with no real percentage signal (e.g. server-side
+   reconciliation after a CSV upload finishes sending) — never used where a
+   real percentage is available. */
 @keyframes indeterminate {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(300%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes pulseGlow {
-  0%, 100% { opacity: 0.8; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.02); }
-}
-
-/* Base Body Styles */
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  min-height: 100vh;
-  transition: background-color 0.25s ease-in-out, color 0.25s ease-in-out, border-color 0.25s ease-in-out;
-  -webkit-font-smoothing: antialiased;
-}
-
-/* Accessibility Focus States */
-:focus-visible {
-  outline: 2px solid #B3312C;
-  outline-offset: 2px;
-  border-radius: 0.375rem;
-}
-
-/* Cards & Surfaces */
-.kpc-card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 20px -2px rgba(31, 27, 25, 0.06);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.kpc-card-interactive {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 20px -2px rgba(31, 27, 25, 0.06);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.kpc-card-interactive:hover {
-  border-color: #B3312C;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px -4px rgba(179, 49, 44, 0.15);
-}
-
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(31, 27, 25, 0.04);
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(179, 49, 44, 0.3);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #B3312C;
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
 }
 
 table {

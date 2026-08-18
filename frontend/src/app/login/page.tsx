@@ -6,6 +6,7 @@ import Image from "next/image";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { BRAND_CONFIG } from "@/lib/brand-config";
+import FlowGuardHeroIllustration from "@/components/FlowGuardHeroIllustration";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -20,13 +21,13 @@ export default function LoginPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const { resetRequired, termsRequired } = await login(email, password);
-      router.push(resetRequired || termsRequired ? "/reset-password" : "/dashboard");
+      await login(email, password);
+      router.push("/dashboard");
     } catch (err) {
       setError(
         err instanceof ApiError
           ? err.message
-          : "Could not reach the API. Is the backend running?"
+          : "Could not reach the API. Is the backend running?",
       );
     } finally {
       setSubmitting(false);
@@ -34,99 +35,88 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex flex-col min-h-screen text-slate-100 font-sans p-6 md:p-12 overflow-hidden justify-between items-center bg-[#050814]">
-      
-      {/* BACKGROUND IMAGE */}
-      <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden bg-[#050814]">
-        <Image
-          src="/images/flowguard-landing-hero.png"
-          alt="KPC FlowGuard Pipeline Background"
-          fill
-          priority
-          unoptimized
-          sizes="100vw"
-          className="object-cover object-center w-full h-full opacity-90 blur-[1px] scale-105 transition-all duration-500"
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#1c1010] p-6 font-sans">
+      {/* Full-bleed atmosphere layer: brand-reddish gradient scene + dimmed illustration,
+          standing in for the reference's hero photograph without borrowing its assets. */}
+      <div className="absolute inset-0 z-0">
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(120% 90% at 15% 10%, color-mix(in oklch, var(--sidebar-primary) 35%, transparent), transparent 55%), radial-gradient(110% 80% at 85% 90%, color-mix(in oklch, var(--sidebar-primary) 40%, black), transparent 60%), linear-gradient(160deg, #1c1010 0%, #2a1414 45%, #170c0c 100%)",
+          }}
         />
-        
-        {/* INTERMEDIATE SEPARATION LAYER: Translucent dark scrim */}
-        <div className="absolute inset-0 bg-[#050814]/60 backdrop-blur-[2px] pointer-events-none z-1 transition-opacity duration-300" />
-        
-        {/* Radial subtle contrast glow behind central login card */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#070D19]/70 via-transparent to-black/50 pointer-events-none z-2" />
+        <FlowGuardHeroIllustration className="absolute inset-0 h-full w-full object-cover opacity-[0.14] mix-blend-screen" />
+        <div
+          className="absolute inset-0 opacity-[0.06]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)",
+            backgroundSize: "42px 42px",
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20" />
       </div>
 
-      {/* TOP HEADER: KPC Transparent Logo Header */}
-      <header className="relative z-10 w-full pt-6 pb-2 flex items-center justify-start max-w-7xl mx-auto animate-fade-in">
-        {/* KPC Logo + Title */}
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-16 md:w-16 md:h-20 relative shrink-0 drop-shadow-[0_0_25px_rgba(228,30,38,0.4)]">
-            <Image 
-              src="/svg/kpc-logo-transparent.svg" 
-              alt="Kenya Pipeline Company Logo" 
-              fill 
-              className="object-contain" 
-              priority 
-            />
-          </div>
-          <div className="flex flex-col text-left">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-white font-sans leading-none">
-              Flowguard
-            </h1>
-            <span className="text-xs md:text-sm font-extrabold tracking-[0.25em] text-[#B3312C] uppercase mt-2">
-              REVENUE ASSURANCE PLATFORM
-            </span>
-          </div>
-        </div>
-      </header>
-
-      {/* DEAD-CENTERED FLOATING LOGIN CARD CONTAINER */}
-      <main className="relative z-10 w-full max-w-lg mx-auto my-auto py-8 px-4 flex flex-col items-center justify-center animate-fade-in">
-        <div className="w-full bg-white/50 dark:bg-[#1F1B19]/55 backdrop-blur-3xl border border-white/60 dark:border-white/25 p-8 sm:p-10 md:p-11 rounded-[32px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.4)] transition-all duration-300 relative overflow-hidden text-slate-900 dark:text-white">
-          
-          {/* Top Logo & Title Section */}
+      {/* CENTER: frosted glass card floating over the scene */}
+      <div className="relative z-10 w-full max-w-md">
+        <div className="rounded-2xl border border-white/15 bg-white/10 p-8 shadow-2xl backdrop-blur-xl sm:p-10">
           <div className="mb-8 flex flex-col items-center text-center">
-            {/* KPC Logo Emblem */}
-            <div className="w-22 h-22 relative shrink-0 mb-3 drop-shadow-lg">
-              <Image 
-                src="/svg/kpc-logo-transparent.svg" 
-                alt="KPC Logo" 
-                fill 
-                className="object-contain" 
-                priority 
-              />
-            </div>
+            {BRAND_CONFIG.logoUrl ? (
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-lg">
+                <div className="relative h-11 w-11">
+                  <Image
+                    src={BRAND_CONFIG.logoUrl}
+                    alt={`${BRAND_CONFIG.companyName} logo`}
+                    fill
+                    sizes="44px"
+                    className="object-contain"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div
+                className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-lg font-black text-white shadow-lg"
+                style={{ backgroundColor: "var(--sidebar-primary)" }}
+              >
+                {BRAND_CONFIG.shortName.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <h1 className="text-xl font-bold tracking-tight text-white">
+              {BRAND_CONFIG.companyName}
+            </h1>
+            <p className="mt-0.5 text-sm font-medium text-white/60">{BRAND_CONFIG.systemName}</p>
+          </div>
 
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">
-              FlowGuard
-            </h2>
-            <p className="text-xs sm:text-sm font-extrabold tracking-widest text-slate-800 dark:text-slate-100 mt-1 font-mono uppercase">
-              Revenue Assurance Platform
-            </p>
+          <div className="mb-6 text-center">
+            <h2 className="text-lg font-semibold text-white">Welcome back</h2>
+            <p className="mt-1 text-sm text-white/60">Sign in to access the reconciliation platform</p>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
-              <label 
-                htmlFor="email" 
-                className="text-xs md:text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white text-left pl-1"
+              <label
+                htmlFor="email"
+                className="text-[11px] font-semibold uppercase tracking-wider text-white/70"
               >
-                Username
+                Email Address
               </label>
               <input
                 id="email"
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-white/80 dark:border-slate-700 focus:border-[#B3312C] focus:ring-2 focus:ring-[#B3312C]/50 px-5 py-4 text-base font-bold text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none transition-all shadow-sm"
-                placeholder="Enter your username"
+                className="rounded-lg border border-white/10 bg-white px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 shadow-inner outline-none transition-all focus:border-white focus:ring-2 focus:ring-white/40"
+                placeholder="manager@kpc.co.ke"
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <label 
-                htmlFor="password" 
-                className="text-xs md:text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white text-left pl-1"
+              <label
+                htmlFor="password"
+                className="text-[11px] font-semibold uppercase tracking-wider text-white/70"
               >
                 Password
               </label>
@@ -134,15 +124,16 @@ export default function LoginPage() {
                 id="password"
                 type="password"
                 required
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-white/80 dark:border-slate-700 focus:border-[#B3312C] focus:ring-2 focus:ring-[#B3312C]/50 px-5 py-4 text-base font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none transition-all shadow-sm"
-                placeholder="Enter your password"
+                className="rounded-lg border border-white/10 bg-white px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 shadow-inner outline-none transition-all focus:border-white focus:ring-2 focus:ring-white/40"
+                placeholder="••••••••"
               />
             </div>
 
             {error && (
-              <div className="rounded-2xl border border-[#B3312C]/50 bg-[#B3312C]/20 px-5 py-4 text-sm text-[#B3312C] dark:text-red-300 font-extrabold">
+              <div className="rounded-lg border border-red-400/30 bg-red-500/15 px-4 py-3 text-sm text-red-100">
                 {error}
               </div>
             )}
@@ -150,21 +141,21 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="mt-2 rounded-2xl py-4 px-8 text-base sm:text-lg font-black text-white shadow-xl active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider bg-[#B3312C] hover:bg-[#962824] focus:ring-2 focus:ring-[#B3312C]/50"
+              className="mt-1 rounded-lg py-3.5 text-sm font-bold uppercase tracking-wider text-white shadow-lg transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
               style={{
-                boxShadow: "0 10px 25px -4px rgba(179, 49, 44, 0.55)",
+                backgroundColor: "var(--sidebar-primary)",
+                boxShadow: "0 10px 25px -6px color-mix(in oklch, var(--sidebar-primary) 55%, transparent)",
               }}
             >
-              {submitting ? "Signing in..." : "Sign In"}
+              {submitting ? "Authenticating..." : "Sign In"}
             </button>
           </form>
         </div>
-      </main>
 
-      {/* FOOTER */}
-      <footer className="relative z-10 w-full pb-3 text-center text-xs font-medium tracking-wide text-slate-400 select-none">
-        <p>© {new Date().getFullYear()} Kenya Pipeline Company • FlowGuard Revenue Assurance</p>
-      </footer>
+        <p className="mt-6 text-center text-xs font-medium tracking-wide text-white/40">
+          Detect, Reconcile, Predict, Protect every transaction.
+        </p>
+      </div>
     </div>
   );
 }
