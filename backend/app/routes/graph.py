@@ -14,13 +14,15 @@ include_router(), same convention as every other route file.
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
 
-from app.core.dependencies import require_permission
+from app.core.dependencies import get_db, require_permission
 from app.models.user import User
 from app.schemas.detective import OmcRiskDetail
 from app.schemas.graph import CommunityOut, FraudGraphResponse, NetworkResponse, OmcDepotEdge, OmcDepotNode
 from app.services import detective_service, graph_engine
 from app.core.cache import get_cached_result, set_cached_result
+from app.services.alert_service import notify_fraud_clusters
 from app.services.reconciliation import run_reconciliation
 from app.utils.db_connection import get_engine
 import pandas as pd
@@ -37,6 +39,7 @@ router = APIRouter()
 @router.get("", response_model=FraudGraphResponse)
 def fraud_graph(
     materiality: float = Query(100000, description="Min leakage to include"),
+    db: Session = Depends(get_db),
     user: User = Depends(require_permission("view_fraud_graph")),
 ):
     """
@@ -59,7 +62,8 @@ def fraud_graph(
         cache_key = f"metrics_{materiality}"
         cached = get_cached_result(cache_key)
 
-        if cached and 'anomalies' in cached:
+        is_cache_miss = not (cached and 'anomalies' in cached)
+        if not is_cache_miss:
             logger.info(f"✅ Graph using cached anomalies for materiality={materiality}")
             anomalies = cached['anomalies']
         else:
@@ -83,6 +87,21 @@ def fraud_graph(
         anomalies_df = pd.DataFrame(anomalies)
         dispatches_df = pd.read_sql("SELECT dispatch_id, omc_id, depot FROM dispatches", get_engine())
         data = graph_engine.build_fraud_graph_from_dataframes(anomalies_df, dispatches_df)
+
+        # Gated to the same cache-miss condition as the anomalies above —
+        # alert_exists() dedup would make this safe on every request
+        # anyway, but there's no reason to re-check on every cached page
+        # view. See services/alert_service.notify_fraud_clusters.
+        if is_cache_miss:
+            try:
+                new_alerts = notify_fraud_clusters(db, data.get('communities', []))
+                if new_alerts:
+                    db.commit()
+                    logger.info(f"🔔 {len(new_alerts)} new fraud-cluster alert(s) created")
+            except Exception as alert_err:
+                db.rollback()
+                logger.error(f"Fraud-cluster alert creation failed (non-fatal): {alert_err}")
+
         return {'status': 'success', 'data': data}
 
     except Exception as e:

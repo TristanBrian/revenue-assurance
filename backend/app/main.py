@@ -2,7 +2,8 @@ from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
 from app.middleware.audit import AuditMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit
+from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit, alerts  # <-- ADDED feed, heatmap, auth, detective, graph, admin, audit, alerts
+# import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
 from contextlib import asynccontextmanager
@@ -46,22 +47,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include Routers — order here also drives the grouping/order Swagger UI
+# displays tags in, so it's kept in sync with the strategic ordering in
+# root()'s "endpoints" list below: Auth first (everything else needs a
+# token), then Live Feed, Reconciliation, Heatmap, E-Billing, Graph,
+# Detective (risk analytics), Admin, Audit.
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])  # <-- ADDED auth router
+app.include_router(feed.router, prefix="/api", tags=["Live Feed"])      # <-- NEW
+app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
+app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
+app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
+app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])  # <-- NEW
+app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
+app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
+app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])  # <-- NEW
 # Envelope and audit middlewares
 app.add_middleware(ResponseEnvelopeMiddleware)
 app.add_middleware(AuditMiddleware)
-
-# ============================================================================
-# ROUTERS
-# ============================================================================
-app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
-app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
-app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
-app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])
-app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
-app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
-app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
-app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
 
 # ============================================================================
 # MANUAL OPTIONS HANDLER FOR LOGIN (fallback)
@@ -89,7 +92,11 @@ async def root():
         "status": "running",
         "version": "2.0.0",
         "endpoints": [
-            "POST /api/auth/login - Log in, returns a JWT",
+            # -- Auth: everything else needs a token from here first --
+            "POST /api/auth/login - Log in, returns a JWT (or a scoped reset_token if must_reset_password)",
+            "POST /api/auth/reset-password - Redeem a reset_token + set a new password + accept Terms/Privacy (forced-reset flow)",
+            "GET /api/auth/terms - Current Terms & Conditions / Privacy Policy text + required version",
+            "POST /api/auth/accept-terms - Redeem a consent_token to re-accept a newer Terms/Privacy version",
             "POST /api/auth/register - Create a user and assign a role (manage_users)",
             "GET /api/auth/me - Current user's profile, roles, permissions",
             "GET /api/feed - Live anomaly feed",
@@ -119,13 +126,26 @@ async def root():
             "GET /api/detective/risk-features - OMC risk features (all OMCs)",
             "GET /api/detective/risk-features/{omc_id} - OMC risk features (single OMC)",
             "GET /api/detective/risk-features/export - Download risk features as CSV",
-            "GET /api/admin/users - List all users",
+
+            # -- Admin: user/permission management, not a revenue-assurance feature --
+            "GET /api/admin/users - List all users (with account_status)",
+            "POST /api/admin/users - Provision a user with an emailed temp password, forced reset on first login",
+            "POST /api/admin/users/{user_id}/resend-temp-password - Regenerate + re-email a temp password",
             "PATCH /api/admin/users/{user_id} - Edit a user (email/name/role/password/is_active)",
             "DELETE /api/admin/users/{user_id} - Delete a user",
             "GET /api/audit/logs - Paginated, filterable audit trail",
             "GET /api/audit/logs/{log_id} - Single audit log entry",
             "GET /api/audit/summary - Aggregate audit stats for the last N days",
             "GET /api/audit/me - Current user's own audit trail",
+
+            # -- Alerts: in-app + email notifications (system-triggered and manual) --
+            "GET /api/alerts - Current user's alert inbox",
+            "GET /api/alerts/unread-count - Unread alert badge count",
+            "POST /api/alerts/{alert_id}/read - Mark one alert read",
+            "POST /api/alerts/read-all - Mark every visible alert read",
+            "POST /api/alerts - Broadcast a manual alert (manage_alerts)",
+
+            # -- Infra --
             "GET /health - Health check"
         ]
     }

@@ -1,0 +1,6 @@
+depot_id,depot_name,location,capacity_litres,is_active
+Mombasa (KOSF),Mombasa (KOSF),,7363900,True
+Mombasa (Kipevu),Mombasa (Kipevu),,2933912,True
+Nairobi,Nairobi,,2209805,True
+Kisumu,Kisumu,,4307113,True
+Eldoret,Eldoret,,4054301,True
