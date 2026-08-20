@@ -2,40 +2,161 @@
 
 @variant dark (&:where(.dark, .dark *));
 
+/* 
+  Kenya Pipeline Company (KPC) FlowGuard Design System Palette
+  ============================================================
+  Brand Core:
+  - Red (Primary Accent): #B3312C — used for buttons, active states, links, focus rings, badges
+  - Black (Brand Dark Surface): #1F1B19 (warm near-black)
+  - White: #FFFFFF
+
+  Light Mode (Default):
+  - Background: #F7F6F4 (warm off-white)
+  - Foreground/text: #26221F (warm near-black)
+  - Card surface: #FFFFFF
+  - Muted surface: #F1EDE9
+  - Muted text: #736C67
+  - Border: #E8E3DE
+  - Primary: #B3312C on white text #FFFFFF
+*/
+
 :root {
-  --background: #ffffff;
-  --foreground: #18181b;
+  /* Brand Core Tokens */
+  --kpc-red: #B3312C;
+  --kpc-red-hover: #962824;
+  --kpc-red-light: #FDF2F2;
+  --kpc-black: #1F1B19;
+  --kpc-white: #FFFFFF;
+
+  /* Light Mode Palette */
+  --background: #F7F6F4;
+  --foreground: #26221F;
+  --card-bg: #FFFFFF;
+  --card-border: #E8E3DE;
+  --muted-surface: #F1EDE9;
+  --muted-text: #736C67;
+
+  --primary: #B3312C;
+  --primary-hover: #962824;
+  --primary-foreground: #FFFFFF;
+  --accent: #B3312C;
+
+  /* Status Feedback Tokens */
+  --status-success: #15803D;
+  --status-warning: #D97706;
+  --status-danger: #B3312C;
+  --status-info: #1F1B19;
 }
 
 .dark {
-  --background: #09090b;
-  --foreground: #f4f4f5;
+  /* Dark Mode Palette */
+  --background: #191614;
+  --foreground: #F7F6F4;
+  --card-bg: #1F1B19;
+  --card-border: rgba(232, 227, 222, 0.15);
+  --muted-surface: #2A2523;
+  --muted-text: #A39B95;
+  --primary: #B3312C;
+  --primary-hover: #C93B35;
+  --accent: #B3312C;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  
+  /* Brand Core Tokens for Tailwind */
+  --color-kpc-red: #B3312C;
+  --color-kpc-red-hover: #962824;
+  --color-kpc-black: #1F1B19;
+  --color-kpc-offwhite: #F7F6F4;
+  --color-kpc-text: #26221F;
+  --color-kpc-muted: #736C67;
+  --color-kpc-muted-surface: #F1EDE9;
+  --color-kpc-border: #E8E3DE;
+
+  /* Typography */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  
+  /* Micro-animations */
   --animate-indeterminate: indeterminate 1.2s ease-in-out infinite;
+  --animate-fade-in: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-pulse-glow: pulseGlow 2s infinite ease-in-out;
 }
 
-/* Sweeping bar for progress with no real percentage signal (e.g. server-side
-   reconciliation after a CSV upload finishes sending) — never used where a
-   real percentage is available. */
+/* HCI Animation Keyframes */
 @keyframes indeterminate {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(300%);
-  }
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.02); }
+}
+
+/* Base Body Styles */
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  transition: background-color 0.25s ease-in-out, border-color 0.25s ease-in-out;
+  min-height: 100vh;
+  transition: background-color 0.25s ease-in-out, color 0.25s ease-in-out, border-color 0.25s ease-in-out;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Accessibility Focus States */
+:focus-visible {
+  outline: 2px solid #B3312C;
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
+/* Cards & Surfaces */
+.kpc-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 20px -2px rgba(31, 27, 25, 0.06);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.kpc-card-interactive {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 20px -2px rgba(31, 27, 25, 0.06);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.kpc-card-interactive:hover {
+  border-color: #B3312C;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -4px rgba(179, 49, 44, 0.15);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(31, 27, 25, 0.04);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(179, 49, 44, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B3312C;
 }
 
 table {

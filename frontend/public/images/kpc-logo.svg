@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520" role="img" aria-labelledby="title desc">
+  <title id="title">KPC logo</title>
+  <desc id="desc">Kenya Pipeline Company style KPC mark in red, black and white.</desc>
+  <rect width="400" height="520" fill="#E41E26"/>
+  <path d="M200 20 L70 235 Q200 160 330 235 Z" fill="#FFFFFF"/>
+  <circle cx="200" cy="340" r="122" fill="#000000" stroke="#FFFFFF" stroke-width="16"/>
+  <path d="M82 340 A118 118 0 0 1 318 340" fill="none" stroke="#E41E26" stroke-width="7"/>
+  <text x="200" y="370" text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif"
+        font-size="86" font-weight="700" fill="#FFFFFF" letter-spacing="2">KPC</text>
+</svg>

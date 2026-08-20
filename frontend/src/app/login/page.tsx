@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { BRAND_CONFIG } from "@/lib/brand-config";
-import FlowGuardHeroIllustration from "@/components/FlowGuardHeroIllustration";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -26,7 +26,7 @@ export default function LoginPage() {
       setError(
         err instanceof ApiError
           ? err.message
-          : "Could not reach the API. Is the backend running?",
+          : "Could not reach the API. Is the backend running?"
       );
     } finally {
       setSubmitting(false);
@@ -34,52 +34,83 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen text-zinc-100 font-sans p-6 relative overflow-hidden justify-between items-center bg-[#071225]">
+    <div className="relative flex flex-col min-h-screen text-slate-100 font-sans p-6 md:p-12 overflow-hidden justify-between items-center bg-[#050814]">
       
-      {/* BACKGROUND GRAPHICS LAYER (Covers the whole landing page - slightly faint) */}
-      <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
-        <FlowGuardHeroIllustration className="w-full h-full object-cover opacity-[0.32]" />
+      {/* BACKGROUND IMAGE */}
+      <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden bg-[#050814]">
+        <Image
+          src="/images/flowguard-landing-hero.png"
+          alt="KPC FlowGuard Pipeline Background"
+          fill
+          priority
+          unoptimized
+          sizes="100vw"
+          className="object-cover object-center w-full h-full opacity-90 blur-[1px] scale-105 transition-all duration-500"
+        />
+        
+        {/* INTERMEDIATE SEPARATION LAYER: Translucent dark scrim */}
+        <div className="absolute inset-0 bg-[#050814]/60 backdrop-blur-[2px] pointer-events-none z-1 transition-opacity duration-300" />
+        
+        {/* Radial subtle contrast glow behind central login card */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#070D19]/70 via-transparent to-black/50 pointer-events-none z-2" />
       </div>
 
-      {/* TOP: Centered Branding spanning full page width (no logo on landing) */}
-      <header className="absolute top-8 left-0 right-0 z-10 w-full text-center flex flex-col items-center gap-2">
-        <h1 
-          className="text-6xl md:text-7xl font-extrabold tracking-tight leading-none filter drop-shadow-sm select-none text-white"
-        >
-          {BRAND_CONFIG.companyName}
-        </h1>
-        <h2 
-          className="text-2xl md:text-3xl font-extrabold tracking-tight mt-1 select-none"
-          style={{ color: BRAND_CONFIG.accentColor }}
-        >
-          {BRAND_CONFIG.systemName}
-        </h2>
+      {/* TOP HEADER: KPC Transparent Logo Header */}
+      <header className="relative z-10 w-full pt-6 pb-2 flex items-center justify-start max-w-7xl mx-auto animate-fade-in">
+        {/* KPC Logo + Title */}
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-16 md:w-16 md:h-20 relative shrink-0 drop-shadow-[0_0_25px_rgba(228,30,38,0.4)]">
+            <Image 
+              src="/svg/kpc-logo-transparent.svg" 
+              alt="Kenya Pipeline Company Logo" 
+              fill 
+              className="object-contain" 
+              priority 
+            />
+          </div>
+          <div className="flex flex-col text-left">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-white font-sans leading-none">
+              Flowguard
+            </h1>
+            <span className="text-xs md:text-sm font-extrabold tracking-[0.25em] text-[#B3312C] uppercase mt-2">
+              REVENUE ASSURANCE PLATFORM
+            </span>
+          </div>
+        </div>
       </header>
 
-      {/* CENTER: Floating Solid White Login Card (Slightly larger for usability/HCI) */}
-      <div className="relative z-10 w-full max-w-lg mx-auto my-auto px-4 flex items-center justify-center">
-        <div className="w-full bg-white border border-zinc-200 p-10 rounded-xl shadow-2xl transition-all duration-300 hover:shadow-[0_20px_50px_rgba(10,46,92,0.18)]">
-          <div className="mb-8 text-center">
-            <h2 
-              className="text-4xl font-extrabold tracking-tight text-zinc-900"
-            >
-              Login
+      {/* DEAD-CENTERED FLOATING LOGIN CARD CONTAINER */}
+      <main className="relative z-10 w-full max-w-lg mx-auto my-auto py-8 px-4 flex flex-col items-center justify-center animate-fade-in">
+        <div className="w-full bg-white/50 dark:bg-[#1F1B19]/55 backdrop-blur-3xl border border-white/60 dark:border-white/25 p-8 sm:p-10 md:p-11 rounded-[32px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.4)] transition-all duration-300 relative overflow-hidden text-slate-900 dark:text-white">
+          
+          {/* Top Logo & Title Section */}
+          <div className="mb-8 flex flex-col items-center text-center">
+            {/* KPC Logo Emblem */}
+            <div className="w-22 h-22 relative shrink-0 mb-3 drop-shadow-lg">
+              <Image 
+                src="/svg/kpc-logo-transparent.svg" 
+                alt="KPC Logo" 
+                fill 
+                className="object-contain" 
+                priority 
+              />
+            </div>
+
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white">
+              FlowGuard
             </h2>
-            <p className="text-sm text-zinc-500 mt-2">
-              Provide credentials to access FlowGuard Audit Center
+            <p className="text-xs sm:text-sm font-extrabold tracking-widest text-slate-800 dark:text-slate-100 mt-1 font-mono uppercase">
+              Revenue Assurance Platform
             </p>
           </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="flex flex-col gap-6"
-          >
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
               <label 
                 htmlFor="email" 
-                className="text-xs font-black uppercase tracking-wider text-left text-zinc-700"
+                className="text-xs md:text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white text-left pl-1"
               >
-                Email Address
+                Username
               </label>
               <input
                 id="email"
@@ -87,15 +118,15 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="rounded-lg bg-zinc-50/50 border border-zinc-250 hover:border-zinc-350 focus:border-[#0A2E5C] focus:bg-white px-4 py-3.5 text-base text-zinc-900 placeholder-zinc-400 focus:outline-none transition-all shadow-inner"
-                placeholder="manager@kpc.co.ke"
+                className="rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-white/80 dark:border-slate-700 focus:border-[#B3312C] focus:ring-2 focus:ring-[#B3312C]/50 px-5 py-4 text-base font-bold text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none transition-all shadow-sm"
+                placeholder="Enter your username"
               />
             </div>
 
             <div className="flex flex-col gap-2">
               <label 
                 htmlFor="password" 
-                className="text-xs font-black uppercase tracking-wider text-left text-zinc-700"
+                className="text-xs md:text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white text-left pl-1"
               >
                 Password
               </label>
@@ -105,13 +136,13 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="rounded-lg bg-zinc-50/50 border border-zinc-250 hover:border-zinc-350 focus:border-[#0A2E5C] focus:bg-white px-4 py-3.5 text-base text-zinc-900 placeholder-zinc-400 focus:outline-none transition-all shadow-inner"
-                placeholder="••••••••"
+                className="rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-white/80 dark:border-slate-700 focus:border-[#B3312C] focus:ring-2 focus:ring-[#B3312C]/50 px-5 py-4 text-base font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none transition-all shadow-sm"
+                placeholder="Enter your password"
               />
             </div>
 
             {error && (
-              <div className="rounded border border-red-200 bg-red-50 px-4 py-3.5 text-sm text-red-600">
+              <div className="rounded-2xl border border-[#B3312C]/50 bg-[#B3312C]/20 px-5 py-4 text-sm text-[#B3312C] dark:text-red-300 font-extrabold">
                 {error}
               </div>
             )}
@@ -119,19 +150,20 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="mt-3 rounded-lg py-4 text-base font-bold text-white shadow-lg active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-wider bg-sky-600 hover:bg-sky-500 shadow-sky-600/10"
-              style={{ 
-                boxShadow: `0 10px 15px -3px rgba(10, 46, 92, 0.15)`
+              className="mt-2 rounded-2xl py-4 px-8 text-base sm:text-lg font-black text-white shadow-xl active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider bg-[#B3312C] hover:bg-[#962824] focus:ring-2 focus:ring-[#B3312C]/50"
+              style={{
+                boxShadow: "0 10px 25px -4px rgba(179, 49, 44, 0.55)",
               }}
             >
-              {submitting ? "Authenticating..." : "Sign in to Platform"}
+              {submitting ? "Signing in..." : "Sign In"}
             </button>
           </form>
         </div>
-      </div>
-      {/* BOTTOM: High-Visibility Tagline */}
-      <footer className="absolute bottom-24 left-0 right-0 z-10 w-full text-center text-sm md:text-base font-bold tracking-wide text-zinc-200 select-none opacity-100">
-        Detect, Reconcile, Predict, Protect every transaction.
+      </main>
+
+      {/* FOOTER */}
+      <footer className="relative z-10 w-full pb-3 text-center text-xs font-medium tracking-wide text-slate-400 select-none">
+        <p>© {new Date().getFullYear()} Kenya Pipeline Company • FlowGuard Revenue Assurance</p>
       </footer>
     </div>
   );
