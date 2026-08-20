@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError, getAnomalies } from "@/lib/api";
 import type { Anomaly, OmcRiskProfile as OmcRiskProfileEntry } from "@/lib/types";
 
@@ -15,11 +15,24 @@ function formatKes(value: number): string {
 function riskBadgeClass(risk: OmcRiskProfileEntry["risk_level"]): string {
   switch (risk) {
     case "High":
-      return "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.08)]";
+      return "bg-status-critical-bg text-status-critical";
     case "Medium":
-      return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20";
+      return "bg-status-medium-bg text-status-medium";
     default:
-      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20";
+      return "bg-status-low-bg text-status-low";
+  }
+}
+
+function timelineDotClass(status: Anomaly["status"]): string {
+  switch (status) {
+    case "Critical":
+      return "bg-status-critical";
+    case "Review Required":
+      return "bg-status-medium";
+    case "Resolved":
+      return "bg-status-low";
+    default:
+      return "bg-muted-foreground";
   }
 }
 
@@ -33,105 +46,97 @@ function DrilldownModal({ omc, onClose }: DrilldownModalProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch anomalies for this OMC on mount to construct the waybill timeline
-  useState(() => {
-    getAnomalies(0, 1, 100)
-      .then((data) => {
-        // Filter anomalies belonging to this customer
-        const filtered = data.anomalies.filter((a) => a.customer === omc.customer);
-        setAnomalies(filtered);
-      })
-      .catch((err) => {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve();
+      try {
+        const data = await getAnomalies(0, 1, 100);
+        if (cancelled) return;
+        setAnomalies(data.anomalies.filter((a) => a.customer === omc.customer));
+      } catch (err) {
+        if (cancelled) return;
         setError(err instanceof ApiError ? err.message : "Could not load timeline data.");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  });
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [omc.customer]);
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] transition-all">
-        {/* Modal Header */}
-        <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-start bg-zinc-50 dark:bg-zinc-950/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+        <div className="flex items-start justify-between border-b border-border bg-muted/40 p-6">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">OMC Profile Gantry Analysis</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">OMC Risk Profile</span>
               <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${riskBadgeClass(omc.risk_level)}`}>
                 {omc.risk_level} Risk
               </span>
             </div>
-            <h3 className="text-xl font-bold text-zinc-900 dark:text-white mt-1">{omc.customer}</h3>
+            <h3 className="mt-1 text-xl font-bold text-foreground">{omc.customer}</h3>
           </div>
           <button
             onClick={onClose}
-            className="text-zinc-500 hover:text-zinc-850 dark:text-zinc-400 dark:hover:text-white p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-colors"
+            className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Modal Content */}
-        <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-6">
-          {/* Quick Metrics Grid */}
+        <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800/60 rounded-lg p-3 text-center shadow-sm">
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Total Identified Leakage</p>
-              <p className="text-base font-bold text-rose-600 dark:text-rose-400 font-mono mt-1">{formatKes(omc.leakage_kes)}</p>
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-center">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total Identified Leakage</p>
+              <p className="mt-1 font-mono text-base font-bold text-status-critical">{formatKes(omc.leakage_kes)}</p>
             </div>
-            <div className="bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800/60 rounded-lg p-3 text-center shadow-sm">
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Active Anomalies</p>
-              <p className="text-base font-bold text-zinc-900 dark:text-white font-mono mt-1">{omc.anomaly_count}</p>
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-center">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Active Anomalies</p>
+              <p className="mt-1 font-mono text-base font-bold text-foreground">{omc.anomaly_count}</p>
             </div>
           </div>
 
-          {/* Timeline Section */}
           <div className="flex flex-col gap-3">
-            <h4 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Waybill Gantry Timeline</h4>
-            
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Waybill Timeline</h4>
+
             {loading && (
               <div className="flex items-center justify-center py-8">
-                <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-ring/30 border-t-ring"></div>
               </div>
             )}
 
-            {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
+            {error && <p className="text-xs text-status-critical">{error}</p>}
 
             {!loading && !error && anomalies.length === 0 && (
-              <p className="text-xs text-zinc-500 italic py-4">No active anomalies registered for this OMC.</p>
+              <p className="py-4 text-xs italic text-muted-foreground">No active anomalies registered for this OMC.</p>
             )}
 
             {!loading && !error && anomalies.length > 0 && (
-              <div className="relative border-l border-zinc-200 dark:border-zinc-800 pl-4 py-2 flex flex-col gap-5">
+              <div className="relative flex flex-col gap-5 border-l border-border py-2 pl-4">
                 {anomalies.map((a, i) => (
                   <div key={`${a.dispatch_id}-${i}`} className="relative flex flex-col gap-1">
-                    {/* Timeline Node Dot */}
-                    <div className={`absolute -left-[21px] top-1.5 w-3 h-3 rounded-full border-2 border-white dark:border-zinc-900 ${
-                      a.status === "Critical" ? "bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" :
-                      a.status === "Review Required" ? "bg-amber-500" :
-                      a.status === "Resolved" ? "bg-emerald-500" :
-                      "bg-zinc-500"
-                    }`}></div>
+                    <div className={`absolute -left-[21px] top-1.5 h-3 w-3 rounded-full border-2 border-card ${timelineDotClass(a.status)}`}></div>
 
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                      <span className="font-semibold text-foreground/90">
                         {a.break_type} ({a.product})
                       </span>
-                      <span className="text-zinc-500 font-mono text-[10px]">
-                        {a.age_days}d ago
-                      </span>
+                      <span className="font-mono text-[10px] text-muted-foreground">{a.age_days}d ago</span>
                     </div>
 
-                    <div className="bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-800/80 rounded-lg p-2.5 flex items-center justify-between gap-4 mt-1">
+                    <div className="mt-1 flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/30 p-2.5">
                       <div className="flex flex-col">
-                        <span className="text-[9px] text-zinc-500 font-bold uppercase">Waybill ID</span>
-                        <span className="text-xs text-zinc-600 dark:text-zinc-300 font-mono mt-0.5">{a.dispatch_id}</span>
+                        <span className="text-[9px] font-bold uppercase text-muted-foreground">Waybill ID</span>
+                        <span className="mt-0.5 font-mono text-xs text-foreground/80">{a.dispatch_id}</span>
                       </div>
                       <div className="flex flex-col items-end">
-                        <span className="text-[9px] text-zinc-500 font-bold uppercase">Gap Leakage</span>
-                        <span className="text-xs text-rose-600 dark:text-rose-400 font-bold font-mono mt-0.5">{formatKes(a.leakage_kes)}</span>
+                        <span className="text-[9px] font-bold uppercase text-muted-foreground">Gap Leakage</span>
+                        <span className="mt-0.5 font-mono text-xs font-bold text-status-critical">{formatKes(a.leakage_kes)}</span>
                       </div>
                     </div>
                   </div>
@@ -141,11 +146,10 @@ function DrilldownModal({ omc, onClose }: DrilldownModalProps) {
           </div>
         </div>
 
-        {/* Modal Footer */}
-        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 flex justify-end">
+        <div className="flex justify-end border-t border-border bg-muted/40 p-4">
           <button
             onClick={onClose}
-            className="rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 px-4 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white transition-colors"
+            className="rounded-md bg-muted px-4 py-2 text-xs font-semibold text-foreground/90 transition-colors hover:bg-accent"
           >
             Close Details
           </button>
@@ -160,8 +164,8 @@ export default function OmcRiskProfile({ profiles }: { profiles: OmcRiskProfileE
 
   if (profiles.length === 0) {
     return (
-      <div className="bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 rounded-lg p-8 text-center shadow-sm">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">No OMC risk data available.</p>
+      <div className="rounded-lg border border-border bg-muted/40 p-8 text-center">
+        <p className="text-sm text-muted-foreground">No OMC risk data available.</p>
       </div>
     );
   }
@@ -169,55 +173,46 @@ export default function OmcRiskProfile({ profiles }: { profiles: OmcRiskProfileE
   const sorted = [...profiles].sort((a, b) => b.leakage_kes - a.leakage_kes);
 
   return (
-    <section className="flex flex-col gap-4 text-zinc-800 dark:text-zinc-100">
-      <h2 className="text-lg font-bold text-zinc-900 dark:text-white">OMC Customer Risk Matrix</h2>
-      
-      {/* Clickable Cards Grid Layout */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+    <section className="flex flex-col gap-4">
+      <h2 className="text-lg font-bold text-foreground">OMC Customer Risk Matrix</h2>
+
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3">
         {sorted.map((p) => (
           <div
             key={p.customer}
             onClick={() => setSelectedOmc(p)}
-            className="group cursor-pointer rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/30 hover:bg-zinc-50 dark:hover:bg-zinc-900/60 p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 border-l-4 border-l-indigo-500 hover:border-l-indigo-400"
+            className="group cursor-pointer rounded-xl border border-border bg-card p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-ring hover:shadow-md active:translate-y-0"
           >
             <div className="flex items-start justify-between gap-3">
-              <h3 className="text-sm font-bold text-zinc-700 dark:text-zinc-200 group-hover:text-zinc-900 group-hover:dark:text-white truncate flex-1">
+              <h3 className="flex-1 truncate text-sm font-bold text-foreground/90 group-hover:text-foreground">
                 {p.customer}
               </h3>
-              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold shrink-0 ${riskBadgeClass(p.risk_level)}`}>
+              <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${riskBadgeClass(p.risk_level)}`}>
                 {p.risk_level}
               </span>
             </div>
 
             <div className="mt-4 flex items-center justify-between">
               <div className="flex flex-col">
-                <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Identified Leakage</span>
-                <span className="text-sm font-extrabold text-zinc-900 dark:text-white font-mono mt-0.5">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Identified Leakage</span>
+                <span className="mt-0.5 font-mono text-sm font-extrabold text-foreground">
                   {formatKes(p.leakage_kes)}
                 </span>
               </div>
               <div className="flex flex-col items-end">
-                <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Anomalies</span>
-                <span className="text-sm font-semibold text-zinc-500 dark:text-zinc-300 mt-0.5">
-                  {p.anomaly_count} breaks
-                </span>
+                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Anomalies</span>
+                <span className="mt-0.5 text-sm font-semibold text-muted-foreground">{p.anomaly_count} breaks</span>
               </div>
             </div>
-            
-            <div className="mt-3.5 border-t border-zinc-200 dark:border-zinc-800/80 pt-2 flex items-center justify-end text-[10px] text-indigo-650 dark:text-indigo-400 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+
+            <div className="mt-3.5 flex items-center justify-end border-t border-border pt-2 text-[10px] font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100">
               <span>View Timeline →</span>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Drill-down Timeline Modal */}
-      {selectedOmc && (
-        <DrilldownModal
-          omc={selectedOmc}
-          onClose={() => setSelectedOmc(null)}
-        />
-      )}
+      {selectedOmc && <DrilldownModal omc={selectedOmc} onClose={() => setSelectedOmc(null)} />}
     </section>
   );
 }

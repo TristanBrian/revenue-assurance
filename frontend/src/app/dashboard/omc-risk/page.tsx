@@ -43,21 +43,21 @@ export default function OmcRiskPage() {
 
   return (
     <RequirePermission code="view_omc_risk_profile">
-      <div className="flex flex-col gap-6 max-w-5xl mx-auto">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6">
         <header>
-          <h1 className="text-2xl font-bold tracking-tight text-white">OMC Risk Profile</h1>
-          <p className="text-sm text-zinc-400">Customer risk rating and leakage aggregation</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">OMC Risk Profile</h1>
+          <p className="text-sm text-muted-foreground">Customer risk rating and leakage aggregation</p>
         </header>
 
         {error && (
-          <div className="rounded-lg border border-red-900 bg-red-950/40 p-4 text-sm text-red-300">
+          <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 text-sm text-status-critical">
             {error}
           </div>
         )}
 
         {loading && !error && (
           <div className="flex items-center justify-center p-12">
-            <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-400 rounded-full animate-spin"></div>
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-ring/30 border-t-ring"></div>
           </div>
         )}
 

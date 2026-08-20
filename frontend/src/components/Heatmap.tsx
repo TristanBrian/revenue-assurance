@@ -5,6 +5,7 @@ import { ApiError, getHeatmap } from "@/lib/api";
 import { useMateriality } from "@/context/MaterialityContext";
 import { useDirection } from "@/context/DirectionContext";
 import type { HeatmapData } from "@/lib/types";
+import DepotMap from "./DepotMap";
 
 function formatKes(value: number): string {
   if (value === 0) return "—";
@@ -25,25 +26,6 @@ function formatKesFull(value: number): string {
   }).format(value);
 }
 
-interface Step {
-  threshold: number;
-  fill: string;
-  colorCode: string;
-  text: string;
-}
-
-const colorSteps: Step[] = [
-  { threshold: 0.1, fill: "fill-teal-100 dark:fill-teal-900/80", colorCode: "rgba(39,39,42,0.1)", text: "text-teal-800 dark:text-teal-300" },
-  { threshold: 0.4, fill: "fill-indigo-100 dark:fill-indigo-900/40", colorCode: "rgba(99,102,241,0.25)", text: "text-indigo-700 dark:text-indigo-300 font-semibold" },
-  { threshold: 0.7, fill: "fill-indigo-600 dark:fill-indigo-600", colorCode: "#4f46e5", text: "text-white font-bold" },
-  { threshold: 0.9, fill: "fill-violet-600 dark:fill-violet-600", colorCode: "#7c3aed", text: "text-white font-bold" },
-  { threshold: Infinity, fill: "fill-rose-600 dark:fill-rose-600", colorCode: "#e11d48", text: "text-white font-black" },
-];
-
-function stepFor(ratio: number): Step {
-  return colorSteps.find((step) => ratio <= step.threshold) || colorSteps[colorSteps.length - 1];
-}
-
 interface HoveredCell {
   omc: string;
   product: string;
@@ -58,8 +40,11 @@ export default function Heatmap() {
   const [heatmap, setHeatmap] = useState<HeatmapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"bar" | "list" | "map">("bar");
   const [hoveredCell, setHoveredCell] = useState<HoveredCell | null>(null);
+  const [listPage, setListPage] = useState(1);
+  const [selectedProduct, setSelectedProduct] = useState<string>("All");
+  const LIST_PAGE_SIZE = 15;
 
   useEffect(() => {
     let cancelled = false;
@@ -81,31 +66,25 @@ export default function Heatmap() {
     };
   }, [materiality, direction]); // ✅ Re-run when slider or direction changes
 
-  const CELL_W = 110;
-  const CELL_H = 46;
-  const LABEL_W = 160;
-  const HEADER_H = 40;
+  const productOptions = useMemo(() => ["All", ...(heatmap?.products ?? [])], [heatmap]);
 
-  const width = useMemo(() => {
-    if (!heatmap) return 0;
-    return LABEL_W + heatmap.products.length * CELL_W;
-  }, [heatmap]);
+  // Total leakage per OMC (or per OMC for one product, when filtered),
+  // sorted descending — the actual question people ask of this data
+  // ("who's worst") rather than a dense OMC x product matrix.
+  const barItems = useMemo(() => {
+    if (!heatmap) return [];
+    const productIndex = selectedProduct === "All" ? -1 : heatmap.products.indexOf(selectedProduct);
+    return heatmap.omcs
+      .map((omc, ri) => {
+        const row = heatmap.data[ri] ?? [];
+        const value = productIndex === -1 ? row.reduce((sum, v) => sum + v, 0) : (row[productIndex] ?? 0);
+        return { omc, value };
+      })
+      .filter((item) => item.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [heatmap, selectedProduct]);
 
-  const height = useMemo(() => {
-    if (!heatmap) return 0;
-    return HEADER_H + heatmap.omcs.length * CELL_H;
-  }, [heatmap]);
-
-  const maxValue = useMemo(() => {
-    if (!heatmap) return 0;
-    let max = 0;
-    heatmap.data.forEach((row) => {
-      row.forEach((val) => {
-        if (val > max) max = val;
-      });
-    });
-    return max || 1;
-  }, [heatmap]);
+  const barMax = useMemo(() => barItems.reduce((max, item) => Math.max(max, item.value), 0) || 1, [barItems]);
 
   const listItems = useMemo(() => {
     if (!heatmap) return [];
@@ -121,234 +100,220 @@ export default function Heatmap() {
     return items.sort((a, b) => b.value - a.value);
   }, [heatmap]);
 
+  // Reset to page 1 whenever the underlying data changes (materiality slider)
+  // so the pager never lands past the new last page.
+  useEffect(() => {
+    Promise.resolve().then(() => setListPage(1));
+  }, [heatmap]);
+
+  const listTotalPages = Math.max(1, Math.ceil(listItems.length / LIST_PAGE_SIZE));
+  const pagedListItems = useMemo(
+    () => listItems.slice((listPage - 1) * LIST_PAGE_SIZE, listPage * LIST_PAGE_SIZE),
+    [listItems, listPage],
+  );
+
   return (
-    <section className="flex flex-col gap-4 bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm relative text-zinc-850 dark:text-zinc-100">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-4">
+    <section className="relative flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-sm">
+      <div className="flex flex-col items-start justify-between gap-4 border-b border-border pb-4 sm:flex-row sm:items-center">
         <div>
-          <h2 className="text-base font-bold text-zinc-900 dark:text-white">
-            Leakage Heatmap — OMC × Product
-          </h2>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Leakage intensity by Oil Marketing Company and fuel category</p>
+          <h2 className="text-base font-bold text-foreground">Leakage Explorer</h2>
+          <p className="text-xs text-muted-foreground">
+            {viewMode === "map"
+              ? "Geographic exposure across KPC's depot network and pipeline corridor"
+              : viewMode === "bar"
+                ? "Total leakage by Oil Marketing Company, ranked highest to lowest"
+                : "Every OMC × product leakage combination, sorted by value"}
+          </p>
         </div>
 
-        <div className="flex items-center bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-0.5 self-end">
+        <div className="flex items-center self-end rounded-lg border border-border bg-muted/40 p-0.5">
           <button
-            onClick={() => setViewMode("grid")}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-all ${
-              viewMode === "grid"
-                ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm"
-                : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+            onClick={() => setViewMode("bar")}
+            className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+              viewMode === "bar"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z" />
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h9M4 12h14M4 18h6" />
             </svg>
-            <span>Grid View</span>
+            <span>Bar Chart</span>
           </button>
           <button
             onClick={() => setViewMode("list")}
-            className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-all ${
+            className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
               viewMode === "list"
-                ? "bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm"
-                : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
             <span>List View</span>
           </button>
+          <button
+            onClick={() => setViewMode("map")}
+            className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+              viewMode === "map"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+            </svg>
+            <span>Map View</span>
+          </button>
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-4 text-sm text-red-650 dark:text-red-300">
+      {viewMode !== "map" && error && (
+        <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 text-sm text-status-critical">
           {error}
         </div>
       )}
 
-      {loading && !error && (
+      {viewMode !== "map" && loading && !error && (
         <div className="flex items-center justify-center p-12">
-          <div className="w-6 h-6 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin"></div>
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-ring/30 border-t-ring"></div>
         </div>
       )}
 
-      {heatmap && !loading && heatmap.omcs.length === 0 && (
-        <p className="text-sm text-zinc-500 py-8 text-center italic">No leakage data to chart at the current threshold.</p>
+      {viewMode === "map" && <DepotMap />}
+
+      {viewMode !== "map" && heatmap && !loading && heatmap.omcs.length === 0 && (
+        <p className="py-8 text-center text-sm italic text-muted-foreground">No leakage data to chart at the current threshold.</p>
       )}
 
-      {heatmap && heatmap.omcs.length > 0 && (
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* Main Visualizer (Grid or List Table) */}
-          <div className="flex-1 w-full min-w-0">
-            {viewMode === "grid" ? (
-              <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/30 p-4">
-                <svg width={width} height={height} className="mx-auto min-w-full">
-                  {heatmap.products.map((product, ci) => (
-                    <text
-                      key={product}
-                      x={LABEL_W + ci * CELL_W + CELL_W / 2}
-                      y={HEADER_H - 12}
-                      textAnchor="middle"
-                      className="fill-zinc-500 dark:fill-zinc-400 text-[10px] font-bold uppercase tracking-wider font-mono"
-                    >
-                      {product}
-                    </text>
-                  ))}
+      {viewMode !== "map" && heatmap && heatmap.omcs.length > 0 && (
+        <div className="flex flex-col gap-4">
+          {viewMode === "bar" ? (
+            <>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {productOptions.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setSelectedProduct(p)}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                      selectedProduct === p
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+                    }`}
+                  >
+                    {p === "All" ? "All products" : p}
+                  </button>
+                ))}
+              </div>
 
-                  {heatmap.omcs.map((omc, ri) => (
-                    <g key={omc}>
-                      <text
-                        x={LABEL_W - 12}
-                        y={HEADER_H + ri * CELL_H + CELL_H / 2 + 4}
-                        textAnchor="end"
-                        className="fill-zinc-700 dark:fill-zinc-300 text-xs font-semibold"
+              {barItems.length === 0 ? (
+                <p className="py-8 text-center text-sm italic text-muted-foreground">
+                  No leakage for {selectedProduct === "All" ? "any product" : selectedProduct} at the current threshold.
+                </p>
+              ) : (
+                <div className="flex max-h-[520px] flex-col gap-2.5 overflow-y-auto rounded-lg border border-border bg-muted/20 p-4 pr-3">
+                  {barItems.map((item) => (
+                    <div key={item.omc} className="grid grid-cols-[minmax(0,168px)_1fr_92px] items-center gap-3">
+                      <span className="truncate text-xs font-semibold text-foreground/90" title={item.omc}>
+                        {item.omc}
+                      </span>
+                      <div
+                        className="relative h-3 cursor-pointer rounded-full bg-muted"
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setHoveredCell({
+                            omc: item.omc,
+                            product: selectedProduct === "All" ? "All products" : selectedProduct,
+                            value: item.value,
+                            x: rect.left + rect.width / 2,
+                            y: rect.top - 8,
+                          });
+                        }}
+                        onMouseLeave={() => setHoveredCell(null)}
                       >
-                        {omc}
-                      </text>
-
-                      {heatmap.products.map((product, ci) => {
-                        const value = heatmap.data[ri]?.[ci] ?? 0;
-                        const step = stepFor(value / maxValue);
-                        const isHovered = hoveredCell?.omc === omc && hoveredCell?.product === product;
-
-                        return (
-                          <g key={product}>
-                            <rect
-                              x={LABEL_W + ci * CELL_W + 2}
-                              y={HEADER_H + ri * CELL_H + 2}
-                              width={CELL_W - 4}
-                              height={CELL_H - 4}
-                              rx={4}
-                              onMouseEnter={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                setHoveredCell({
-                                  omc,
-                                  product,
-                                  value,
-                                  x: rect.left + rect.width / 2,
-                                  y: rect.top - 8,
-                                });
-                              }}
-                              onMouseLeave={() => setHoveredCell(null)}
-                              style={{
-                                stroke: isHovered ? "#6366f1" : "rgba(100,116,139,0.2)",
-                                strokeWidth: isHovered ? 2 : 1,
-                                cursor: "pointer",
-                              }}
-                              className={`transition-all duration-150 ${step.fill}`}
-                            />
-                            <text
-                              x={LABEL_W + ci * CELL_W + CELL_W / 2}
-                              y={HEADER_H + ri * CELL_H + CELL_H / 2 + 4}
-                              textAnchor="middle"
-                              className={`pointer-events-none text-[10px] font-semibold font-mono ${step.text}`}
-                            >
-                              {formatKes(value)}
-                            </text>
-                          </g>
-                        );
-                      })}
-                    </g>
+                        <div
+                          className="h-3 rounded-full bg-[var(--chart-1)] transition-all duration-300"
+                          style={{ width: `${Math.max((item.value / barMax) * 100, 2)}%` }}
+                        />
+                      </div>
+                      <span className="text-right font-mono text-xs font-bold text-foreground">{formatKes(item.value)}</span>
+                    </div>
                   ))}
-                </svg>
-              </div>
-            ) : (
-              <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/20">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/40 text-zinc-550 dark:text-zinc-400 font-medium">
-                    <tr>
-                      <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">OMC Customer</th>
-                      <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">Product Group</th>
-                      <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">Leakage (KSh)</th>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-border bg-muted/20">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-border bg-muted/50 font-medium text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">OMC Customer</th>
+                    <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">Product Group</th>
+                    <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">Leakage (KSh)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border text-foreground/90">
+                  {pagedListItems.map((item, index) => (
+                    <tr key={index} className="transition-colors hover:bg-accent/60">
+                      <td className="px-4 py-3 font-semibold">{item.omc}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{item.product}</td>
+                      <td className="px-4 py-3 font-mono font-bold text-foreground">
+                        {formatKesFull(item.value)}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-205 dark:divide-zinc-900 text-zinc-700 dark:text-zinc-300">
-                    {listItems.map((item, index) => (
-                      <tr key={index} className="hover:bg-zinc-100 dark:hover:bg-zinc-900/40 transition-colors">
-                        <td className="px-4 py-3 font-semibold">{item.omc}</td>
-                        <td className="px-4 py-3 text-zinc-550 dark:text-zinc-400">{item.product}</td>
-                        <td className="px-4 py-3 font-mono font-bold text-zinc-900 dark:text-white">
-                          {formatKesFull(item.value)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Sidebar Legend Key */}
-          <div className="w-full lg:w-60 shrink-0 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 flex flex-col gap-4 shadow-sm">
-            <div>
-              <h3 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-                Leakage Intensity
-              </h3>
-              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">
-                Measured as % of the highest single-cell leakage value in the grid
-              </p>
+                  ))}
+                </tbody>
+              </table>
+              {listItems.length > LIST_PAGE_SIZE && (
+                <div className="flex items-center justify-between border-t border-border px-4 py-3">
+                  <span className="text-xs text-muted-foreground">
+                    Showing {(listPage - 1) * LIST_PAGE_SIZE + 1}–
+                    {Math.min(listPage * LIST_PAGE_SIZE, listItems.length)} of {listItems.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={listPage === 1}
+                      onClick={() => setListPage((p) => Math.max(1, p - 1))}
+                      className="rounded-md px-3 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                    >
+                      Prev
+                    </button>
+                    <span className="px-2 text-xs font-medium text-foreground/90">
+                      {listPage} / {listTotalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={listPage === listTotalPages}
+                      onClick={() => setListPage((p) => Math.min(listTotalPages, p + 1))}
+                      className="rounded-md px-3 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-            
-            <div className="flex flex-col gap-3 text-xs">
-              <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded border border-teal-200 dark:border-teal-800 bg-teal-100 dark:bg-teal-900/80 shrink-0"></div>
-                <div className="flex flex-col">
-                  <span className="font-semibold text-zinc-750 dark:text-zinc-300">&lt; 10%</span>
-                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">Negligible Loss</span>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded border border-indigo-200/30 dark:border-indigo-900/30 bg-indigo-100 dark:bg-indigo-900/40 shrink-0"></div>
-                <div className="flex flex-col">
-                  <span className="font-semibold text-zinc-750 dark:text-zinc-300">10% - 40%</span>
-                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">Low Leakage</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded bg-indigo-600 dark:bg-indigo-600 shrink-0"></div>
-                <div className="flex flex-col">
-                  <span className="font-semibold text-zinc-750 dark:text-zinc-300">40% - 70%</span>
-                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">Medium Leakage</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded bg-violet-600 dark:bg-violet-600 shrink-0"></div>
-                <div className="flex flex-col">
-                  <span className="font-semibold text-zinc-750 dark:text-zinc-300">70% - 90%</span>
-                  <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium">High Leakage</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded bg-rose-600 dark:bg-rose-600 shrink-0"></div>
-                <div className="flex flex-col">
-                  <span className="font-semibold text-rose-600 dark:text-rose-400">&gt; 90%</span>
-                  <span className="text-[10px] text-rose-500 dark:text-rose-400 font-bold">Critical Loss</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
       {hoveredCell && hoveredCell.value > 0 && (
         <div
-          className="fixed z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-3.5 py-2.5 rounded-lg shadow-2xl flex flex-col gap-1 transition-opacity duration-150 animate-fade-in"
+          className="fixed z-50 flex -translate-x-1/2 -translate-y-full transform flex-col gap-1 rounded-lg border border-border bg-card px-3.5 py-2.5 pointer-events-none shadow-2xl transition-opacity duration-150"
           style={{ left: hoveredCell.x, top: hoveredCell.y }}
         >
-          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Reconciliation Break</span>
-          <span className="text-xs text-zinc-900 dark:text-white font-bold">{hoveredCell.omc}</span>
-          <div className="flex items-center gap-1.5 text-xs text-zinc-550 dark:text-zinc-400 mt-0.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Reconciliation Break</span>
+          <span className="text-xs font-bold text-foreground">{hoveredCell.omc}</span>
+          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
             <span>{hoveredCell.product}:</span>
-            <span className="text-indigo-650 dark:text-indigo-400 font-mono font-bold">
+            <span className="font-mono font-bold text-primary">
               {formatKesFull(hoveredCell.value)}
             </span>
           </div>
-          <div className="absolute left-1/2 bottom-0 w-2 h-2 bg-white dark:bg-zinc-900 border-r border-b border-zinc-200 dark:border-zinc-800 transform -translate-x-1/2 translate-y-1/2 rotate-45"></div>
+          <div className="absolute bottom-0 left-1/2 h-2 w-2 -translate-x-1/2 translate-y-1/2 rotate-45 transform border-b border-r border-border bg-card"></div>
         </div>
       )}
     </section>
