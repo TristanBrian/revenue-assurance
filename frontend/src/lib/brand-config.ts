@@ -11,6 +11,7 @@ export interface BrandConfig {
   shortName: string;
   logoUrl: string | null;
   primaryColor: string;     // KPC Blue (#00529B)
+  secondaryColor: string;   // KPC Deep Blue (#003B6F)
   deepBlueColor: string;    // KPC Deep Blue (#003B6F)
   accentColor: string;      // KPC Orange (#F58220)
   highlightColor: string;   // Amber/Gold (#F59E0B)
@@ -23,6 +24,7 @@ export const BRAND_CONFIG: BrandConfig = {
   shortName: "FlowGuard",
   logoUrl: "/kpc-logo.png",
   primaryColor: "#00529B",   // KPC Blue
+  secondaryColor: "#003B6F", // KPC Deep Blue
   deepBlueColor: "#003B6F",  // KPC Deep Blue
   accentColor: "#F58220",    // KPC Safety Orange
   highlightColor: "#F59E0B",
