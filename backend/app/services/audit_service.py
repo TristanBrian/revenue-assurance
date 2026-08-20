@@ -156,3 +156,14 @@ def get_audit_summary(db: Session, days: int = 7) -> dict:
         "period_days": days,
         "since": since,
     }
+
+
+def get_record_audit_history(db: Session, target_type: str, target_id: str) -> list[AuditLog]:
+    """Retrieves all historical audit log entries for a given target record (provenance timeline)."""
+    return (
+        db.query(AuditLog)
+        .filter(AuditLog.target_type == target_type, AuditLog.target_id == target_id)
+        .order_by(AuditLog.created_at.desc())
+        .all()
+    )
+

@@ -488,3 +488,77 @@ export async function deleteUser(userId: string): Promise<void> {
   await unwrap<{ status: string; message: string }>(res);
 }
 
+// Governance & Verification APIs
+
+export async function downloadExportWithFields(materiality: number, fields?: string[]): Promise<Blob> {
+  const url = new URL("/api/reconcile/export", API_URL);
+  url.searchParams.set("materiality", String(materiality));
+  if (fields && fields.length > 0) {
+    url.searchParams.set("fields", fields.join(","));
+  }
+
+  const token = getAuthToken();
+  const headers: HeadersInit = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url.toString(), { headers });
+
+  if (!response.ok) {
+    let message = "Export failed";
+    try {
+      const errorJson = await response.json();
+      message = errorJson.detail || message;
+    } catch {
+      // ignored
+    }
+    throw new ApiError(message, response.status);
+  }
+
+  return response.blob();
+}
+
+export async function verifyReportFile(file: File): Promise<{
+  status: "VERIFIED" | "UNKNOWN" | "ALTERED";
+  filename: string;
+  file_hash: string;
+  signature: string;
+  audit_match?: {
+    log_id: string;
+    created_at: string;
+    report_type: string;
+    rows_exported: number;
+    contains_sensitive_omc_pii: boolean;
+  };
+}> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await authFetch(new URL("/api/reports/verify", API_URL), {
+    method: "POST",
+    body: formData,
+  });
+
+  return unwrap(res);
+}
+
+export async function getRecordHistory(targetType: string, targetId: string): Promise<{
+  target_type: string;
+  target_id: string;
+  history: Array<{
+    id: string;
+    actor_user_id: string | null;
+    action: string;
+
+    before_value: Record<string, unknown> | null;
+    after_value: Record<string, unknown> | null;
+    extra_metadata: Record<string, unknown> | null;
+    created_at: string;
+  }>;
+}> {
+  const res = await authFetch(new URL(`/api/audit/history/${targetType}/${targetId}`, API_URL));
+  return unwrap(res);
+}
+
+

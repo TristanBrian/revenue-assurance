@@ -2,7 +2,7 @@ from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
 from app.middleware.audit import AuditMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit, alerts  # <-- ADDED feed, heatmap, auth, detective, graph, admin, audit, alerts
+from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit, alerts, report_verify
 # import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
@@ -62,6 +62,8 @@ app.include_router(detective.router, prefix="/api/detective", tags=["Detective"]
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
 app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])  # <-- NEW
+app.include_router(report_verify.router, prefix="/api/reports", tags=["Report Verification"])
+
 # Envelope and audit middlewares
 app.add_middleware(ResponseEnvelopeMiddleware)
 app.add_middleware(AuditMiddleware)

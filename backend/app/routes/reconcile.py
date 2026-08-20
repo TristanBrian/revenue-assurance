@@ -9,6 +9,7 @@ from app.services.reconciliation import run_reconciliation, run_reconciliation_o
 from app.services.e_billing import sync_anomalies_to_ebilling, update_anomaly_status
 from app.services.feed import update_feed
 from app.services.audit_service import log_action
+from app.services.report_crypto import sign_report_bytes
 from app.services.alert_service import (
     notify_bulk_export,
     notify_critical_anomalies,
@@ -507,33 +508,68 @@ async def update_anomaly(
 @router.get("/reconcile/export")
 def export_report(
     materiality: float = Query(100000),
+    fields: Optional[str] = Query(None, description="Comma-separated field names for data minimization"),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("export_reports")),
 ):
     try:
         result = run_reconciliation(materiality=materiality)
+        anomalies_df = pd.DataFrame(result['anomalies'])
 
-        try:
-            notify_bulk_export(db, actor_user_id=user.id, row_count=len(result.get('anomalies', [])))
-            db.commit()
-        except Exception as alert_err:
-            db.rollback()
-            logger.error(f"Bulk-export alert failed (non-fatal): {alert_err}")
+        # Data Minimization: filter columns if specified
+        selected_fields_list = None
+        if fields:
+            selected_fields_list = [f.strip() for f in fields.split(",") if f.strip()]
+            valid_cols = [col for col in selected_fields_list if col in anomalies_df.columns]
+            if valid_cols:
+                anomalies_df = anomalies_df[valid_cols]
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             pd.DataFrame([result['metrics']]).to_excel(writer, sheet_name='Summary', index=False)
-            pd.DataFrame(result['anomalies']).to_excel(writer, sheet_name='Anomalies', index=False)
+            anomalies_df.to_excel(writer, sheet_name='Anomalies', index=False)
             pd.DataFrame([result['data_quality']]).to_excel(writer, sheet_name='Data Quality', index=False)
             if result.get('omc_risk_profile'):
                 pd.DataFrame(result['omc_risk_profile']).to_excel(writer, sheet_name='OMC Risk Profile', index=False)
             if result.get('duplicate_anomalies'):
                 pd.DataFrame(result['duplicate_anomalies']).to_excel(writer, sheet_name='Duplicates', index=False)
+        
+        file_bytes = output.getvalue()
+        file_hash, signature = sign_report_bytes(file_bytes)
+
+        # Audit Trail Logging & Alerting
+        try:
+            notify_bulk_export(db, actor_user_id=user.id, row_count=len(result.get('anomalies', [])))
+            log_action(
+                db,
+                actor_user_id=user.id,
+                action="report.export",
+                target_type="report",
+                target_id="reconciliation_report",
+                metadata={
+                    "report_type": "revenue_reconciliation",
+                    "materiality": materiality,
+                    "rows_exported": len(anomalies_df),
+                    "file_hash": file_hash,
+                    "signature": signature,
+                    "included_fields": selected_fields_list,
+                    "contains_sensitive_omc_pii": "kra_pin" in (selected_fields_list or []),
+                }
+            )
+            db.commit()
+        except Exception as alert_err:
+            db.rollback()
+            logger.error(f"Export audit/alert logging failed (non-fatal): {alert_err}")
+
         output.seek(0)
         return StreamingResponse(
             output,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": "attachment; filename=reconciliation_report.xlsx"}
+            headers={
+                "Content-Disposition": "attachment; filename=reconciliation_report.xlsx",
+                "X-Report-Hash": file_hash,
+                "X-Report-Signature": signature
+            }
         )
     except Exception as e:
         logger.error(f"Export failed: {e}")
