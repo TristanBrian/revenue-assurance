@@ -1,0 +1,21 @@
+omc_id,customer_name,kra_pin,payment_terms_days,credit_limit_kes,risk_rating,risk_profile,contact_email,phone,director_name,registered_address,incorporation_date,primary_bank_account,is_active
+OMC-001,TotalEnergies Kenya,P787194506Z,15,70922700,Low,Medium,gabriellecameron@perez.com,(541)639-5376x7242,James Howard,"78161 Calderon River Suite 931, Lake Jeremyport, CO 31013",2014-08-05,GB06DMIO52553419283276,True
+OMC-002,Vivo Energy,P214257751Z,60,42833825,Medium,Small,meagan89@hernandez.net,001-380-395-7015x43039,Jessica Silva,"710 Eric Estate, Carlsonfurt, MS 78605",2018-08-21,GB45OQIR01845146270482,True
+OMC-003,Rubis Energy,P172370545Z,30,71237223,Low,Small,heathchad@ramirez.com,+1-329-397-3763,Rose Spence,"78248 Brandt Plains, Lake Larry, TN 85681",2013-11-23,GB04LOQO13315098393010,True
+OMC-004,Gulf Energy,P562837684Z,45,26859215,High,High,rodney70@valdez.com,633-938-7262,Allison Hill,"819 Johnson Course, East William, AK 74064",2024-12-02,GB89GWUW86379402654235,True
+OMC-005,PetroOil Kenya,P180943908Z,15,45496489,High,High,jmorton@williams.com,432-867-7360,Allison Hill,"819 Johnson Course, East William, AK 74064",2024-11-13,GB89GWUW86379402654235,True
+OMC-006,Hashi Energy,P661333669Z,45,60515368,Low,Small,sarah35@baker.com,651.407.9911x838,James House,"8723 Robinson Centers Apt. 500, Shawhaven, GA 07956",2019-08-14,GB05QCFC91361939909169,True
+OMC-007,Kobil,P554811020Z,15,68971471,Low,Small,bradley52@whitney.biz,+1-401-812-8059,Shirley Suarez,"8498 Elizabeth Plaza, Sarahville, FM 18102",2020-10-16,GB37IDDX82449353487401,True
+OMC-008,National Oil,P953995721Z,15,45403012,Low,Small,jeffreykeller@murphy-lin.com,(386)885-0142x940,Eric Nolan,"3315 Dickson Summit, East Michelle, AS 23707",2023-12-17,GB08NAFX56342160733754,True
+OMC-009,Dalbit Petroleum,P417457352Z,45,75660404,Low,Medium,jamesortega@byrd-orr.org,001-746-980-4436,Richard Graham,"Unit 1693 Box 4060, DPO AP 71076",2021-11-11,GB53VXXX35615951484656,True
+OMC-010,Tamoil,P556497252Z,45,58745446,Medium,Small,gregoryrubio@marshall.com,927.488.9579x868,Michael Dixon,"148 Davis Terrace, Lake Lance, AS 26601",2023-03-30,GB34EABH79176936763201,True
+OMC-011,Hass Petroleum,P477698143Z,15,23075222,Low,Small,karen68@navarro.info,946.470.6562,Karen Green,"734 Jones Heights Apt. 455, East Edwardfurt, UT 20529",2010-02-06,GB56WGCN65876036690967,True
+OMC-012,Galana Energies,P673510887Z,30,71879738,High,High,meadowsbrittany@johnson.info,(804)665-3755,Allison Hill,"819 Johnson Course, East William, AK 74064",2024-12-01,GB89GWUW86379402654235,True
+OMC-013,Lake Oil,P127571992Z,15,77399400,Low,Good,barbara66@gonzalez.com,749-319-0586,Sandra King,"805 Debra Tunnel, Port Anthonybury, ID 03172",2019-11-05,GB88TEHE71937452991241,True
+OMC-014,Texol Energies,P295249057Z,15,45509839,Low,Medium,zlewis@peterson-beard.com,+1-508-931-3678,Gloria Atkinson,"5726 Jessica Run, Christinaside, WI 63873",2015-07-13,GB06ONXS45314737996507,True
+OMC-015,Mombasa Petroleum,P403867539Z,45,30915531,Low,Good,wallkenneth@white-smith.net,(240)608-4271,Katherine Mcguire,"3495 Tran Key, Barajasside, MA 46613",2020-02-26,GB80WOIJ43135182337498,True
+OMC-016,KPA Marine,P692697161Z,30,64974694,Low,Medium,moorericky@wheeler.com,001-671-434-9361x832,Jeremiah Lopez,"16719 Edward Valleys Suite 131, Obrienbury, WI 68995",2012-12-16,GB31MOOJ96499091334123,True
+OMC-017,KAA Aviation,P473620340Z,15,60878089,Low,Good,qcook@hodge.biz,001-874-268-0715x451,Christopher Parker,"1746 Mason Park Suite 190, Navarroview, AK 12471",2017-12-30,GB54HVSS04902787429671,True
+OMC-018,Uganda National Oil,P590470737Z,30,30965755,Medium,Small,patrickweeks@francis.biz,784-804-4997x27875,Kimberly Gutierrez,"770 Joseph Curve Suite 771, Lake Chelseabury, VT 21259",2014-02-23,GB73JRAR61317127484677,True
+OMC-019,Tanzania Petroleum,P138546365Z,45,62949656,Low,Small,younggabrielle@bright-francis.biz,617-724-0050,Frank Lopez,"60576 Mcneil Turnpike Apt. 702, Mollymouth, CT 69438",2019-03-16,GB64OAXE62174596158657,True
+OMC-020,Ethiopian Oil,P618840705Z,30,65943684,Medium,Small,youngashley@phillips.biz,609-409-7439x533,Charles Schmidt,"21969 Tyler Prairie, East Steven, KS 60737",2016-07-18,GB08IVAZ74821759464743,True
