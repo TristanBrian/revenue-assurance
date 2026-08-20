@@ -19,7 +19,7 @@ This platform reconciles Dispatches → Invoices → Payments, flags these break
 graph TD
     subgraph Data_Layer["Data Layer"]
         CSV[("Raw CSVs")]
-        DB[("SQLite DB")]
+        DB[("Postgress")]
     end
 
     subgraph Service_Layer["Backend Services"]
@@ -91,6 +91,7 @@ graph TD
 | Data quality scoring     | 0-100% score based on nulls, zeros, and invalid customer references.                                           |
 | CSV upload & templates   | Reconcile ad hoc CSVs without touching the database, or download templates for the expected format.            |
 | Excel export             | Multi-sheet workbook report (summary, anomalies, data quality, risk profile).                                  |
+| Alerts & notifications   | In-app inbox + SMTP email, one module for both. System-triggered (new critical anomalies, e-billing failure-rate breaches) and manual broadcasts (`manage_alerts`). See [Alerts & Notifications](#alerts--notifications). |
 
 
 
@@ -125,6 +126,14 @@ Every API route except `POST /api/auth/login`, `POST /api/auth/register` (bootst
 
 Role names are matched loosely at registration/edit time rather than requiring an exact string: `"supervisor"`, `"depot"`, `"depo"` all map to `depot_supervisor`; `"man"`, `"manager"`, `"MANAGER"` map to `manager`; anything containing `"revenue"` or `"assurance"` maps to `revenue_assurance`.
 
+### Admin-provisioned users & forced password reset
+
+`POST /api/admin/users` (`manage_users`) is the normal way to create a user going forward — unlike `POST /api/auth/register`, it takes no password. The backend generates a random 12-character temp password, stores only its hash, sets `must_reset_password=True` with a 48h expiry, and emails the plaintext once via `app/core/email.py` (never persisted, never returned in the API response).
+
+On that first login, `POST /api/auth/login` doesn't issue a normal session token — it returns `reset_required: true` and a separate, 15-minute, single-purpose `reset_token` scoped only to `POST /api/auth/reset-password`. That endpoint rejects a password identical to the temp one, and on success issues a normal session token and clears `must_reset_password`. The reset token self-invalidates once redeemed (or once an admin regenerates the temp password via `POST /api/admin/users/{id}/resend-temp-password`) — no server-side token blacklist needed, see `core/security.py`'s `password_fingerprint()`.
+
+`get_current_user()` also rejects any request from a user with `must_reset_password` still set, even with an otherwise-valid session token — closing the gap where an admin forces a reset on an already-active user mid-session. The admin user list surfaces this as an `account_status` per user: `Invited / Pending first login`, `Reset Required`, or `Active`.
+
 ### Permission Mapping
 
 | Feature | Permission code | Depot Supervisor | Manager | Revenue Assurance |
@@ -141,8 +150,25 @@ Role names are matched loosely at registration/edit time rather than requiring a
 | Fraud Graph (structural network) | `view_fraud_graph` | ❌ | ❌ | ✅ |
 | Risk Analytics (statistical/EDA) | `view_risk_analytics` | ❌ | ❌ | ✅ |
 | Audit Trail | `view_audit` | ❌ | ✅ | ✅ |
+| Broadcast Alerts | `manage_alerts` | ❌ | ✅ | ✅ |
 
 `manage_users` and `manage_permissions` gate user administration (`/api/admin/*`) and are held only by `system_admin` — not shown above since they're not a revenue-assurance feature.
+
+Every role can read its own alert inbox (`GET /api/alerts`) regardless of `manage_alerts` — that permission only gates *creating* a manual broadcast, not *seeing* alerts addressed to you. See [Alerts & Notifications](#alerts--notifications).
+
+## Alerts & Notifications
+
+One module (`app/services/alert_service.py`), two channels (`app/models/alert.py` for the in-app inbox, `app/core/email.py` for SMTP) — every alert is always written in-app and optionally emailed, never one or the other from separate code paths.
+
+**System-triggered:**
+- **Critical anomalies** — `POST /api/reconcile/metrics` alerts everyone holding `resolve_anomaly` when a fresh reconciliation run surfaces new critical anomalies (`status == "Critical"`): one in-app row per anomaly, one digest email per run. De-duplicated by dispatch id, so re-running reconciliation never re-alerts the same anomaly twice.
+- **E-billing failure rate** — after any sync (`POST /api/e-billing/sync` or the async variant), if the failure rate breaches `FAILURE_THRESHOLD`, everyone holding `manage_ebilling` gets an alert. Throttled to at most one per hour.
+
+**Manual:** `POST /api/alerts` (requires `manage_alerts`) broadcasts a one-off alert to everyone holding a given permission, or to one specific user.
+
+**Reading your inbox:** `GET /api/alerts` (own alerts, `unread_only` filter, paginated), `GET /api/alerts/unread-count` (badge count), `POST /api/alerts/{id}/read` / `POST /api/alerts/read-all`.
+
+**Email setup:** optional — see `SMTP_*` in `.env.example`. Without SMTP configured, alerts still work in-app; email sending is skipped and logged, not an error.
 
 ## Quick Start
 

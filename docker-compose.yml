@@ -3,7 +3,10 @@ services:
     image: postgres:16
     container_name: kpc-db
     ports:
-      - "5434:5432"
+      # Not 5434 (taken by an unrelated project's container on this
+      # machine) or 5433 (reserved for this project's own non-Docker
+      # Postgres dev setup, per AUTH_NOTES.md) — 5437 is clear of both.
+      - "5437:5432"
     environment:
       - POSTGRES_USER=kpc_app
       - POSTGRES_PASSWORD=kpc_local_dev
