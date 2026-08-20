@@ -25,8 +25,15 @@ class User(Base):
 
     must_reset_password = Column(Boolean, default=False, nullable=False)
     temp_password_expires_at = Column(DateTime, nullable=True)
-  
+
     last_login_at = Column(DateTime, nullable=True)
+
+    # Cached "latest state" for fast checks (dependencies.py's guard,
+    # login()'s terms_required branch) — the full history lives in
+    # consent_records (models/consent_record.py), not here. Null =
+    # never accepted anything.
+    terms_accepted_version = Column(String(50), nullable=True)
+    terms_accepted_at = Column(DateTime, nullable=True)
 
     roles = relationship("Role", secondary=user_roles, back_populates="users")
 
