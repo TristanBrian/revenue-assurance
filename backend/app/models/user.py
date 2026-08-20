@@ -23,6 +23,11 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+    must_reset_password = Column(Boolean, default=False, nullable=False)
+    temp_password_expires_at = Column(DateTime, nullable=True)
+  
+    last_login_at = Column(DateTime, nullable=True)
+
     roles = relationship("Role", secondary=user_roles, back_populates="users")
 
     def has_permission(self, code: str) -> bool:

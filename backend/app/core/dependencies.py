@@ -65,12 +65,36 @@ def get_current_user(
         email: str = payload.get("sub")
         if email is None:
             raise credentials_exception
+        # Reject a password-reset token (type="password_reset") presented
+        # here — it's scoped only to POST /auth/reset-password (see
+        # core/security.py's create_reset_token/decode_reset_token), never
+        # a substitute for a real session token on any other route.
+        if payload.get("type", "access") != "access":
+            raise credentials_exception
     except JWTError:
         raise credentials_exception
 
     user = db.query(User).filter(User.email == email).first()
     if user is None or not user.is_active:
         raise credentials_exception
+
+    # Forced-reset guard (spec: "any authenticated route/middleware must
+    # check must_reset_password... force-redirect to /reset-password").
+    # Structurally, a user can't normally hold a valid access token while
+    # must_reset_password is True — login() issues a reset token instead
+    # (see routes/auth.py) — except when an admin sets it on an
+    # *already-active* user who still has an unexpired token from before
+    # (services/user_service.py's regenerate_temp_password). This is the
+    # guard that closes that gap: a distinct, greppable detail string
+    # ("PASSWORD_RESET_REQUIRED") rather than the generic 401 message so
+    # the frontend can tell "reset required" apart from "not logged in"
+    # and redirect instead of just bouncing to /login.
+    if user.must_reset_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="PASSWORD_RESET_REQUIRED",
+        )
+
     return user
 
 
