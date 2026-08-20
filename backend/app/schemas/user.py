@@ -58,28 +58,44 @@ class LoginRequest(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    """POST /api/auth/login returns one of two shapes, discriminated by
-    reset_required:
-      - reset_required=False (normal login): access_token set, reset_token null.
-      - reset_required=True (must_reset_password): reset_token set instead —
-        a 15-minute, reset-endpoint-only token (see core/security.py's
-        create_reset_token) — access_token stays null. The client should
-        store reset_token and navigate to `redirect` instead of treating
-        this as a normal authenticated session.
+    """POST /api/auth/login returns one of three shapes:
+      - Normal login: access_token set, everything else null/False.
+      - reset_required=True (must_reset_password): reset_token set instead
+        — a 15-minute, reset-endpoint-only token (see core/security.py's
+        create_reset_token). The reset-password screen also bundles terms/
+        privacy consent into that same submission (see ResetPasswordRequest),
+        so this case never also sets terms_required.
+      - terms_required=True (password is fine, but terms_accepted_version
+        is stale or never set): consent_token set instead — same idea, but
+        scoped to POST /api/auth/accept-terms (create_terms_consent_token).
+    In every "required" case, access_token stays null — the client should
+    store the given token and navigate to `redirect` instead of treating
+    the response as an authenticated session.
     """
     access_token: Optional[str] = None
     token_type: str = "bearer"
     reset_required: bool = False
     reset_token: Optional[str] = None
+    terms_required: bool = False
+    consent_token: Optional[str] = None
     redirect: Optional[str] = None
 
 
 class ResetPasswordRequest(BaseModel):
     """POST /api/auth/reset-password. reset_token is the short-lived token
     from LoginResponse.reset_token — not a normal Authorization bearer
-    token, so it travels in the body like the password does."""
+    token, so it travels in the body like the password does.
+
+    Consent is bundled into this same submission (spec: "rather than as a
+    separate screen") — checkbox_accepted covers both the Terms &
+    Conditions and Privacy Policy shown alongside the password fields.
+    confirm_password is validated server-side, not just in the UI —
+    client-side matching is a UX nicety only.
+    """
     reset_token: str
     new_password: str = Field(min_length=8)
+    confirm_password: str
+    checkbox_accepted: bool
 
 
 class ResetPasswordResponse(BaseModel):
