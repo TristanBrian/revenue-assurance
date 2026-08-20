@@ -67,19 +67,6 @@ app.add_middleware(ResponseEnvelopeMiddleware)
 app.add_middleware(AuditMiddleware)
 
 # ============================================================================
-# ROUTERS
-# ============================================================================
-app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
-app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
-app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
-app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])
-app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
-app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
-app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
-app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
-
-# ============================================================================
 # MANUAL OPTIONS HANDLER FOR LOGIN (fallback)
 # ============================================================================
 @app.options("/api/auth/login")
@@ -107,7 +94,9 @@ async def root():
         "endpoints": [
             # -- Auth: everything else needs a token from here first --
             "POST /api/auth/login - Log in, returns a JWT (or a scoped reset_token if must_reset_password)",
-            "POST /api/auth/reset-password - Redeem a reset_token + set a new password (forced-reset flow)",
+            "POST /api/auth/reset-password - Redeem a reset_token + set a new password + accept Terms/Privacy (forced-reset flow)",
+            "GET /api/auth/terms - Current Terms & Conditions / Privacy Policy text + required version",
+            "POST /api/auth/accept-terms - Redeem a consent_token to re-accept a newer Terms/Privacy version",
             "POST /api/auth/register - Create a user and assign a role (manage_users)",
             "GET /api/auth/me - Current user's profile, roles, permissions",
             "GET /api/feed - Live anomaly feed",
