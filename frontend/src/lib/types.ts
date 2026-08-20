@@ -9,7 +9,11 @@ export type BreakType =
   | "Overpayment"
   | "Reconciled";
 
-export type AnomalyStatus = "Critical" | "Pending" | "Review Required" | "Resolved";
+export type AnomalyStatus =
+  | "Critical"
+  | "Pending"
+  | "Review Required"
+  | "Resolved";
 
 export interface Metrics {
   total_dispatched_kes: number;
@@ -172,6 +176,11 @@ export interface TaskStatusResponse {
   error?: string | null;
   started_at?: string;
   completed_at?: string;
+  // Set by run_sync_task()'s batch loop (backend/app/services/e_billing.py) —
+  // absent until the first batch reports in, so all optional.
+  total?: number;
+  synced_so_far?: number;
+  failed_so_far?: number;
 }
 
 export interface RetrySyncResult {

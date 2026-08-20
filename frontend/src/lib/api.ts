@@ -118,15 +118,25 @@ export async function getMetrics(materiality = 100000): Promise<MetricsResult> {
   return unwrap<MetricsResult>(res);
 }
 
+export interface AnomalyFilters {
+  breakType?: string;
+  status?: string;
+  search?: string;
+}
+
 export async function getAnomalies(
   materiality = 100000,
   page = 1,
   pageSize = 20,
+  filters: AnomalyFilters = {},
 ): Promise<AnomalyTableResult> {
   const url = new URL("/api/reconcile/anomalies", API_URL);
   url.searchParams.set("materiality", String(materiality));
   url.searchParams.set("page", String(page));
   url.searchParams.set("page_size", String(pageSize));
+  if (filters.breakType) url.searchParams.set("break_type", filters.breakType);
+  if (filters.status) url.searchParams.set("status", filters.status);
+  if (filters.search) url.searchParams.set("search", filters.search);
   const res = await authFetch(url);
   return unwrap<AnomalyTableResult>(res);
 }
@@ -160,6 +170,59 @@ export async function reconcileUpload(
   const res = await authFetch(url, { method: "POST", body: formData });
   const body = await unwrap<{ data: ReconcileResult }>(res);
   return body.data;
+}
+
+/** Same call as reconcileUpload(), but reports real upload-percentage via
+ * onProgress as the files transfer. fetch() has no cross-browser way to
+ * observe upload progress (only download-stream progress), so this uses
+ * XMLHttpRequest instead — the one place in this file that isn't authFetch/
+ * fetch-based, for that reason alone. onProgress fires up to 100 once the
+ * bytes are fully sent; there's no equivalent signal for the server-side
+ * reconciliation work that happens after that (POST /reconcile/upload is a
+ * single synchronous response, not a polled task like e-billing sync), so
+ * callers should treat "upload progress hit 100" as "now reconciling" with
+ * no further percentage rather than inventing one. */
+export function reconcileUploadWithProgress(
+  files: ReconcileUploadFiles,
+  materiality: number,
+  onProgress: (percent: number) => void,
+): Promise<ReconcileResult> {
+  const url = new URL("/api/reconcile/upload", API_URL);
+  url.searchParams.set("materiality", String(materiality));
+
+  const formData = new FormData();
+  formData.append("dispatches_file", files.dispatches);
+  formData.append("invoices_file", files.invoices);
+  formData.append("payments_file", files.payments);
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    const token = getAuthToken();
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+
+    xhr.onload = () => {
+      let parsed: { Success?: number; Message?: string; Data?: { data?: ReconcileResult } } | null = null;
+      try {
+        parsed = JSON.parse(xhr.responseText);
+      } catch {
+        // non-JSON body — falls through to the generic message below
+      }
+      if (xhr.status >= 200 && xhr.status < 300 && parsed?.Data?.data) {
+        resolve(parsed.Data.data);
+      } else {
+        reject(new ApiError(parsed?.Message ?? `Request failed with status ${xhr.status}`, xhr.status));
+      }
+    };
+
+    xhr.onerror = () => reject(new ApiError("Network error during upload", 0));
+
+    xhr.send(formData);
+  });
 }
 
 export type TemplateType = "dispatches" | "invoices" | "payments";

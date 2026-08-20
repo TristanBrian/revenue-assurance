@@ -1,27 +1,25 @@
 # backend/Dockerfile
 FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies for pandas/numpy
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
+    gcc g++ curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first (for better caching)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire project
 COPY . .
 
-# Create data directories
-RUN mkdir -p data/raw data/clean
+RUN mkdir -p data/raw data/clean logs
 
-# Expose the port
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:8000/health || exit 1
+
 EXPOSE 8000
 
-# Default command (override for different tasks)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+COPY scripts/start.sh /app/scripts/start.sh
+RUN chmod +x /app/scripts/start.sh
+
+CMD ["/app/scripts/start.sh"]

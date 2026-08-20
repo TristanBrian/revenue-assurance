@@ -1,7 +1,5 @@
-"use client";
-
-import { useMemo, useState } from "react";
 import type { Anomaly } from "@/lib/types";
+import { useState } from "react";
 
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", {
@@ -11,57 +9,58 @@ function formatKes(value: number): string {
   }).format(value);
 }
 
-type SortKey = "leakage_kes" | "age_days" | "customer" | "break_type";
-
-const columns: { key: SortKey; label: string }[] = [
-  { key: "customer", label: "Customer" },
-  { key: "break_type", label: "Break Type" },
-  { key: "leakage_kes", label: "Leakage" },
-  { key: "age_days", label: "Age (days)" },
-];
-
-function statusClass(status: Anomaly["status"]): string {
+function statusClass(status: string) {
   switch (status) {
     case "Critical":
-      return "bg-rose-500/10 text-rose-400 border border-rose-500/20";
-    case "Review Required":
-      return "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+      return "bg-red-500/10 text-red-500 border border-red-500/20";
+    case "Resolved":
+      return "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20";
     default:
-      return "bg-zinc-800 text-zinc-300 border border-zinc-700/50";
+      return "bg-amber-500/10 text-amber-500 border border-amber-500/20";
   }
 }
 
+interface Column {
+  key: keyof Anomaly;
+  label: string;
+}
+
+const columns: Column[] = [
+  { key: "customer", label: "Customer OMC" },
+  { key: "break_type", label: "Anomaly Type" },
+  { key: "leakage_kes", label: "Leakage" },
+  { key: "age_days", label: "Age" },
+];
+
 interface AnomalyTableProps {
   anomalies: Anomaly[];
+  selectedAnomalyId?: string;
   onSelectAnomaly?: (anomaly: Anomaly) => void;
-  selectedAnomalyId?: string | null;
 }
 
 export default function AnomalyTable({
   anomalies,
-  onSelectAnomaly,
   selectedAnomalyId,
+  onSelectAnomaly,
 }: AnomalyTableProps) {
-  const [sortKey, setSortKey] = useState<SortKey>("leakage_kes");
-  const [sortDesc, setSortDesc] = useState(true);
+  const [sortKey, setSortKey] = useState<keyof Anomaly>("leakage_kes");
+  const [sortDesc, setSortDesc] = useState<boolean>(true);
 
-  const sorted = useMemo(() => {
-    const copy = [...anomalies];
-    copy.sort((a, b) => {
-      const av = a[sortKey];
-      const bv = b[sortKey];
-      const cmp =
-        typeof av === "number" && typeof bv === "number"
-          ? av - bv
-          : String(av).localeCompare(String(bv));
-      return sortDesc ? -cmp : cmp;
-    });
-    return copy;
-  }, [anomalies, sortKey, sortDesc]);
+  const sorted = [...anomalies].sort((a, b) => {
+    const valA = a[sortKey];
+    const valB = b[sortKey];
 
-  function toggleSort(key: SortKey) {
-    if (key === sortKey) {
-      setSortDesc((d) => !d);
+    if (typeof valA === "number" && typeof valB === "number") {
+      return sortDesc ? valB - valA : valA - valB;
+    }
+    return sortDesc
+      ? String(valB).localeCompare(String(valA))
+      : String(valA).localeCompare(String(valB));
+  });
+
+  function toggleSort(key: keyof Anomaly) {
+    if (sortKey === key) {
+      setSortDesc(!sortDesc);
     } else {
       setSortKey(key);
       setSortDesc(true);
@@ -70,8 +69,8 @@ export default function AnomalyTable({
 
   if (anomalies.length === 0) {
     return (
-      <div className="bg-zinc-900/30 border border-zinc-800 rounded-lg p-8 text-center">
-        <p className="text-sm text-zinc-500">
+      <div className="bg-zinc-50 dark:bg-zinc-900/30 border border-zinc-200 dark:border-zinc-800 rounded-lg p-8 text-center shadow-sm">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
           No anomalies match the current filters or materiality threshold.
         </p>
       </div>
@@ -79,9 +78,9 @@ export default function AnomalyTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950/40">
+    <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950/40 shadow-sm">
       <table className="w-full min-w-[640px] text-left text-sm">
-        <thead className="border-b border-zinc-800 bg-zinc-900/60 text-zinc-400 font-medium">
+        <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 text-zinc-500 dark:text-zinc-400 font-medium">
           <tr>
             <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">
               Dispatch ID
@@ -89,13 +88,13 @@ export default function AnomalyTable({
             {columns.map((col) => (
               <th
                 key={col.key}
-                className="cursor-pointer select-none px-4 py-3 text-xs uppercase tracking-wider font-semibold hover:text-white transition-colors"
+                className="cursor-pointer select-none px-4 py-3 text-xs uppercase tracking-wider font-semibold hover:text-zinc-950 dark:hover:text-white transition-colors"
                 onClick={() => toggleSort(col.key)}
               >
                 <div className="flex items-center gap-1">
                   <span>{col.label}</span>
                   {sortKey === col.key && (
-                    <span className="text-indigo-400">{sortDesc ? "↓" : "↑"}</span>
+                    <span className="text-indigo-500 dark:text-indigo-400">{sortDesc ? "↓" : "↑"}</span>
                   )}
                 </div>
               </th>
@@ -105,28 +104,28 @@ export default function AnomalyTable({
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-900 text-zinc-300">
+        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-900 text-zinc-700 dark:text-zinc-350">
           {sorted.map((a, i) => {
             const isSelected = selectedAnomalyId === a.dispatch_id;
             return (
               <tr
                 key={`${a.dispatch_id}-${i}`}
                 onClick={() => onSelectAnomaly?.(a)}
-                className={`group cursor-pointer border-zinc-900 transition-all duration-150 ${
+                className={`group cursor-pointer border-zinc-200 dark:border-zinc-900 transition-all duration-150 ${
                   isSelected
-                    ? "bg-indigo-950/20 text-indigo-300"
-                    : "hover:bg-zinc-900/40"
+                    ? "bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-300"
+                    : "hover:bg-zinc-100/60 dark:hover:bg-zinc-900/40"
                 }`}
               >
-                <td className="px-4 py-3.5 font-mono text-xs font-semibold text-zinc-400 group-hover:text-zinc-200">
+                <td className="px-4 py-3.5 font-mono text-xs font-semibold text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-850 group-hover:dark:text-zinc-200">
                   {a.dispatch_id}
                 </td>
                 <td className="px-4 py-3.5 font-medium">{a.customer}</td>
-                <td className="px-4 py-3.5 text-zinc-400">{a.break_type}</td>
-                <td className="px-4 py-3.5 font-semibold font-mono text-white">
+                <td className="px-4 py-3.5 text-zinc-550 dark:text-zinc-400">{a.break_type}</td>
+                <td className="px-4 py-3.5 font-semibold font-mono text-zinc-900 dark:text-white">
                   {formatKes(a.leakage_kes)}
                 </td>
-                <td className="px-4 py-3.5 text-zinc-400">{a.age_days}</td>
+                <td className="px-4 py-3.5 text-zinc-550 dark:text-zinc-400">{a.age_days}</td>
                 <td className="px-4 py-3.5">
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusClass(a.status)}`}
