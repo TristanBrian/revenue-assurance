@@ -31,7 +31,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.core.email import send_email
+from app.core.email import is_configured, send_email
 from app.models.alert import Alert
 from app.models.alert_read import AlertRead
 from app.models.permission import Permission
@@ -256,7 +256,19 @@ def _notify_alert_delivery_failed(db: Session, failed_alert: Alert, recipient_co
     """In-app-only follow-up when an alert's own email failed to send —
     forced notify_email=False (retrying the same failing SMTP call would
     be pointless) and forced alert_type=ALERT_DELIVERY_FAILED so this
-    can't recurse into itself."""
+    can't recurse into itself.
+
+    Gated on is_configured(): send_email() returns False for two very
+    different reasons — SMTP is configured but the send itself broke
+    (genuine delivery failure, worth an alert), or SMTP was simply never
+    configured at all (the expected state for e.g. CI, or any deployment
+    that hasn't set SMTP_* yet — not a failure of anything, and alerting
+    on it would mean *every* alert creation spawns a second one, forever,
+    in any environment without SMTP set up). Only the first case is a
+    delivery failure; this exists to alert on that one, not the other.
+    """
+    if not is_configured():
+        return
     create_alert(
         db,
         alert_type=AlertType.ALERT_DELIVERY_FAILED,
