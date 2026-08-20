@@ -39,8 +39,10 @@ from app.models.alert import Alert  # noqa: E402
 from app.models.alert_read import AlertRead  # noqa: E402
 from app.models.associations import role_permissions, user_roles  # noqa: E402
 from app.models.audit import AuditLog  # noqa: E402
+from app.models.consent_record import ConsentRecord  # noqa: E402
 from app.models.permission import Permission  # noqa: E402
 from app.models.role import Role  # noqa: E402
+from app.models.terms_document import TermsDocument  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.services.user_service import (  # noqa: E402
     provision_user_with_temp_password,
@@ -69,6 +71,7 @@ def db_session():
             User.__table__, Role.__table__, Permission.__table__,
             user_roles, role_permissions, AuditLog.__table__,
             Alert.__table__, AlertRead.__table__,
+            TermsDocument.__table__, ConsentRecord.__table__,
         ],
     )
     Session = sessionmaker(bind=engine)
@@ -146,6 +149,18 @@ def _admin_token(client, admin_user):
 
 def _auth_headers(token):
     return {"Authorization": f"Bearer {token}"}
+
+
+def _reset_password(client, reset_token, new_password, confirm_password=None, checkbox_accepted=True):
+    return client.post(
+        "/api/auth/reset-password",
+        json={
+            "reset_token": reset_token,
+            "new_password": new_password,
+            "confirm_password": confirm_password if confirm_password is not None else new_password,
+            "checkbox_accepted": checkbox_accepted,
+        },
+    )
 
 
 # ============================================================================
@@ -278,23 +293,25 @@ def test_full_first_login_forced_reset_flow(client, admin_user, no_real_email):
     assert me.status_code == 401
 
     # 3. New password same as temp password -> rejected.
-    res = client.post("/api/auth/reset-password", json={"reset_token": reset_token, "new_password": temp_password})
+    res = _reset_password(client, reset_token, temp_password)
+    assert res.status_code == 400
+
+    # 3b. Checkbox not accepted -> rejected, no mutation.
+    res = _reset_password(client, reset_token, "Brand-New-Pass-1!", checkbox_accepted=False)
+    assert res.status_code == 400
+
+    # 3c. Passwords don't match -> rejected, no mutation.
+    res = _reset_password(client, reset_token, "Brand-New-Pass-1!", confirm_password="Different-Pass-1!")
     assert res.status_code == 400
 
     # 4. Successful reset -> normal access token issued.
-    res = client.post(
-        "/api/auth/reset-password",
-        json={"reset_token": reset_token, "new_password": "Brand-New-Pass-1!"},
-    )
+    res = _reset_password(client, reset_token, "Brand-New-Pass-1!")
     assert res.status_code == 200, res.text
     access_token = res.json()["Data"]["access_token"]
     assert access_token
 
     # 5. The now-redeemed reset token can't be replayed.
-    res = client.post(
-        "/api/auth/reset-password",
-        json={"reset_token": reset_token, "new_password": "Another-Pass-2!"},
-    )
+    res = _reset_password(client, reset_token, "Another-Pass-2!")
     assert res.status_code == 401
 
     # 6. Old temp password no longer works; new one logs in normally.
@@ -346,10 +363,7 @@ def test_admin_resend_temp_password_invalidates_old_reset_token(client, admin_us
     assert len(no_real_email) >= 2
 
     # The reset token issued against the old temp password is now stale.
-    res = client.post(
-        "/api/auth/reset-password",
-        json={"reset_token": old_reset_token, "new_password": "Whatever-Pass-1!"},
-    )
+    res = _reset_password(client, old_reset_token, "Whatever-Pass-1!")
     assert res.status_code == 401
 
 
