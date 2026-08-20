@@ -5,7 +5,8 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { getMetrics, getOmcRiskProfile, getEbillingStatus } from "@/lib/api";
+import { getMetrics, getOmcRiskProfile, getEbillingStatus, getDepotAlerts } from "@/lib/api";
+import type { Anomaly } from "@/lib/types";
 import {
   MaterialityProvider,
   useMateriality,
@@ -55,7 +56,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/dashboard/heatmap",
-    label: "Heatmap",
+    label: "Leakage Explorer",
     anyOf: ["view_heatmap"],
     icon: (
       <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -108,16 +109,6 @@ const NAV_ITEMS: NavItem[] = [
       </svg>
     ),
   },
-  {
-    href: "/dashboard/admin",
-    label: "User Management",
-    anyOf: ["manage_users"],
-    icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-      </svg>
-    ),
-  },
 ];
 
 function formatKes(value: number): string {
@@ -126,6 +117,14 @@ function formatKes(value: number): string {
     currency: "KES",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function BellIcon() {
+  return (
+    <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+    </svg>
+  );
 }
 
 const THEME_ICONS: Record<"light" | "dark" | "system", React.ReactNode> = {
@@ -158,6 +157,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [highRiskCount, setHighRiskCount] = useState<number>(0);
   const [failedSyncCount, setFailedSyncCount] = useState<number>(0);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [depotAlerts, setDepotAlerts] = useState<{ depotId: string; criticalCount: number; items: Anomaly[] } | null>(null);
+  const [depotAlertsOpen, setDepotAlertsOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -187,6 +188,15 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         .then((status) => setFailedSyncCount(status.failed_count))
         .catch(() => {});
     }
+
+    // Depot Supervisor's alert bell: their own depot only, from a server
+    // endpoint that ignores any client-supplied depot — not the global
+    // view_metrics critical_count above, which is unscoped across every depot.
+    if (user.permissions.includes("view_depot_alerts")) {
+      getDepotAlerts()
+        .then((data) => setDepotAlerts({ depotId: data.depot_id, criticalCount: data.critical_count, items: data.items }))
+        .catch(() => {});
+    }
   }, [user, materiality]);
 
   function handleLogout() {
@@ -197,13 +207,22 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const visibleItems = NAV_ITEMS.filter(
     (item) => !item.anyOf || item.anyOf.some((code) => user?.permissions.includes(code)),
   );
-  const canSeeAlerts = user?.permissions.includes("view_anomaly_table");
+  const canSeeAllAlerts = user?.permissions.includes("view_anomaly_table") ?? false;
+  const canSeeDepotAlerts = user?.permissions.includes("view_depot_alerts") ?? false;
+  const isAdmin = user?.roles.includes("system_admin") ?? false;
+  // Decorative search over anomalies/OMCs/invoices only makes sense on pages
+  // that actually show that content — not the Explorer, uploads, reports,
+  // e-billing, or fraud graph, and never for admin (their page is users).
+  const SEARCH_RELEVANT_PATHS = ["/dashboard", "/dashboard/anomalies", "/dashboard/omc-risk"];
+  const showSearch = !isAdmin && SEARCH_RELEVANT_PATHS.includes(pathname);
 
   return (
-    <div className="flex min-h-full flex-1 bg-background text-foreground">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* Sidebar — deliberately its own reddish-dark surface (bg-sidebar),
           distinct from the neutral bg-background main layout in both themes. */}
-      <aside className="flex w-60 shrink-0 flex-col bg-sidebar border-r border-sidebar-border p-3">
+      {/* h-full + its own overflow-y-auto — stays put while <main> scrolls,
+          instead of scrolling away with the rest of the page. */}
+      <aside className="flex h-full w-60 shrink-0 flex-col overflow-y-auto bg-sidebar border-r border-sidebar-border p-3">
         <div className="flex items-center gap-2.5 px-2 py-3 mb-2">
           {BRAND_CONFIG.logoUrl ? (
             <div className="w-8 h-8 shrink-0 relative">
@@ -306,33 +325,86 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <header className="flex h-14 items-center justify-between gap-4 px-6 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground max-w-md w-full">
-            <div className="flex items-center gap-2 w-full rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs">
-              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z" />
-              </svg>
-              <span className="truncate">Search anomalies, OMCs, invoices…</span>
+          {/* Decorative reconciliation search — only on pages that actually
+              show anomalies/OMCs/invoices (see SEARCH_RELEVANT_PATHS above),
+              not on every page regardless of relevance. */}
+          {showSearch ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground max-w-md w-full">
+              <div className="flex items-center gap-2 w-full rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs">
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z" />
+                </svg>
+                <span className="truncate">Search anomalies, OMCs, invoices…</span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div />
+          )}
 
           <div className="flex items-center gap-1.5 shrink-0">
-            {canSeeAlerts && (
+            {canSeeAllAlerts && (
               <Link
                 href="/dashboard/anomalies"
                 title="Critical anomalies"
                 className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
-                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
+                <BellIcon />
                 {criticalCount > 0 && (
                   <span className="absolute top-1 right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-status-critical px-1 text-[8px] font-bold text-white">
                     {criticalCount > 99 ? "99+" : criticalCount}
                   </span>
                 )}
               </Link>
+            )}
+
+            {!canSeeAllAlerts && canSeeDepotAlerts && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setDepotAlertsOpen((o) => !o)}
+                  onBlur={() => setTimeout(() => setDepotAlertsOpen(false), 150)}
+                  title={depotAlerts ? `Critical alerts — ${depotAlerts.depotId}` : "Critical alerts"}
+                  className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                >
+                  <BellIcon />
+                  {depotAlerts && depotAlerts.criticalCount > 0 && (
+                    <span className="absolute top-1 right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-status-critical px-1 text-[8px] font-bold text-white">
+                      {depotAlerts.criticalCount > 99 ? "99+" : depotAlerts.criticalCount}
+                    </span>
+                  )}
+                </button>
+                {depotAlertsOpen && (
+                  <div className="absolute right-0 mt-1 w-80 rounded-md border border-border bg-popover shadow-lg py-2 z-40">
+                    <div className="px-3 pb-2 border-b border-border">
+                      <p className="text-xs font-bold text-foreground">
+                        {depotAlerts ? depotAlerts.depotId : "Your depot"} — critical alerts
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Scoped to your assigned depot only</p>
+                    </div>
+                    {!depotAlerts || depotAlerts.items.length === 0 ? (
+                      <p className="px-3 py-4 text-xs text-muted-foreground italic">No alerts for your depot right now.</p>
+                    ) : (
+                      <div className="max-h-72 overflow-y-auto divide-y divide-border">
+                        {depotAlerts.items.slice(0, 8).map((a) => (
+                          <div key={a.dispatch_id} className="px-3 py-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-semibold text-foreground truncate">{a.customer}</span>
+                              <span className="text-xs font-mono font-bold text-status-critical shrink-0">
+                                {formatKes(a.leakage_kes)}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {a.break_type} · {a.dispatch_id}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="relative">
@@ -371,7 +443,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-x-auto p-6 bg-background">{children}</main>
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-auto p-6 bg-background">{children}</main>
       </div>
     </div>
   );

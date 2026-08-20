@@ -14,33 +14,38 @@
    ============================================================================ */
 
 :root {
-  --background: #fafafa;
-  --foreground: #0a0a0a;
+  /* Pixel-sampled from the "Direction 3 — Softer Modern SaaS" reference
+     mockup (warm off-white surfaces, warm near-black ink, single red
+     accent) — not the cooler pure-gray/pure-black scale this used to be. */
+  --background: #f7f6f4;
+  --foreground: #26221f;
   --card: #ffffff;
-  --card-foreground: #0a0a0a;
+  --card-foreground: #26221f;
   --popover: #ffffff;
-  --popover-foreground: #0a0a0a;
-  --primary: #171717;
-  --primary-foreground: #fafafa;
-  --secondary: #f3f3f3;
-  --secondary-foreground: #171717;
-  --muted: #f2f2f2;
-  --muted-foreground: #6b6b6b;
-  --accent: #f2f2f2;
-  --accent-foreground: #171717;
-  --border: #e4e4e7;
-  --input: #e4e4e7;
-  --ring: #a1a1a1;
+  --popover-foreground: #26221f;
+  --primary: #b3312c;
+  --primary-foreground: #ffffff;
+  --secondary: #f1ede9;
+  --secondary-foreground: #26221f;
+  --muted: #f1ede9;
+  --muted-foreground: #736c67;
+  --accent: #f1ede9;
+  --accent-foreground: #26221f;
+  --border: #e8e3de;
+  --input: #e8e3de;
+  --ring: #b3312c;
 
-  /* Sidebar — deliberately its own reddish-dark surface, distinct from the
-     neutral main layout (brand direction: KPC's red, not a themed neutral). */
-  --sidebar: #1c1010;
-  --sidebar-foreground: #f6ecec;
-  --sidebar-muted-foreground: #b08a8a;
-  --sidebar-border: #3a1f1f;
-  --sidebar-accent: #2c1616;
-  --sidebar-primary: #e0483f;
-  --sidebar-primary-foreground: #fff5f5;
+  /* Sidebar — same reference, sampled directly from its sidebar: a warm
+     near-black (not pure #000) with a reddish-dark active-item highlight
+     and the same #B3312C brand red used everywhere else. Fixed regardless
+     of light/dark mode, same as the reference's own dark sidebar. */
+  --sidebar: #1f1b19;
+  --sidebar-foreground: #f5f2ef;
+  --sidebar-muted-foreground: #b2aeac;
+  --sidebar-border: #322019;
+  --sidebar-accent: #3f201e;
+  --sidebar-primary: #b3312c;
+  --sidebar-primary-foreground: #ffffff;
 
   /* Status palette (fixed, never themed) — dataviz skill reference palette.
      Never carries meaning alone: every use pairs the color with an icon/label. */
@@ -68,31 +73,33 @@
 }
 
 .dark {
-  --background: #0a0a0a;
-  --foreground: #fafafa;
-  --card: #171717;
-  --card-foreground: #fafafa;
-  --popover: #171717;
-  --popover-foreground: #fafafa;
-  --primary: #e5e5e5;
-  --primary-foreground: #171717;
-  --secondary: #262626;
-  --secondary-foreground: #fafafa;
-  --muted: #262626;
-  --muted-foreground: #a1a1a1;
-  --accent: #262626;
-  --accent-foreground: #fafafa;
-  --border: #ffffff1a;
-  --input: #ffffff26;
-  --ring: #737373;
+  /* No dark variant in the reference — same warm undertone, inverted, with
+     the brand red held byte-identical to light mode rather than re-tuned. */
+  --background: #171310;
+  --foreground: #f5f2ef;
+  --card: #221d1a;
+  --card-foreground: #f5f2ef;
+  --popover: #221d1a;
+  --popover-foreground: #f5f2ef;
+  --primary: #b3312c;
+  --primary-foreground: #ffffff;
+  --secondary: #2a2725;
+  --secondary-foreground: #f5f2ef;
+  --muted: #2a2725;
+  --muted-foreground: #b2aeac;
+  --accent: #2a2725;
+  --accent-foreground: #f5f2ef;
+  --border: #33302c;
+  --input: #33302c;
+  --ring: #b3312c;
 
-  --sidebar: #170c0c;
-  --sidebar-foreground: #f6ecec;
-  --sidebar-muted-foreground: #9c7a7a;
-  --sidebar-border: #331b1b;
-  --sidebar-accent: #2a1414;
-  --sidebar-primary: #ef5b52;
-  --sidebar-primary-foreground: #fff5f5;
+  --sidebar: #1f1b19;
+  --sidebar-foreground: #f5f2ef;
+  --sidebar-muted-foreground: #b2aeac;
+  --sidebar-border: #322019;
+  --sidebar-accent: #3f201e;
+  --sidebar-primary: #b3312c;
+  --sidebar-primary-foreground: #ffffff;
 
   --status-critical: #e66767;
   --status-critical-bg: #2a1414;
