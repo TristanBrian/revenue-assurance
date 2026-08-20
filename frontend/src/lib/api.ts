@@ -1,4 +1,5 @@
 import type {
+  AcceptTermsResponse,
   AdminUser,
   AnomalyTableResult,
   AuthUser,
@@ -17,6 +18,7 @@ import type {
   ResetPasswordResponse,
   RetrySyncResult,
   TaskStatusResponse,
+  TermsBundle,
   UpdateAnomalyResponse,
   UpdateUserPayload,
 } from "./types";
@@ -68,6 +70,26 @@ export function getResetToken(): string | null {
 
 export function clearResetToken(): void {
   if (typeof window !== "undefined") window.sessionStorage.removeItem(RESET_TOKEN_KEY);
+}
+
+// Sibling of the reset token above, for an already-active account that
+// just needs to re-accept a newer Terms/Privacy Policy version — scoped
+// only to POST /auth/accept-terms. Kept in a separate key so the
+// reset-password page can tell "full reset form" and "consent-only form"
+// apart by which token is actually present.
+const CONSENT_TOKEN_KEY = "kpc_consent_token";
+
+export function setConsentToken(token: string): void {
+  if (typeof window !== "undefined") window.sessionStorage.setItem(CONSENT_TOKEN_KEY, token);
+}
+
+export function getConsentToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.sessionStorage.getItem(CONSENT_TOKEN_KEY);
+}
+
+export function clearConsentToken(): void {
+  if (typeof window !== "undefined") window.sessionStorage.removeItem(CONSENT_TOKEN_KEY);
 }
 
 export class ApiError extends Error {
@@ -127,19 +149,51 @@ export async function login(email: string, password: string): Promise<LoginRespo
   return unwrap<LoginResponse>(res);
 }
 
+/** Fetches the current Terms & Conditions / Privacy Policy text + required
+ * version for the reset-password / accept-terms screen to render. No auth
+ * — a user in either flow doesn't have a normal session token yet. */
+export async function getTermsBundle(): Promise<TermsBundle> {
+  const res = await fetch(new URL("/api/auth/terms", API_URL));
+  return unwrap<TermsBundle>(res);
+}
+
 /** Redeems the short-lived reset_token from a reset_required login
- * response for a new password. On success returns a normal access token,
- * same as a successful login(). */
+ * response for a new password — consent (checkboxAccepted) is bundled
+ * into this same call, not a separate screen/request, matching the
+ * backend's single combined validation. On success returns a normal
+ * access token, same as a successful login(). */
 export async function resetPassword(
   resetToken: string,
   newPassword: string,
+  confirmPassword: string,
+  checkboxAccepted: boolean,
 ): Promise<ResetPasswordResponse> {
   const res = await fetch(new URL("/api/auth/reset-password", API_URL), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ reset_token: resetToken, new_password: newPassword }),
+    body: JSON.stringify({
+      reset_token: resetToken,
+      new_password: newPassword,
+      confirm_password: confirmPassword,
+      checkbox_accepted: checkboxAccepted,
+    }),
   });
   return unwrap<ResetPasswordResponse>(res);
+}
+
+/** Re-consent variant for an already-active user (no password fields) —
+ * redeems the short-lived consent_token from a terms_required login
+ * response. */
+export async function acceptTerms(
+  consentToken: string,
+  checkboxAccepted: boolean,
+): Promise<AcceptTermsResponse> {
+  const res = await fetch(new URL("/api/auth/accept-terms", API_URL), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ consent_token: consentToken, checkbox_accepted: checkboxAccepted }),
+  });
+  return unwrap<AcceptTermsResponse>(res);
 }
 
 export async function getCurrentUser(): Promise<AuthUser> {
