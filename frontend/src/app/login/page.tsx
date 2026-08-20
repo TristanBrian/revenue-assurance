@@ -20,9 +20,7 @@ export default function LoginPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await login(email, password);
-      const resetRequired = res?.resetRequired;
-      const termsRequired = res?.termsRequired;
+      const { resetRequired, termsRequired } = await login(email, password);
       router.push(resetRequired || termsRequired ? "/reset-password" : "/dashboard");
     } catch (err) {
       setError(
