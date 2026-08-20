@@ -1,48 +1,87 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, clearResetToken, getResetToken, resetPassword } from "@/lib/api";
+import {
+  acceptTerms,
+  ApiError,
+  clearConsentToken,
+  clearResetToken,
+  getConsentToken,
+  getResetToken,
+  getTermsBundle,
+  resetPassword,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { BRAND_CONFIG } from "@/lib/brand-config";
 import FlowGuardHeroIllustration from "@/components/FlowGuardHeroIllustration";
+import type { TermsBundle } from "@/lib/types";
+
+// Two modes, one screen (spec: consent bundled into the reset screen, not
+// a separate page) — which mode depends entirely on which single-purpose
+// token the login page stashed in sessionStorage:
+//   "reset"   — reset_token present: full form (password + confirm + consent).
+//   "consent" — no reset_token, but a consent_token: consent-only variant
+//               for an already-active user re-accepting a newer version.
+//   "invalid" — neither present: page opened directly, not via login's redirect.
+type Mode = "reset" | "consent" | "invalid";
 
 export default function ResetPasswordPage() {
   const { completeReset } = useAuth();
   const router = useRouter();
+
+  const [resetToken] = useState(() => getResetToken());
+  const [consentToken] = useState(() => getConsentToken());
+  const mode: Mode = resetToken ? "reset" : consentToken ? "consent" : "invalid";
+
+  const [terms, setTerms] = useState<TermsBundle | null>(null);
+  const [termsError, setTermsError] = useState<string | null>(null);
+  const [termsLoading, setTermsLoading] = useState(true);
+
+  const [checkboxAccepted, setCheckboxAccepted] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Read once per mount rather than per render — sessionStorage only, set
-  // by the login page right before redirecting here (see
-  // auth-context.tsx's login()). No token means this page was opened
-  // directly rather than arrived at via the forced-reset redirect.
-  const [resetToken] = useState(() => getResetToken());
+  useEffect(() => {
+    let cancelled = false;
+    getTermsBundle()
+      .then((bundle) => {
+        if (!cancelled) setTerms(bundle);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setTermsError(err instanceof ApiError ? err.message : "Could not load Terms & Conditions.");
+      })
+      .finally(() => {
+        if (!cancelled) setTermsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Client-side gating is a UX nicety only — the backend validates all of
+  // this again server-side regardless (see routes/auth.py's
+  // reset_password()/accept_terms()).
+  const passwordOk = mode !== "reset" || (newPassword.length >= 8 && newPassword === confirmPassword);
+  const canSubmit = checkboxAccepted && passwordOk && !termsLoading && !termsError && mode !== "invalid";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-
-    if (!resetToken) {
-      setError("This reset link has expired or wasn't reached from login. Please log in again.");
-      return;
-    }
-    if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setError("Passwords don't match.");
-      return;
-    }
-
     setSubmitting(true);
     try {
-      const { access_token } = await resetPassword(resetToken, newPassword);
-      clearResetToken();
-      await completeReset(access_token);
+      if (mode === "reset" && resetToken) {
+        const { access_token } = await resetPassword(resetToken, newPassword, confirmPassword, checkboxAccepted);
+        clearResetToken();
+        await completeReset(access_token);
+      } else if (mode === "consent" && consentToken) {
+        const { access_token } = await acceptTerms(consentToken, checkboxAccepted);
+        clearConsentToken();
+        await completeReset(access_token);
+      }
       router.push("/dashboard");
     } catch (err) {
       setError(
@@ -61,74 +100,128 @@ export default function ResetPasswordPage() {
         <FlowGuardHeroIllustration className="w-full h-full object-cover opacity-[0.32]" />
       </div>
 
-      <header className="absolute top-8 left-0 right-0 z-10 w-full text-center flex flex-col items-center gap-2">
-        <h1 className="text-6xl md:text-7xl font-extrabold tracking-tight leading-none filter drop-shadow-sm select-none text-white">
+      <header className="relative z-10 w-full text-center flex flex-col items-center gap-2 pt-4">
+        <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight leading-none filter drop-shadow-sm select-none text-white">
           {BRAND_CONFIG.companyName}
         </h1>
         <h2
-          className="text-2xl md:text-3xl font-extrabold tracking-tight mt-1 select-none"
+          className="text-xl md:text-2xl font-extrabold tracking-tight mt-1 select-none"
           style={{ color: BRAND_CONFIG.accentColor }}
         >
           {BRAND_CONFIG.systemName}
         </h2>
       </header>
 
-      <div className="relative z-10 w-full max-w-lg mx-auto my-auto px-4 flex items-center justify-center">
-        <div className="w-full bg-white border border-zinc-200 p-10 rounded-xl shadow-2xl transition-all duration-300 hover:shadow-[0_20px_50px_rgba(10,46,92,0.18)]">
-          <div className="mb-8 text-center">
-            <h2 className="text-4xl font-extrabold tracking-tight text-zinc-900">Set a new password</h2>
+      <div className="relative z-10 w-full max-w-2xl mx-auto my-6 px-4 flex items-center justify-center">
+        <div className="w-full bg-white border border-zinc-200 p-8 md:p-10 rounded-xl shadow-2xl">
+          <div className="mb-6 text-center">
+            <h2 className="text-3xl font-extrabold tracking-tight text-zinc-900">
+              {mode === "consent" ? "Updated Terms & Privacy Policy" : "Set a new password"}
+            </h2>
             <p className="text-sm text-zinc-500 mt-2">
-              You signed in with a temporary password. Choose a new one to continue — it must be
-              different from the temporary password you were emailed.
+              {mode === "consent"
+                ? "Our Terms & Conditions / Privacy Policy have been updated. Please review and re-accept to continue."
+                : "You signed in with a temporary password. Choose a new one and accept the Terms & Conditions / Privacy Policy to continue."}
             </p>
           </div>
 
-          {!resetToken ? (
+          {mode === "invalid" ? (
             <div className="rounded border border-red-200 bg-red-50 px-4 py-3.5 text-sm text-red-600 text-center">
-              This reset link has expired or wasn&apos;t reached from login.{" "}
+              This link has expired or wasn&apos;t reached from login.{" "}
               <a href="/login" className="font-bold underline">
                 Log in again
               </a>{" "}
-              to request a new temporary password.
+              to continue.
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-              <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="new-password"
-                  className="text-xs font-black uppercase tracking-wider text-left text-zinc-700"
-                >
-                  New Password
-                </label>
-                <input
-                  id="new-password"
-                  type="password"
-                  required
-                  minLength={8}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="rounded-lg bg-zinc-50/50 border border-zinc-250 hover:border-zinc-350 focus:border-[#0A2E5C] focus:bg-white px-4 py-3.5 text-base text-zinc-900 placeholder-zinc-400 focus:outline-none transition-all shadow-inner"
-                  placeholder="At least 8 characters"
-                />
-              </div>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+              {mode === "reset" && (
+                <>
+                  <div className="flex flex-col gap-2">
+                    <label
+                      htmlFor="new-password"
+                      className="text-xs font-black uppercase tracking-wider text-left text-zinc-700"
+                    >
+                      New Password
+                    </label>
+                    <input
+                      id="new-password"
+                      type="password"
+                      required
+                      minLength={8}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="rounded-lg bg-zinc-50/50 border border-zinc-250 hover:border-zinc-350 focus:border-[#0A2E5C] focus:bg-white px-4 py-3.5 text-base text-zinc-900 placeholder-zinc-400 focus:outline-none transition-all shadow-inner"
+                      placeholder="At least 8 characters"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label
+                      htmlFor="confirm-password"
+                      className="text-xs font-black uppercase tracking-wider text-left text-zinc-700"
+                    >
+                      Confirm New Password
+                    </label>
+                    <input
+                      id="confirm-password"
+                      type="password"
+                      required
+                      minLength={8}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="rounded-lg bg-zinc-50/50 border border-zinc-250 hover:border-zinc-350 focus:border-[#0A2E5C] focus:bg-white px-4 py-3.5 text-base text-zinc-900 placeholder-zinc-400 focus:outline-none transition-all shadow-inner"
+                      placeholder="••••••••"
+                    />
+                    {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+                      <p className="text-xs text-red-600">Passwords don&apos;t match.</p>
+                    )}
+                  </div>
+                </>
+              )}
 
               <div className="flex flex-col gap-2">
-                <label
-                  htmlFor="confirm-password"
-                  className="text-xs font-black uppercase tracking-wider text-left text-zinc-700"
-                >
-                  Confirm New Password
+                <span className="text-xs font-black uppercase tracking-wider text-left text-zinc-700">
+                  Terms &amp; Conditions and Privacy Policy
+                </span>
+                <div className="rounded-lg border border-zinc-250 bg-zinc-50/50 max-h-56 overflow-y-auto p-4 text-xs text-zinc-700 whitespace-pre-wrap leading-relaxed shadow-inner">
+                  {termsLoading && "Loading…"}
+                  {termsError && <span className="text-red-600">{termsError}</span>}
+                  {terms && (
+                    <>
+                      {terms.terms_and_conditions && (
+                        <>
+                          <p className="font-bold text-zinc-900 mb-2">
+                            Terms &amp; Conditions (v{terms.terms_and_conditions.version})
+                          </p>
+                          <p className="mb-4">{terms.terms_and_conditions.content}</p>
+                        </>
+                      )}
+                      {terms.privacy_policy && (
+                        <>
+                          <p className="font-bold text-zinc-900 mb-2">
+                            Privacy Policy (v{terms.privacy_policy.version})
+                          </p>
+                          <p>{terms.privacy_policy.content}</p>
+                        </>
+                      )}
+                      {!terms.terms_and_conditions && !terms.privacy_policy && (
+                        <span className="text-zinc-500">No Terms & Conditions configured yet.</span>
+                      )}
+                    </>
+                  )}
+                </div>
+                <label className="flex items-start gap-2.5 mt-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={checkboxAccepted}
+                    onChange={(e) => setCheckboxAccepted(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-sky-600"
+                  />
+                  <span className="text-sm text-zinc-700">
+                    I have read and agree to the Terms &amp; Conditions and Privacy Policy
+                  </span>
                 </label>
-                <input
-                  id="confirm-password"
-                  type="password"
-                  required
-                  minLength={8}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="rounded-lg bg-zinc-50/50 border border-zinc-250 hover:border-zinc-350 focus:border-[#0A2E5C] focus:bg-white px-4 py-3.5 text-base text-zinc-900 placeholder-zinc-400 focus:outline-none transition-all shadow-inner"
-                  placeholder="••••••••"
-                />
               </div>
 
               {error && (
@@ -139,18 +232,22 @@ export default function ResetPasswordPage() {
 
               <button
                 type="submit"
-                disabled={submitting}
-                className="mt-3 rounded-lg py-4 text-base font-bold text-white shadow-lg active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-wider bg-sky-600 hover:bg-sky-500 shadow-sky-600/10"
+                disabled={submitting || !canSubmit}
+                className="mt-2 rounded-lg py-4 text-base font-bold text-white shadow-lg active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-wider bg-sky-600 hover:bg-sky-500 shadow-sky-600/10"
                 style={{ boxShadow: `0 10px 15px -3px rgba(10, 46, 92, 0.15)` }}
               >
-                {submitting ? "Setting password..." : "Set password & continue"}
+                {submitting
+                  ? "Saving…"
+                  : mode === "consent"
+                    ? "Accept & continue"
+                    : "Set password & continue"}
               </button>
             </form>
           )}
         </div>
       </div>
 
-      <footer className="absolute bottom-24 left-0 right-0 z-10 w-full text-center text-sm md:text-base font-bold tracking-wide text-zinc-200 select-none opacity-100">
+      <footer className="relative z-10 w-full text-center text-sm md:text-base font-bold tracking-wide text-zinc-200 select-none opacity-100 pb-4">
         Detect, Reconcile, Predict, Protect every transaction.
       </footer>
     </div>

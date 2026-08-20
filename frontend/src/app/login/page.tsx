@@ -20,8 +20,8 @@ export default function LoginPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const { resetRequired } = await login(email, password);
-      router.push(resetRequired ? "/reset-password" : "/dashboard");
+      const { resetRequired, termsRequired } = await login(email, password);
+      router.push(resetRequired || termsRequired ? "/reset-password" : "/dashboard");
     } catch (err) {
       setError(
         err instanceof ApiError
