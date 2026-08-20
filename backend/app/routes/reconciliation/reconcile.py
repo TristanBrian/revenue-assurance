@@ -5,7 +5,16 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.core.dependencies import get_db, require_permission
 from app.models.auth.user import User
-from app.services.reconciliation.reconciliation import run_reconciliation, run_reconciliation_on_dataframes, run_combined_reconciliation
+from app.services.reconciliation.reconciliation import (
+    run_reconciliation,
+    run_reconciliation_on_dataframes,
+    run_combined_reconciliation,
+    get_exposure_recovery_trend,
+    get_depot_alerts,
+    get_depot_risk_summary,
+    get_omc_depot_map,
+)
+from app.services.feed.feed import update_feed
 from app.services.ebilling.e_billing import sync_anomalies_to_ebilling, update_anomaly_status
 from app.services.audit.audit_service import log_action
 from app.services.report_crypto import sign_report_bytes
@@ -40,6 +49,47 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.get("/reconcile/trend")
+def reconcile_trend(
+    days: int = Query(30, description="Rolling window size in days", ge=1, le=90),
+    _: User = Depends(require_permission("view_metrics")),
+):
+    try:
+        return {"days": days, "series": get_exposure_recovery_trend(days=days)}
+    except Exception as e:
+        logger.error(f"❌ /reconcile/trend failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/reconcile/depot-alerts")
+def reconcile_depot_alerts(user: User = Depends(require_permission("view_depot_alerts"))):
+    if not user.depot_id:
+        raise HTTPException(status_code=409, detail="No depot assigned to this account yet.")
+    try:
+        return get_depot_alerts(user.depot_id)
+    except Exception as e:
+        logger.error(f"❌ /reconcile/depot-alerts failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/reconcile/depot-risk")
+def reconcile_depot_risk(_: User = Depends(require_permission("view_heatmap"))):
+    try:
+        return {"depots": get_depot_risk_summary()}
+    except Exception as e:
+        logger.error(f"❌ /reconcile/depot-risk failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/reconcile/omc-depot-map")
+def reconcile_omc_depot_map(_: User = Depends(require_permission("view_heatmap"))):
+    try:
+        return {"omcs": get_omc_depot_map()}
+    except Exception as e:
+        logger.error(f"❌ /reconcile/omc-depot-map failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================================
 # ULTIMATE SANITIZER – handles arrays, scalars, Timestamps, whole floats
