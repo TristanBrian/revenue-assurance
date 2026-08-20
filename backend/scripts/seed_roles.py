@@ -30,6 +30,7 @@ PERMISSIONS = [
     ("view_risk_analytics", "View OMC risk features (statistical/EDA analysis, no graph concept)"),
     ("manage_users", "Create, edit, deactivate users and assign roles to them"),
     ("manage_permissions", "Create/edit permissions and assign them to roles"),
+    ("manage_alerts", "Broadcast manual in-app/email alerts to a role or a specific user"),
 ]
 
 # Feature permission matrix:
@@ -64,6 +65,7 @@ ROLE_PERMISSIONS = {
         "view_anomaly_table",
         "export_reports",
         "view_audit",
+        "manage_alerts",
     ],
     "revenue_assurance": [
         "view_live_feed",
@@ -78,6 +80,7 @@ ROLE_PERMISSIONS = {
         "view_fraud_graph",
         "view_risk_analytics",
         "view_audit",
+        "manage_alerts",
     ],
 }
 

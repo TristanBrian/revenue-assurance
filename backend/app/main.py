@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
 from app.middleware.audit import AuditMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit  # <-- ADDED feed, heatmap, auth, detective, graph, admin, audit
+from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit, alerts  # <-- ADDED feed, heatmap, auth, detective, graph, admin, audit, alerts
 # import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
@@ -74,6 +74,7 @@ app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])  # <-- NEW
 app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
 app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
+app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])  # <-- NEW
 
 
 @app.get("/")
@@ -84,7 +85,8 @@ async def root():
         "version": "2.0.0",
         "endpoints": [
             # -- Auth: everything else needs a token from here first --
-            "POST /api/auth/login - Log in, returns a JWT",
+            "POST /api/auth/login - Log in, returns a JWT (or a scoped reset_token if must_reset_password)",
+            "POST /api/auth/reset-password - Redeem a reset_token + set a new password (forced-reset flow)",
             "POST /api/auth/register - Create a user and assign a role (manage_users)",
             "GET /api/auth/me - Current user's profile, roles, permissions",
 
@@ -128,7 +130,9 @@ async def root():
             "GET /api/detective/risk-features/export - Download risk features as CSV",
 
             # -- Admin: user/permission management, not a revenue-assurance feature --
-            "GET /api/admin/users - List all users",
+            "GET /api/admin/users - List all users (with account_status)",
+            "POST /api/admin/users - Provision a user with an emailed temp password, forced reset on first login",
+            "POST /api/admin/users/{user_id}/resend-temp-password - Regenerate + re-email a temp password",
             "PATCH /api/admin/users/{user_id} - Edit a user (email/name/role/password/is_active)",
             "DELETE /api/admin/users/{user_id} - Delete a user",
 
@@ -137,6 +141,13 @@ async def root():
             "GET /api/audit/logs/{log_id} - Single audit log entry",
             "GET /api/audit/summary - Aggregate audit stats for the last N days",
             "GET /api/audit/me - Current user's own audit trail",
+
+            # -- Alerts: in-app + email notifications (system-triggered and manual) --
+            "GET /api/alerts - Current user's alert inbox",
+            "GET /api/alerts/unread-count - Unread alert badge count",
+            "POST /api/alerts/{alert_id}/read - Mark one alert read",
+            "POST /api/alerts/read-all - Mark every visible alert read",
+            "POST /api/alerts - Broadcast a manual alert (manage_alerts)",
 
             # -- Infra --
             "GET /health - Health check"
