@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.models.user import User
+from app.services.terms_service import get_required_version, user_needs_consent
 from app.utils.db_connection import SessionLocal
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -65,6 +66,21 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="PASSWORD_RESET_REQUIRED",
+        )
+
+    # Same guard, same reasoning, for stale consent: a user whose password
+    # is fine but who hasn't accepted the currently-active Terms &
+    # Conditions/Privacy Policy version (never accepted at all, or a newer
+    # version was published since) is blocked from every other route until
+    # they re-consent via POST /api/auth/accept-terms — see routes/auth.py
+    # and services/terms_service.py. Distinct detail string so the
+    # frontend routes to the consent-only variant of /reset-password
+    # instead of the full password-reset form.
+    required_version = get_required_version(db)
+    if user_needs_consent(user, required_version):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="TERMS_ACCEPTANCE_REQUIRED",
         )
 
     return user
