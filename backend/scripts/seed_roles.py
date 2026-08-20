@@ -28,6 +28,7 @@ PERMISSIONS = [
     ("view_audit", "View the audit trail (who did what, when)"),
     ("view_fraud_graph", "View fraud/graph detection view (structural/network analysis)"),
     ("view_risk_analytics", "View OMC risk features (statistical/EDA analysis, no graph concept)"),
+    ("view_depot_alerts", "View critical alerts for the caller's own assigned depot only"),
     ("manage_users", "Create, edit, deactivate users and assign roles to them"),
     ("manage_permissions", "Create/edit permissions and assign them to roles"),
     ("manage_alerts", "Broadcast manual in-app/email alerts to a role or a specific user"),
@@ -81,12 +82,32 @@ PERMISSIONS = [
 # relying on the backend to refuse an explicit direction=inbound request,
 # since nothing here stops a mixed-permission role from requesting any
 # direction it already has the base view_* permission for.
+# | Feature                | Depot Supervisor | Manager | Revenue Assurance |
+# |-------------------------|:---:|:---:|:---:|
+# | Live Feed                | Y | Y | Y |
+# | Upload CSV / Templates    | Y | N | Y |
+# | Heatmap                  | N | Y | Y |
+# | OMC Risk Profile          | N | Y | Y |
+# | Executive Metrics         | Y | Y | Y |
+# | Anomaly Table             | N | Y | Y |
+# | Resolve/Review/Assign     | N | N | Y |
+# | E-Billing Sync            | N | N | Y |
+# | Export Reports            | N | Y | Y |
+# | Audit Trail               | N | Y | Y |
+# | Alerts                    | Own depot only | All | All |
+#
+# system_admin is scoped ONLY to user/permission control, not
+# revenue-assurance features — including alerts, which it never sees.
+# Depot Supervisor's alert visibility is scoped server-side to their own
+# users.depot_id (view_anomaly_table stays N for them — this is a narrower,
+# separate permission, not a backdoor into the full anomaly table).
 ROLE_PERMISSIONS = {
     "system_admin": ["manage_users", "manage_permissions"],
     "depot_supervisor": [
         "view_live_feed",
         "upload_csv",
         "view_metrics",
+        "view_depot_alerts",
     ],
     "manager": [
         "view_live_feed",

@@ -5,7 +5,7 @@ associations.py for the user_roles / role_permissions join tables.
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -35,7 +35,13 @@ class User(Base):
     terms_accepted_version = Column(String(50), nullable=True)
     terms_accepted_at = Column(DateTime, nullable=True)
 
+    # Only meaningful for depot_supervisor — scopes their alert visibility to
+    # this one depot (see services/alert_scope.py). Null for every other
+    # role, and null for a depot_supervisor not yet assigned one.
+    depot_id = Column(Text, ForeignKey("depots.depot_id"), nullable=True)
+
     roles = relationship("Role", secondary=user_roles, back_populates="users")
+    depot = relationship("Depot")
 
     def has_permission(self, code: str) -> bool:
         return any(p.code == code for role in self.roles for p in role.permissions)
