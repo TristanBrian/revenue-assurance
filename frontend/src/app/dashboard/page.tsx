@@ -16,6 +16,9 @@ import LiveFeed from "@/components/LiveFeed";
 type DataSource = "database" | "upload";
 
 function formatKesCompact(value: number): string {
+  if (value >= 1e9) {
+    return `KES ${(value / 1e9).toFixed(2)}B`;
+  }
   if (value >= 1e6) {
     return `KES ${(value / 1e6).toFixed(2)}M`;
   }

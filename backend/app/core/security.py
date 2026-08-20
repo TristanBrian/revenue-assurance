@@ -16,9 +16,12 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app import config  # noqa: F401 — import side effect: loads .env into os.environ before we read it below
+from app import config
 
-SECRET_KEY = os.environ["SECRET_KEY"]  # fail loudly if not set — don't default a secret
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY environment variable is not set")
+
 ALGORITHM = os.environ.get("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 

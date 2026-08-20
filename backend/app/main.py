@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
 from app.middleware.audit import AuditMiddleware
@@ -10,17 +10,14 @@ from contextlib import asynccontextmanager
 import logging
 import time
 
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("kpc.startup")
-
 
 # ============================================================================
 # LIFESPAN (Runs on startup)
 # ============================================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Check database connection
     engine = get_engine()
     safe_url = engine.url.render_as_string(hide_password=True)
     try:
@@ -29,9 +26,7 @@ async def lifespan(app: FastAPI):
         logger.info(f"✅ Database connected successfully ({safe_url})")
     except Exception as e:
         logger.error(f"❌ Database connection failed ({safe_url}): {e}")
-
     yield
-
 
 # ============================================================================
 # FASTAPI APP
@@ -43,19 +38,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Standardized {Success, Message, Data, Timestamp} response envelope for
-# every route, plus the fallback audit-logging middleware — both added
-# before CORSMiddleware so CORS ends up outermost in the middleware stack
-# and still applies its headers to the wrapped/audited response (and to
-# error responses from either middleware itself).
-app.add_middleware(ResponseEnvelopeMiddleware)
-app.add_middleware(AuditMiddleware)
-
-# CORS
+# ✅ CORS – must be the FIRST middleware (outermost)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://*.vercel.app", "https://*.railway.app"],
-    allow_credentials=True,
+    allow_origins=["*"],                 # Allow all origins during debugging
+    allow_credentials=False,             # Must be False when using "*"
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -75,7 +62,41 @@ app.include_router(detective.router, prefix="/api/detective", tags=["Detective"]
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
 app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])  # <-- NEW
+# Envelope and audit middlewares
+app.add_middleware(ResponseEnvelopeMiddleware)
+app.add_middleware(AuditMiddleware)
 
+# ============================================================================
+# ROUTERS
+# ============================================================================
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
+app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
+app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])
+app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
+app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
+app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
+
+# ============================================================================
+# MANUAL OPTIONS HANDLER FOR LOGIN (fallback)
+# ============================================================================
+@app.options("/api/auth/login")
+async def options_login():
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Max-Age": "86400",
+        }
+    )
+
+# ============================================================================
+# ROOT AND HEALTH ENDPOINTS (with HEAD support)
+# ============================================================================
 
 @app.get("/")
 async def root():
@@ -89,11 +110,7 @@ async def root():
             "POST /api/auth/reset-password - Redeem a reset_token + set a new password (forced-reset flow)",
             "POST /api/auth/register - Create a user and assign a role (manage_users)",
             "GET /api/auth/me - Current user's profile, roles, permissions",
-
-            # -- Live Feed: real-time entry point, every role sees it --
             "GET /api/feed - Live anomaly feed",
-
-            # -- Reconciliation: the core leakage-detection workflow --
             "POST /api/reconcile/metrics - Executive metrics (DB)",
             "GET /api/reconcile/anomalies - Paginated anomaly table (DB)",
             "GET /api/reconcile/omc-risk-profile - OMC risk profile (DB)",
@@ -102,11 +119,7 @@ async def root():
             "POST /api/reconcile/update - Update anomaly status",
             "GET /api/reconcile/export - Download Excel report",
             "POST /api/reconcile/sync - Sync anomalies to E-Billing",
-
-            # -- Heatmap: visual complement to reconciliation --
             "GET /api/heatmap - Leakage heatmap (OMC × Product)",
-
-            # -- E-Billing: downstream KRA iCMS integration --
             "GET /api/e-billing/status - E-Billing integration status",
             "POST /api/e-billing/sync - Sync invoices to KRA iCMS",
             "POST /api/e-billing/sync/async - Async sync (returns task_id)",
@@ -117,14 +130,10 @@ async def root():
             "POST /api/e-billing/webhook - KRA webhook callback",
             "GET /api/e-billing/reconcile - E-Billing reconciliation dashboard",
             "GET /api/e-billing/monitor - Failure rate monitoring",
-
-            # -- Fraud Graph: network/structural leakage analysis --
             "GET /api/graph - Anomaly-based fraud graph (OMC<->Depot leakage, Louvain communities)",
             "GET /api/graph/network - OMC/depot structural network graph",
             "GET /api/graph/communities - Detected risk communities (structural graph)",
             "GET /api/graph/omc/{omc_id} - Risk features + community info for one OMC",
-
-            # -- Risk Analytics: statistical/EDA counterpart to the graph --
             "GET /api/detective/risk-features - OMC risk features (all OMCs)",
             "GET /api/detective/risk-features/{omc_id} - OMC risk features (single OMC)",
             "GET /api/detective/risk-features/export - Download risk features as CSV",
@@ -135,8 +144,6 @@ async def root():
             "POST /api/admin/users/{user_id}/resend-temp-password - Regenerate + re-email a temp password",
             "PATCH /api/admin/users/{user_id} - Edit a user (email/name/role/password/is_active)",
             "DELETE /api/admin/users/{user_id} - Delete a user",
-
-            # -- Audit: who did what, across everything above --
             "GET /api/audit/logs - Paginated, filterable audit trail",
             "GET /api/audit/logs/{log_id} - Single audit log entry",
             "GET /api/audit/summary - Aggregate audit stats for the last N days",
@@ -154,12 +161,12 @@ async def root():
         ]
     }
 
+@app.head("/")
+async def head_root():
+    return Response(status_code=200)
 
 @app.get("/version")
 async def version():
-    """
-    Returns API version information for monitoring and CI/CD.
-    """
     return {
         "version": "2.0.0",
         "service": "kpc-revenue-assurance",
@@ -167,15 +174,10 @@ async def version():
         "endpoints_count": len(app.routes)
     }
 
-
 @app.get("/health")
 async def health_check():
-    """
-    Health check endpoint for monitoring and cloud deployments.
-    """
     db_status = "disconnected"
     start_time = time.time()
-
     try:
         engine = get_engine()
         with engine.connect() as conn:
@@ -183,7 +185,6 @@ async def health_check():
         db_status = "connected"
     except Exception as e:
         db_status = f"error: {str(e)}"
-
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
         "database": db_status,
@@ -192,7 +193,14 @@ async def health_check():
         "uptime": round(time.time() - start_time, 2)
     }
 
+@app.head("/health")
+async def head_health():
+    return Response(status_code=200)
 
 @app.get("/api/health")
 async def api_health():
     return await health_check()
+
+@app.get("/ping")
+async def ping():
+    return {"status": "ok"}

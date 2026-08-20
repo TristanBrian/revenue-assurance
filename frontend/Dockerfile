@@ -1,17 +1,29 @@
 # frontend/Dockerfile
-FROM node:20-slim
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Copy package manifests first (for better caching)
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
-# Copy the entire project
 COPY . .
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+RUN npm run build
+
+FROM node:20-slim AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Copy standalone output
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
 EXPOSE 3000
 
-# Dev server (mirrors backend/Dockerfile's dev-oriented setup — hot reload,
-# no production build step)
-CMD ["npm", "run", "dev"]
+# ✅ Use node server.js for standalone mode
+CMD ["node", "server.js"]

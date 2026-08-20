@@ -1,25 +1,53 @@
-# Render Blueprint for the backend API.
-#
-# Inert until you connect this repo on Render (https://dashboard.render.com/blueprints)
-# — nothing here provisions anything on its own. DATABASE_URL and SECRET_KEY
-# are marked sync: false so Render prompts you for them in its dashboard
-# rather than storing secrets in this file.
+# render.yaml
 services:
+  # ============================================================================
+  # BACKEND SERVICE (FastAPI + Python)
+  # ============================================================================
   - type: web
-    name: kpc-revenue-assurance-api
-    runtime: python
+    name: kpc-backend
+    runtime: docker
+    repo: https://github.com/TristanBrian/revenue-assurance.git
     plan: free
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    dockerfilePath: backend/Dockerfile
+    healthCheckPath: /health
+
+    # ========================================================================
+    # ENVIRONMENT VARIABLES
+    # ========================================================================
     envVars:
       - key: DATABASE_URL
         sync: false
+
       - key: SECRET_KEY
-        sync: false
+        generateValue: true
+
       - key: ALGORITHM
         value: HS256
+
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+
+      - key: PORT
+        value: "10000"
+
+      # KRA Integration
+      - key: KRA_ICMS_ENDPOINT
+        value: https://api.kra.go.ke/icms/v2/invoices
+
+      - key: KRA_ICMS_API_KEY
+        generateValue: true
+
+      # App config
+      - key: MATERIALITY_THRESHOLD
+        value: "100000"
+
+      - key: CRITICAL_AGE_DAYS
         value: "60"
+
+      - key: LOG_LEVEL
+        value: INFO
+
+      # ✅ CORS – allow your Vercel frontend
       - key: CORS_ORIGINS
-        value: https://*.vercel.app
+        value: https://flowguardd.vercel.app,https://*.vercel.app,https://*.onrender.com
