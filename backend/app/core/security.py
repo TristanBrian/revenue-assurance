@@ -28,6 +28,11 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", 
 
 RESET_TOKEN_EXPIRE_MINUTES = 15
 
+# Short-lived, single-purpose token issued by /api/auth/login when a user's
+# terms_accepted_version is stale but their password is fine — scoped only
+# to /api/auth/accept-terms, same shape/reasoning as the reset token above.
+TERMS_CONSENT_TOKEN_EXPIRE_MINUTES = 15
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -115,4 +120,35 @@ def decode_reset_token(token: str) -> dict:
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     if payload.get("type") != "password_reset":
         raise JWTError("Not a password-reset token")
+    return payload
+
+
+# ============================================================================
+# TERMS-CONSENT TOKEN (re-consent flow for already-active users)
+# ============================================================================
+
+def create_terms_consent_token(subject: str, current_terms_accepted_version: str | None) -> str:
+    """Bound to the user's terms_accepted_version *at issuance* (not the
+    version they're being asked to accept) — same self-invalidation trick
+    as create_reset_token, just keyed on a different field: once the user
+    actually accepts and that column changes, any token issued before the
+    change carries a stale fingerprint and decode_terms_consent_token's
+    caller rejects it. Covers the token-already-redeemed case without a
+    server-side blacklist."""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=TERMS_CONSENT_TOKEN_EXPIRE_MINUTES)
+    to_encode = {
+        "sub": subject,
+        "exp": expire,
+        "type": "terms_consent",
+        "prior_version_fp": current_terms_accepted_version or "",
+    }
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_terms_consent_token(token: str) -> dict:
+    """Raises jose.JWTError if invalid/expired, or if a token of any other
+    type is presented here — same contract as decode_reset_token."""
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    if payload.get("type") != "terms_consent":
+        raise JWTError("Not a terms-consent token")
     return payload
