@@ -9,6 +9,14 @@ from app.services.reconciliation import run_reconciliation, run_reconciliation_o
 from app.services.e_billing import sync_anomalies_to_ebilling, update_anomaly_status
 from app.services.feed import update_feed
 from app.services.audit_service import log_action
+from app.services.alert_service import (
+    notify_bulk_export,
+    notify_critical_anomalies,
+    notify_data_quality_drop,
+    notify_duplicate_spike,
+    notify_materiality_spike,
+    notify_omc_risk_escalation,
+)
 from app.core.cache import get_cached_result, set_cached_result, invalidate_cache
 from app.schemas.reconciliation import (
     MetricsResponse,
@@ -90,6 +98,7 @@ def deep_sanitize(obj):
 @router.post("/reconcile/metrics", response_model=MetricsResponse)
 def reconcile_metrics(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
+    db: Session = Depends(get_db),
     _: User = Depends(require_permission("view_metrics")),
 ):
     try:
@@ -110,6 +119,28 @@ def reconcile_metrics(
         logger.info(f"🔄 Metrics cache miss for materiality={materiality}, running reconciliation...")
         result = run_reconciliation(materiality=materiality)
         update_feed(result.get('anomalies', []))
+
+        # Reconciliation-side alert triggers — all gated to the cache-miss
+        # path so they run once per fresh reconciliation, not on every
+        # dashboard load. See services/alert_types.py for tier/audience per
+        # trigger, and services/alert_service.py for the notify_* functions.
+        # Any failure here is logged and swallowed — an alerting bug must
+        # never break the metrics endpoint itself.
+        try:
+            anomalies = result.get('anomalies', [])
+            new_alerts = notify_critical_anomalies(db, anomalies)
+            new_alerts += notify_materiality_spike(db, anomalies, materiality)
+            new_alerts += notify_omc_risk_escalation(db, result.get('omc_risk_profile', []))
+            new_alerts += notify_duplicate_spike(db, result.get('duplicate_anomalies', []))
+            quality_alert = notify_data_quality_drop(db, result.get('data_quality', {}))
+            if quality_alert:
+                new_alerts.append(quality_alert)
+            if new_alerts:
+                db.commit()
+                logger.info(f"🔔 {len(new_alerts)} new alert(s) created from this reconciliation run")
+        except Exception as alert_err:
+            db.rollback()
+            logger.error(f"Alert creation for reconciliation triggers failed (non-fatal): {alert_err}")
 
         metrics_data = {
             'metrics': result['metrics'],
@@ -474,9 +505,21 @@ async def update_anomaly(
 
 
 @router.get("/reconcile/export")
-def export_report(materiality: float = Query(100000), _: User = Depends(require_permission("export_reports"))):
+def export_report(
+    materiality: float = Query(100000),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("export_reports")),
+):
     try:
         result = run_reconciliation(materiality=materiality)
+
+        try:
+            notify_bulk_export(db, actor_user_id=user.id, row_count=len(result.get('anomalies', [])))
+            db.commit()
+        except Exception as alert_err:
+            db.rollback()
+            logger.error(f"Bulk-export alert failed (non-fatal): {alert_err}")
+
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             pd.DataFrame([result['metrics']]).to_excel(writer, sheet_name='Summary', index=False)

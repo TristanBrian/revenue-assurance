@@ -1,4 +1,5 @@
 import type {
+  AcceptTermsResponse,
   AdminUser,
   AnomalyTableResult,
   AuthUser,
@@ -14,8 +15,10 @@ import type {
   OmcRiskProfile,
   OmcRiskProfileResult,
   ReconcileResult,
+  ResetPasswordResponse,
   RetrySyncResult,
   TaskStatusResponse,
+  TermsBundle,
   UpdateAnomalyResponse,
   UpdateUserPayload,
 } from "./types";
@@ -44,6 +47,49 @@ export function setAuthToken(token: string): void {
 
 export function clearAuthToken(): void {
   document.cookie = `${TOKEN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+}
+
+// The forced-reset token from a reset_required login response is
+// deliberately NOT stored alongside the normal auth cookie: it's a
+// separate, single-purpose, 15-minute credential scoped only to
+// POST /auth/reset-password (see backend/app/core/security.py's
+// create_reset_token), not a session token proxy.ts or authFetch should
+// ever attach to a normal request. sessionStorage (not a cookie) keeps it
+// out of every other request automatically and clears itself when the tab
+// closes.
+const RESET_TOKEN_KEY = "kpc_reset_token";
+
+export function setResetToken(token: string): void {
+  if (typeof window !== "undefined") window.sessionStorage.setItem(RESET_TOKEN_KEY, token);
+}
+
+export function getResetToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.sessionStorage.getItem(RESET_TOKEN_KEY);
+}
+
+export function clearResetToken(): void {
+  if (typeof window !== "undefined") window.sessionStorage.removeItem(RESET_TOKEN_KEY);
+}
+
+// Sibling of the reset token above, for an already-active account that
+// just needs to re-accept a newer Terms/Privacy Policy version — scoped
+// only to POST /auth/accept-terms. Kept in a separate key so the
+// reset-password page can tell "full reset form" and "consent-only form"
+// apart by which token is actually present.
+const CONSENT_TOKEN_KEY = "kpc_consent_token";
+
+export function setConsentToken(token: string): void {
+  if (typeof window !== "undefined") window.sessionStorage.setItem(CONSENT_TOKEN_KEY, token);
+}
+
+export function getConsentToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.sessionStorage.getItem(CONSENT_TOKEN_KEY);
+}
+
+export function clearConsentToken(): void {
+  if (typeof window !== "undefined") window.sessionStorage.removeItem(CONSENT_TOKEN_KEY);
 }
 
 export class ApiError extends Error {
@@ -91,14 +137,63 @@ async function authFetch(input: string | URL, init: RequestInit = {}): Promise<R
   return fetch(input, { ...init, headers });
 }
 
-export async function login(email: string, password: string): Promise<string> {
+/** Returns the full envelope rather than just the token — callers must
+ * check reset_required before treating this as a normal session (see
+ * auth-context.tsx's login()). */
+export async function login(email: string, password: string): Promise<LoginResponse> {
   const res = await fetch(new URL("/api/auth/login", API_URL), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
-  const data = await unwrap<LoginResponse>(res);
-  return data.access_token;
+  return unwrap<LoginResponse>(res);
+}
+
+/** Fetches the current Terms & Conditions / Privacy Policy text + required
+ * version for the reset-password / accept-terms screen to render. No auth
+ * — a user in either flow doesn't have a normal session token yet. */
+export async function getTermsBundle(): Promise<TermsBundle> {
+  const res = await fetch(new URL("/api/auth/terms", API_URL));
+  return unwrap<TermsBundle>(res);
+}
+
+/** Redeems the short-lived reset_token from a reset_required login
+ * response for a new password — consent (checkboxAccepted) is bundled
+ * into this same call, not a separate screen/request, matching the
+ * backend's single combined validation. On success returns a normal
+ * access token, same as a successful login(). */
+export async function resetPassword(
+  resetToken: string,
+  newPassword: string,
+  confirmPassword: string,
+  checkboxAccepted: boolean,
+): Promise<ResetPasswordResponse> {
+  const res = await fetch(new URL("/api/auth/reset-password", API_URL), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      reset_token: resetToken,
+      new_password: newPassword,
+      confirm_password: confirmPassword,
+      checkbox_accepted: checkboxAccepted,
+    }),
+  });
+  return unwrap<ResetPasswordResponse>(res);
+}
+
+/** Re-consent variant for an already-active user (no password fields) —
+ * redeems the short-lived consent_token from a terms_required login
+ * response. */
+export async function acceptTerms(
+  consentToken: string,
+  checkboxAccepted: boolean,
+): Promise<AcceptTermsResponse> {
+  const res = await fetch(new URL("/api/auth/accept-terms", API_URL), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ consent_token: consentToken, checkbox_accepted: checkboxAccepted }),
+  });
+  return unwrap<AcceptTermsResponse>(res);
 }
 
 export async function getCurrentUser(): Promise<AuthUser> {
@@ -357,13 +452,26 @@ export async function getUsers(): Promise<AdminUser[]> {
   return unwrap<AdminUser[]>(res);
 }
 
+/** Admin-provisioned user — no password field. The backend generates a
+ * random temp password and emails it; must_reset_password forces the new
+ * user through /reset-password on their first login. */
 export async function createUser(payload: CreateUserPayload): Promise<AdminUser> {
-  const res = await authFetch(new URL("/api/auth/register", API_URL), {
+  const res = await authFetch(new URL("/api/admin/users", API_URL), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   return unwrap<AdminUser>(res);
+}
+
+/** Regenerates and re-emails a temp password — for an expired original or
+ * a failed delivery. Re-arms must_reset_password even for an already-active user. */
+export async function resendTempPassword(userId: string): Promise<AdminUser> {
+  const res = await authFetch(new URL(`/api/admin/users/${userId}/resend-temp-password`, API_URL), {
+    method: "POST",
+  });
+  const body = await unwrap<{ status: string; user: AdminUser }>(res);
+  return body.user;
 }
 
 export async function updateUser(userId: string, payload: UpdateUserPayload): Promise<AdminUser> {

@@ -14,7 +14,7 @@ Enterprise-grade features:
 import pandas as pd
 import random
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import os
 import json
 import logging
@@ -26,6 +26,15 @@ from sqlalchemy.orm import Session
 from app.utils.db_connection import get_engine, SessionLocal
 from app.models.anomaly_resolution import AnomalyResolution
 from app.services.audit_service import log_action
+from app.models.audit import AuditLog
+from app.services.alert_service import (
+    REPEATED_RESOLVE_REOPEN_WINDOW_DAYS,
+    notify_anomaly_reopened,
+    notify_ebilling_dlq,
+    notify_ebilling_failure_rate,
+    notify_ebilling_webhook_failure,
+    notify_repeated_resolve_reopen,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +211,7 @@ def sync_invoices_to_ebilling(invoice_ids: Optional[List[str]] = None) -> dict:
 
     synced = []
     failed = []
+    dlq_entries = []  # (invoice_id, error_message) — alerted once the whole batch is processed
     engine = get_engine()
 
     for inv_id in invoice_ids:
@@ -216,6 +226,7 @@ def sync_invoices_to_ebilling(invoice_ids: Optional[List[str]] = None) -> dict:
             status = 'failed'
             error = str(e)
             failed.append(inv_id)
+            dlq_entries.append((inv_id, error))
             with engine.begin() as conn:
                 conn.execute(text("""
                     INSERT INTO ebilling_dlq (invoice_id, error_message, last_attempt, status)
@@ -251,6 +262,40 @@ def sync_invoices_to_ebilling(invoice_ids: Optional[List[str]] = None) -> dict:
 
     # Invalidate cache after sync
     invalidate_total_count_cache()
+
+    if dlq_entries:
+        try:
+            dlq_db = SessionLocal()
+            try:
+                for inv_id, error in dlq_entries:
+                    notify_ebilling_dlq(dlq_db, inv_id, error)
+                dlq_db.commit()
+            finally:
+                dlq_db.close()
+        except Exception as alert_err:
+            logger.error(f"DLQ alert creation failed (non-fatal): {alert_err}")
+
+    # Alert manage_ebilling holders (in-app + email) if this sync pushed the
+    # failure rate over FAILURE_THRESHOLD. Shared by both the sync sync path
+    # (POST /e-billing/sync) and the async one (run_sync_task, which calls
+    # this in batches) since both funnel through here. Never lets an alert
+    # failure fail the sync itself — see notify_ebilling_failure_rate's
+    # own 1-hour throttle for why this is safe to check after every sync.
+    try:
+        monitor = check_failure_rate()
+        if monitor.get('alert'):
+            alert_db = SessionLocal()
+            try:
+                created = notify_ebilling_failure_rate(
+                    alert_db, monitor['failure_rate'], monitor['threshold']
+                )
+                if created is not None:
+                    alert_db.commit()
+                    logger.warning(f"🔔 E-billing failure rate alert created: {monitor['failure_rate']}%")
+            finally:
+                alert_db.close()
+    except Exception as alert_err:
+        logger.error(f"E-billing failure-rate alert failed (non-fatal): {alert_err}")
 
     return {
         'status': 'success' if synced else 'error' if failed else 'warning',
@@ -408,6 +453,28 @@ def update_anomaly_status(db: Session, dispatch_id: str, status: str, notes: str
         before={"status": before_status},
         after={"status": status, "notes": notes},
     )
+
+    # Same convention as log_action() just above — not defensively wrapped:
+    # these are plain INSERTs in the same uncommitted transaction as the
+    # resolution write, so a try/except-and-continue here would need a
+    # rollback that'd also wipe that write out from under it. If this
+    # raises, it propagates to the route's own try/except like everything
+    # else in this function does.
+    notify_anomaly_reopened(db, dispatch_id, before_status, status)
+
+    window_start = datetime.now(timezone.utc) - timedelta(days=REPEATED_RESOLVE_REOPEN_WINDOW_DAYS)
+    change_count = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.action == "anomaly.resolve",
+            AuditLog.target_id == dispatch_id,
+            AuditLog.actor_user_id == actor_user_id,
+            AuditLog.created_at >= window_start,
+        )
+        .count()
+    )
+    notify_repeated_resolve_reopen(db, dispatch_id, actor_user_id, change_count)
+
     db.commit()
 
     return {
@@ -725,6 +792,17 @@ def handle_webhook(payload: dict) -> dict:
                 "sync_date": datetime.now().isoformat(),
                 "invoice_id": invoice_id
             })
+
+    if status == 'failed':
+        try:
+            webhook_db = SessionLocal()
+            try:
+                notify_ebilling_webhook_failure(webhook_db, invoice_id, message or 'no message')
+                webhook_db.commit()
+            finally:
+                webhook_db.close()
+        except Exception as alert_err:
+            logger.error(f"Webhook-failure alert creation failed (non-fatal): {alert_err}")
 
     return {
         'status': 'success',

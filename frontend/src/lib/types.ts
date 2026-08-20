@@ -251,9 +251,41 @@ export interface FraudGraphData {
 
 // Mirrors backend/app/schemas/user.py — the response shapes for /api/auth/*.
 
+// access_token is null and reset_required is true when the account has
+// must_reset_password set — see reset_token/redirect and
+// POST /api/auth/reset-password below. terms_required is the sibling case
+// for an already-active account whose terms_accepted_version is stale —
+// see consent_token and POST /api/auth/accept-terms.
 export interface LoginResponse {
+  access_token: string | null;
+  token_type: string;
+  reset_required: boolean;
+  reset_token: string | null;
+  terms_required: boolean;
+  consent_token: string | null;
+  redirect: string | null;
+}
+
+export interface ResetPasswordResponse {
   access_token: string;
   token_type: string;
+}
+
+export interface AcceptTermsResponse {
+  access_token: string;
+  token_type: string;
+}
+
+// Mirrors backend/app/schemas/terms.py.
+export interface TermsDocument {
+  version: string;
+  content: string;
+}
+
+export interface TermsBundle {
+  terms_and_conditions: TermsDocument | null;
+  privacy_policy: TermsDocument | null;
+  required_version: string | null;
 }
 
 export interface AuthUser {
@@ -265,6 +297,10 @@ export interface AuthUser {
 }
 
 // Mirrors backend/app/schemas/user.py's UserOut — the /api/admin/users shape.
+// account_status is derived server-side from must_reset_password + whether
+// the user has ever logged in — "Invited / Pending first login",
+// "Reset Required" (admin forced a reset on an already-active account), or
+// "Active". See RegisterRequest.
 export interface AdminUser {
   id: string;
   email: string;
@@ -273,11 +309,13 @@ export interface AdminUser {
   created_at: string;
   roles: string[];
   permissions: string[];
+  account_status: "Invited / Pending first login" | "Reset Required" | "Active";
 }
 
+// POST /api/admin/users — admin-provisioned, no password field: the
+// backend generates a random temp password and emails it.
 export interface CreateUserPayload {
   email: string;
-  password: string;
   full_name?: string;
   role_name: string;
 }

@@ -21,6 +21,10 @@ from app.models.payment import Payment
 from app.models.depot_ledger import DepotLedger
 from app.models.anomaly_resolution import AnomalyResolution
 from app.models.audit import AuditLog
+from app.models.alert import Alert
+from app.models.alert_read import AlertRead
+from app.models.terms_document import TermsDocument
+from app.models.consent_record import ConsentRecord
 
 __all__ = [
     "User",
@@ -36,4 +40,8 @@ __all__ = [
     "DepotLedger",
     "AnomalyResolution",
     "AuditLog",
+    "Alert",
+    "AlertRead",
+    "TermsDocument",
+    "ConsentRecord",
 ]
