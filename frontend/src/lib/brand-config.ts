@@ -1,8 +1,6 @@
 export interface LandingConfig {
   bgImage: string;
-  bgBlur: string;           // CSS blur value e.g. "blur(4px)"
-  overlayOpacity: number;   // Opacity value e.g. 0.7
-  overlayGradient: string;  // CSS overlay background gradient conforming to KPC colors
+  cardBlur?: string;
 }
 
 export interface BrandConfig {
@@ -10,11 +8,16 @@ export interface BrandConfig {
   systemName: string;
   shortName: string;
   logoUrl: string | null;
-  primaryColor: string;     // KPC Blue (#00529B)
-  secondaryColor: string;   // KPC Deep Blue (#003B6F)
-  deepBlueColor: string;    // KPC Deep Blue (#003B6F)
-  accentColor: string;      // KPC Orange (#F58220)
-  highlightColor: string;   // Amber/Gold (#F59E0B)
+  primaryColor: string;       // Red Accent (#B3312C)
+  secondaryColor: string;     // Warm Near-Black (#1F1B19)
+  deepBlueColor: string;      // Brand Dark Surface (#1F1B19)
+  accentColor: string;        // Red Accent (#B3312C)
+  highlightColor: string;     // Red Accent (#B3312C)
+  bgColor: string;            // Off-White (#F7F6F4)
+  textColor: string;          // Near-Black (#26221F)
+  mutedSurface: string;       // (#F1EDE9)
+  mutedText: string;          // (#736C67)
+  borderColor: string;        // (#E8E3DE)
   landing: LandingConfig;
 }
 
@@ -22,16 +25,19 @@ export const BRAND_CONFIG: BrandConfig = {
   companyName: "Kenya Pipeline Company",
   systemName: "FlowGuard Revenue Assurance",
   shortName: "FlowGuard",
-  logoUrl: "/kpc-logo.png",
-  primaryColor: "#00529B",   // KPC Blue
-  secondaryColor: "#003B6F", // KPC Deep Blue
-  deepBlueColor: "#003B6F",  // KPC Deep Blue
-  accentColor: "#F58220",    // KPC Safety Orange
-  highlightColor: "#F59E0B",
+  logoUrl: "/svg/kpc-logo-transparent.svg",
+  primaryColor: "#B3312C",     // Red primary accent
+  secondaryColor: "#1F1B19",   // Warm near-black surface
+  deepBlueColor: "#1F1B19",    // Warm near-black surface
+  accentColor: "#B3312C",      // Red accent
+  highlightColor: "#B3312C",
+  bgColor: "#F7F6F4",
+  textColor: "#26221F",
+  mutedSurface: "#F1EDE9",
+  mutedText: "#736C67",
+  borderColor: "#E8E3DE",
   landing: {
     bgImage: process.env.NEXT_PUBLIC_LANDING_BG_IMAGE || "/images/flowguard-landing-hero.png",
-    bgBlur: process.env.NEXT_PUBLIC_LANDING_BG_BLUR || "blur(4px)",
-    overlayOpacity: Number(process.env.NEXT_PUBLIC_LANDING_OVERLAY_OPACITY) || 0.65,
-    overlayGradient: "linear-gradient(135deg, rgba(7, 13, 25, 0.85) 0%, rgba(0, 59, 111, 0.75) 50%, rgba(7, 13, 25, 0.90) 100%)",
+    cardBlur: "backdrop-blur-lg",
   },
 };
