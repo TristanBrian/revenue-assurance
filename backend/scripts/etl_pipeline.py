@@ -321,5 +321,30 @@ def main():
     logger.info(" KPC REVENUE ETL PIPELINE EXECUTION COMPLETE")
     logger.info("==================================================")
 
+def _alert_etl_failure(error: str) -> None:
+    """Best-effort — this script runs standalone and start.sh runs it
+    *before* `alembic upgrade head`, so on a fresh install the alerts
+    table may not exist yet. A failure here must never mask or replace
+    the real ETL failure being reported, just supplement it when possible."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from app.services.alert_service import notify_etl_failed  # noqa: E402
+        from app.utils.db_connection import SessionLocal  # noqa: E402
+
+        db = SessionLocal()
+        try:
+            notify_etl_failed(db, error)
+            db.commit()
+        finally:
+            db.close()
+    except Exception as alert_err:
+        logger.error(f"ETL-failure alert could not be created (non-fatal, e.g. pre-migration): {alert_err}")
+
+
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        logger.error(f"ETL pipeline failed: {e}")
+        _alert_etl_failure(str(e))
+        raise
