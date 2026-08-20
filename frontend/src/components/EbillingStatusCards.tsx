@@ -1,49 +1,73 @@
 import type { EbillingIntegrationStatus } from "@/lib/types";
 
-interface CardProps {
+interface Segment {
   label: string;
-  value: string;
-  tone?: "default" | "danger" | "warning" | "success";
+  value: number;
+  barClass: string;
+  dotClass: string;
+  textClass: string;
 }
 
-function Card({ label, value, tone = "default" }: CardProps) {
-  const toneClass =
-    tone === "danger"
-      ? "text-red-600 dark:text-red-400"
-      : tone === "warning"
-        ? "text-amber-600 dark:text-amber-400"
-        : tone === "success"
-          ? "text-emerald-600 dark:text-emerald-400"
-          : "text-zinc-900 dark:text-zinc-50";
-
-  return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</p>
-    </div>
-  );
-}
-
+// A single-row stacked bar (dataviz mark spec: 2px surface gap between
+// segments, rounded ends) reading left-to-right as the invoice's journey —
+// synced, still pending, failed, or never attempted — instead of five
+// disconnected numbers with no sense of the whole pipeline.
 export default function EbillingStatusCards({
   status,
 }: {
   status: EbillingIntegrationStatus;
 }) {
+  const total = status.total_invoices || 1;
+  const segments: Segment[] = [
+    { label: "Synced", value: status.synced_count, barClass: "bg-status-low", dotClass: "bg-status-low", textClass: "text-status-low" },
+    { label: "Pending", value: status.pending_count, barClass: "bg-status-medium", dotClass: "bg-status-medium", textClass: "text-status-medium" },
+    { label: "Failed", value: status.failed_count, barClass: "bg-status-critical", dotClass: "bg-status-critical", textClass: "text-status-critical" },
+    { label: "Not Attempted", value: status.not_attempted, barClass: "bg-muted-foreground/40", dotClass: "bg-muted-foreground/60", textClass: "text-muted-foreground" },
+  ];
+
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-      <Card
-        label="Connection"
-        value={status.connected ? "Connected" : "Disconnected"}
-        tone={status.connected ? "success" : "danger"}
-      />
-      <Card label="Total Invoices" value={String(status.total_invoices)} />
-      <Card label="Synced" value={String(status.synced_count)} tone="success" />
-      <Card
-        label="Failed"
-        value={String(status.failed_count)}
-        tone={status.failed_count > 0 ? "danger" : "default"}
-      />
-      <Card label="Not Attempted" value={String(status.not_attempted)} />
+    <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <span className={`h-2 w-2 rounded-full ${status.connected ? "bg-status-low" : "bg-status-critical"}`} />
+          <span className="text-sm font-semibold text-foreground">
+            {status.connected ? "Connected" : "Disconnected"}
+          </span>
+          <span className="text-xs text-muted-foreground">— {status.system}</span>
+          <span className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+            {status.api_endpoint}
+          </span>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span>Response time <span className="font-mono font-semibold text-foreground/80">{status.response_time_ms}ms</span></span>
+          <span>Last sync <span className="font-medium text-foreground/80">{status.last_sync ?? "never"}</span></span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-semibold text-foreground">{status.total_invoices} total invoices</span>
+        </div>
+        <div className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full bg-muted">
+          {segments.map((s) => (
+            <div
+              key={s.label}
+              className={`h-full rounded-full transition-all ${s.barClass}`}
+              style={{ width: `${(s.value / total) * 100}%` }}
+              title={`${s.label}: ${s.value}`}
+            />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+          {segments.map((s) => (
+            <div key={s.label} className="flex items-center gap-2">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${s.dotClass}`} />
+              <span className="text-xs text-muted-foreground">{s.label}</span>
+              <span className={`ml-auto font-mono text-sm font-bold ${s.textClass}`}>{s.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

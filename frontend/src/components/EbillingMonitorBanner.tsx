@@ -7,7 +7,7 @@ export default function EbillingMonitorBanner({
 }) {
   if (!monitor.alert) {
     return (
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
+      <div className="rounded-lg border border-status-low/30 bg-status-low-bg px-4 py-2 text-sm text-status-low">
         Failure rate {monitor.failure_rate}%
         {monitor.threshold !== undefined ? ` (threshold ${monitor.threshold}%)` : ""} — normal.
       </div>
@@ -15,7 +15,7 @@ export default function EbillingMonitorBanner({
   }
 
   return (
-    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+    <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg px-4 py-2 text-sm text-status-critical">
       <span className="font-medium">Alert:</span> failure rate {monitor.failure_rate}% exceeds
       threshold {monitor.threshold}%.
     </div>
