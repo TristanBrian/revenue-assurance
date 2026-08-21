@@ -8,7 +8,9 @@ from app.routes.feed import feed
 from app.routes.auth import auth, admin
 from app.routes.fraud import detective, graph
 from app.routes.audit import audit
-from app.routes.alerts import alerts
+from app.routes import report_verify
+
+
 # import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
@@ -82,6 +84,8 @@ app.include_router(detective.router, prefix="/api/detective", tags=["Detective"]
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
 app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])  # <-- NEW
+app.include_router(report_verify.router, prefix="/api/reports", tags=["Report Verification"])
+
 # Envelope and audit middlewares
 app.add_middleware(ResponseEnvelopeMiddleware)
 app.add_middleware(AuditMiddleware)

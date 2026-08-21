@@ -7,9 +7,12 @@ from app.core.dependencies import get_db, require_permission
 from app.models.auth.user import User
 from app.services.reconciliation.reconciliation import run_reconciliation, run_reconciliation_on_dataframes, run_combined_reconciliation
 from app.services.ebilling.e_billing import sync_anomalies_to_ebilling, update_anomaly_status
-from app.services.feed.feed import update_feed
 from app.services.audit.audit_service import log_action
+from app.services.report_crypto import sign_report_bytes
+
+
 from app.services.alerts.alert_service import (
+
     notify_bulk_export,
     notify_critical_anomalies,
     notify_data_quality_drop,
@@ -511,47 +514,78 @@ async def update_anomaly(
 def export_report(
     materiality: float = Query(100000),
     direction: str = Query("all", description="inbound | outbound | all — defaults to all"),
+    fields: Optional[str] = Query(None, description="Comma-separated field names for data minimization"),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("export_reports")),
 ):
     try:
         result = run_combined_reconciliation(direction=direction, materiality=materiality)
 
-        try:
-            notify_bulk_export(db, actor_user_id=user.id, row_count=len(result.get('anomalies', [])))
-            db.commit()
-        except Exception as alert_err:
-            db.rollback()
-            logger.error(f"Bulk-export alert failed (non-fatal): {alert_err}")
-
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             pd.DataFrame([result['metrics']]).to_excel(writer, sheet_name='Summary', index=False)
-            # direction="all" mixes inbound (OMC/dispatch) and outbound
-            # (beneficiary/attendance) anomalies, which share field NAMES
-            # (customer, dispatch_id, ...) but not field MEANING — splitting
-            # into two tabs by flow_direction keeps the export readable
-            # instead of interleaving rows from two different domains.
-            # inbound/outbound-only requests already contain a single
-            # direction, so one "Anomalies" sheet is enough there.
-            if direction == "all":
-                anomalies = result.get('anomalies', [])
-                inbound_anomalies = [a for a in anomalies if a.get('flow_direction') != 'outbound']
-                outbound_anomalies = [a for a in anomalies if a.get('flow_direction') == 'outbound']
-                pd.DataFrame(inbound_anomalies).to_excel(writer, sheet_name='Anomalies (Inbound)', index=False)
-                pd.DataFrame(outbound_anomalies).to_excel(writer, sheet_name='Anomalies (Outbound)', index=False)
+
+            anomalies = result.get('anomalies', [])
+            anomalies_df = pd.DataFrame(anomalies)
+
+            # Data Minimization: filter columns if specified
+            if fields and not anomalies_df.empty:
+                selected_fields_list = [f.strip() for f in fields.split(",") if f.strip()]
+                valid_cols = [col for col in selected_fields_list if col in anomalies_df.columns]
+                if valid_cols:
+                    anomalies_df = anomalies_df[valid_cols]
+
+            if direction == "all" and not anomalies_df.empty and "flow_direction" in anomalies_df.columns:
+                inbound_df = anomalies_df[anomalies_df['flow_direction'] != 'outbound']
+                outbound_df = anomalies_df[anomalies_df['flow_direction'] == 'outbound']
+                inbound_df.to_excel(writer, sheet_name='Anomalies (Inbound)', index=False)
+                outbound_df.to_excel(writer, sheet_name='Anomalies (Outbound)', index=False)
             else:
-                pd.DataFrame(result['anomalies']).to_excel(writer, sheet_name='Anomalies', index=False)
+                anomalies_df.to_excel(writer, sheet_name='Anomalies', index=False)
+
             pd.DataFrame([result['data_quality']]).to_excel(writer, sheet_name='Data Quality', index=False)
             if result.get('omc_risk_profile'):
                 pd.DataFrame(result['omc_risk_profile']).to_excel(writer, sheet_name='OMC Risk Profile', index=False)
             if result.get('duplicate_anomalies'):
                 pd.DataFrame(result['duplicate_anomalies']).to_excel(writer, sheet_name='Duplicates', index=False)
+
+        
+        file_bytes = output.getvalue()
+        file_hash, signature = sign_report_bytes(file_bytes)
+
+        # Audit Trail Logging & Alerting
+        try:
+            notify_bulk_export(db, actor_user_id=user.id, row_count=len(result.get('anomalies', [])))
+            log_action(
+                db,
+                actor_user_id=user.id,
+                action="report.export",
+                target_type="report",
+                target_id="reconciliation_report",
+                metadata={
+                    "report_type": "revenue_reconciliation",
+                    "materiality": materiality,
+                    "rows_exported": len(anomalies_df),
+                    "file_hash": file_hash,
+                    "signature": signature,
+                    "included_fields": selected_fields_list,
+                    "contains_sensitive_omc_pii": "kra_pin" in (selected_fields_list or []),
+                }
+            )
+            db.commit()
+        except Exception as alert_err:
+            db.rollback()
+            logger.error(f"Export audit/alert logging failed (non-fatal): {alert_err}")
+
         output.seek(0)
         return StreamingResponse(
             output,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": "attachment; filename=reconciliation_report.xlsx"}
+            headers={
+                "Content-Disposition": "attachment; filename=reconciliation_report.xlsx",
+                "X-Report-Hash": file_hash,
+                "X-Report-Signature": signature
+            }
         )
     except Exception as e:
         logger.error(f"Export failed: {e}")
