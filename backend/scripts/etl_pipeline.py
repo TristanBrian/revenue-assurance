@@ -12,7 +12,7 @@ or Pytest environment to satisfy test assertions.
 import os
 import sys
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict
 import pandas as pd
 from sqlalchemy import create_engine
@@ -343,9 +343,100 @@ def main():
     DatabaseLoader.load_to_sqlite(datasets_clean)
     DatabaseLoader.load_to_postgres(datasets_clean)
 
+    # 5. IMMUTABLE AUDIT TRAIL — chain one row per ingested record that
+    # passed Gate D, attributed to whoever the source record names (see
+    # _AUDITED_TABLES above). Only meaningful against Postgres (audit_logs
+    # is a real ORM table with a UUID PK, same reason auth requires
+    # Postgres — see README's Local development section); no-ops
+    # gracefully if DATABASE_URL isn't a postgresql:// URI or the table/
+    # columns don't exist yet, same as DatabaseLoader.load_to_postgres.
+    _write_ingestion_audit_trail(datasets_clean)
+
     logger.info("==================================================")
     logger.info(" KPC REVENUE ETL PIPELINE EXECUTION COMPLETE")
     logger.info("==================================================")
+
+# Ingestion-path actor attribution (immutable audit trail extension) —
+# for each audited table, which column names the actor and which names
+# the record's own business timestamp. None for the actor column means
+# "genuinely no natural human actor" (payments — a bank-to-bank
+# remittance, see generate_kpc_data.py's comment above KPC_FINANCE_STAFF),
+# not a missed lookup. depot_ledger/quota_ledger/stipend_ledger aren't
+# audited here because nothing populates them yet (see their model
+# docstrings) — there's nothing to ingest.
+_AUDITED_TABLES = [
+    # (dataset key in datasets_clean, target_type, id_col, actor_col, event_timestamp_col)
+    ("dispatches", "dispatch", "dispatch_id", "dispatched_by", "date"),
+    ("invoices", "invoice", "invoice_id", "prepared_by", "date"),
+    ("payments", "payment", "payment_id", None, "date"),
+    ("attendance", "attendance", "attendance_id", "officer_id", "attendance_date"),
+    ("stipend_authorizations", "stipend_authorization", "authorization_id", "authorized_by", "date"),
+    ("disbursements", "disbursement", "disbursement_id", "processed_by", "date"),
+]
+
+
+def _row_event_timestamp(row: dict, event_ts_col: str) -> datetime:
+    """Gate C leaves date columns as plain 'YYYY-MM-DD' strings (see
+    DataQualitySuite.gate_c_standardize_dates), not datetime objects —
+    parse back into a real datetime for event_timestamp. Falls back to
+    "now" for the rare row where the date column is missing/unparseable
+    (shouldn't happen post-Gate-C, but a fallback here is cheaper than
+    letting one bad row abort the whole audit backfill)."""
+    raw = row.get(event_ts_col)
+    parsed = pd.to_datetime(raw, errors="coerce") if raw is not None else None
+    if parsed is None or pd.isna(parsed):
+        return datetime.now(timezone.utc)
+    dt = parsed.to_pydatetime() if hasattr(parsed, "to_pydatetime") else parsed
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
+def _write_ingestion_audit_trail(datasets_clean: Dict[str, pd.DataFrame]) -> None:
+    """
+    Chains one AuditLog row per ingested record that passed Gate D, for
+    every table in _AUDITED_TABLES — the "ETL is the boundary where
+    real-world, actor-attributed events enter this platform" model (see
+    the immutable-audit-trail extension prompt's Section 1). Uses ONE
+    ChainWriter across all 6 tables so they land in a single sequence in
+    a natural reading order (inbound dispatch->invoice->payment, then
+    outbound attendance->authorization->disbursement), not six separate
+    per-table sequences.
+
+    Best-effort and non-fatal, same convention as _alert_etl_failure():
+    start.sh runs this script *before* `alembic upgrade head`, so on a
+    fresh install audit_logs may not have the hash-chain columns yet (or
+    may not exist at all). A failure here must never block or roll back
+    the actual data load that already succeeded above.
+    """
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from app.services.audit.audit_service import ChainWriter  # noqa: E402
+        from app.utils.db_connection import SessionLocal  # noqa: E402
+
+        db = SessionLocal()
+        try:
+            writer = ChainWriter(db)
+            total_rows = 0
+            for dataset_key, target_type, id_col, actor_col, event_ts_col in _AUDITED_TABLES:
+                df = datasets_clean.get(dataset_key)
+                if df is None or df.empty:
+                    continue
+                for row in df.to_dict(orient="records"):
+                    writer.write_ingested(
+                        external_actor=(row.get(actor_col) if actor_col else None),
+                        target_type=target_type,
+                        target_id=row.get(id_col),
+                        record=row,
+                        event_timestamp=_row_event_timestamp(row, event_ts_col),
+                    )
+                    total_rows += 1
+            writer.finalize()
+            db.commit()
+            logger.info(f" [Audit] Chained {total_rows} ingestion-path audit rows across {len(_AUDITED_TABLES)} tables.")
+        finally:
+            db.close()
+    except Exception as audit_err:
+        logger.error(f" [Audit] Ingestion audit trail could not be written (non-fatal, e.g. pre-migration): {audit_err}")
+
 
 def _alert_etl_failure(error: str) -> None:
     """Best-effort — this script runs standalone and start.sh runs it
