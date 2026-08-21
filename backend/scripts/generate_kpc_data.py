@@ -18,11 +18,12 @@ Datasets Generated (inbound):
 9. depot_daily_inventory.csv   - Daily Physical Tank Dips vs. Book Balances
 
 Datasets Generated (outbound — Stage 2):
-10. officers.csv                - Field Officer / Program Site master
-11. beneficiaries.csv            - Beneficiary master (Inuka Foundation program participants)
-12. attendance.csv               - Attendance / Eligibility Records
-13. stipend_authorizations.csv   - Stipend Authorizations (officer sign-off on eligible attendance)
-14. disbursements.csv            - Disbursements (mobile money / bank payouts to beneficiaries)
+10. officers.csv               - Field Officer / Program Site master
+11. beneficiaries.csv          - Beneficiary master (Inuka Foundation program participants)
+12. attendance.csv             - Attendance / Eligibility Records
+13. stipend_authorizations.csv - Stipend Authorizations (officer sign-off on eligible attendance)
+14. disbursements.csv          - Disbursements (mobile money / bank payouts to beneficiaries)
+15. beneficiary_consents.csv   - KDPA Consent tracking (Photography, Donor Reporting, SMS)
 """
 
 import os
@@ -46,25 +47,25 @@ CONFIG = {
 
 # --- OMC RISK PROFILES ---
 LEAKAGE_PROFILES = {
-    "Good": { # 3 OMCs: Zero leakages (Perfect baseline)
+    "Good": { 
         "unmetered_loading_leak": 0.00, "dispatch_loading_skew": 0.00,
         "invoice_leak": 0.00, "payment_leak": 0.00, "underpay_rate": 0.00,
         "overpay_rate": 0.00, 
         "installment_rate": 0.00, "tariff_error_rate": 0.00
     },
-    "Small": { # 10 OMCs: Very minor, occasional errors
+    "Small": { 
         "unmetered_loading_leak": 0.01, "dispatch_loading_skew": 0.02,
         "invoice_leak": 0.02, "payment_leak": 0.01, "underpay_rate": 0.05,
         "overpay_rate": 0.02, 
         "installment_rate": 0.10, "tariff_error_rate": 0.01
     },
-    "Medium": { # 4 OMCs: Standard operational messiness
+    "Medium": { 
         "unmetered_loading_leak": 0.05, "dispatch_loading_skew": 0.08,
         "invoice_leak": 0.08, "payment_leak": 0.05, "underpay_rate": 0.20,
         "overpay_rate": 0.05, 
         "installment_rate": 0.30, "tariff_error_rate": 0.05
     },
-    "High": { # 3 OMCs: Massive leakages & targeted for fraud ring / shell companies
+    "High": { 
         "unmetered_loading_leak": 0.15, "dispatch_loading_skew": 0.20,
         "invoice_leak": 0.20, "payment_leak": 0.15, "underpay_rate": 0.40,
         "overpay_rate": 0.10, 
@@ -80,37 +81,15 @@ DEPOT_DISTANCES_KM = {
     "Eldoret": 700,
 }
 
-# --- ACTOR ATTRIBUTION (audit trail — Domain 5, Problem 10) ---
-# The audit trail attributes every ingested record to whoever the source
-# record itself names as having done it, not a generic "ETL system"
-# actor. These are the depot/KPC-side and Foundation-side staff pools that
-# make that possible — a small, mostly-consistent-per-depot cast (like
-# shared_fleet/shared_drivers above), not a fresh random name per row,
-# since that's what a real depot/finance desk roster looks like.
 DEPOT_CLERKS = {
-    # depot.split(' ')[0][:3] alone collides for "Mombasa (KOSF)" and
-    # "Mombasa (Kipevu)" (both -> "MOM") — the parenthesized suffix (if
-    # any) disambiguates them into distinct clerk-id prefixes.
     depot: [
         f"CLERK-{depot.split(' ')[0][:3].upper()}{('-' + depot.split('(')[1][:3].upper()) if '(' in depot else ''}-{n:02d}"
         for n in range(1, 4)
     ]
     for depot in DEPOT_DISTANCES_KM
 }
-# KPC billing/finance staff who prepare invoices — deliberately a
-# separate pool from depot clerks (segregation of duties: the person who
-# records a dispatch isn't the one who bills for it).
 KPC_FINANCE_STAFF = [f"FIN-{n:03d}" for n in range(1, 6)]
-# Inuka Foundation payments desk — deliberately a separate pool from
-# field officers (segregation of duties: the officer who authorizes a
-# stipend isn't the one who processes the payout).
 FOUNDATION_PAYMENTS_STAFF = [f"PAY-{n:03d}" for n in range(1, 5)]
-# payments.csv has no analogous actor field: a payment here is a bank-to-
-# bank remittance from the OMC's own banking system settling an invoice,
-# not a KPC/OMC staff action — there's no real single named individual to
-# attribute it to (see remitting_bank_account, already the closest thing
-# to "who/what sent this"). Audited with a null actor, which is the
-# realistic attribution, not a gap.
 
 OMC_NAMES = [
     "TotalEnergies Kenya", "Vivo Energy", "Rubis Energy", "Gulf Energy",
@@ -147,7 +126,6 @@ def generate_depot_master():
 
 def generate_tariff_master():
     tariffs = []
-    # Rate Schedule 2025
     for product in PRODUCTS:
         for depot in DEPOT_DISTANCES_KM.keys():
             tariffs.append({
@@ -159,7 +137,6 @@ def generate_tariff_master():
                 'effective_start': '2025-01-01',
                 'effective_end': '2025-12-31'
             })
-    # Adjusted Rate Schedule 2026 (5% Tariff Revision)
     for product in PRODUCTS:
         for depot in DEPOT_DISTANCES_KM.keys():
             tariffs.append({
@@ -174,13 +151,10 @@ def generate_tariff_master():
     return pd.DataFrame(tariffs)
 
 def generate_omc_master():
-    """Generates customer master records, injecting shell company network graphs."""
     omcs = []
-    
     profiles = (["Good"] * 3) + (["Small"] * 10) + (["Medium"] * 4) + (["High"] * 3)
     random.shuffle(profiles)
     
-    # --- FRAUD RING / SHELL COMPANY SHARED ASSETS ---
     fraud_director = fake.name()
     fraud_address = fake.address().replace('\n', ', ')
     fraud_bank_account = fake.iban()
@@ -188,19 +162,16 @@ def generate_omc_master():
     for idx, name in enumerate(OMC_NAMES, 1):
         profile = profiles[idx-1]
         
-        # Inject network graph connections for high-risk OMCs
         if profile == "High":
             director = fraud_director
             address = fraud_address
             bank_acc = fraud_bank_account
-            # Shell companies incorporated just days before operations begin
             incorp_date = fake.date_between(start_date=datetime(2024, 11, 1), end_date=datetime(2024, 12, 15)).strftime('%Y-%m-%d')
             risk_rating = 'High'
         else:
             director = fake.name()
             address = fake.address().replace('\n', ', ')
             bank_acc = fake.iban()
-            # Legitimate companies incorporated years ago
             incorp_date = fake.date_between(start_date=datetime(2010, 1, 1), end_date=datetime(2023, 12, 31)).strftime('%Y-%m-%d')
             risk_rating = random.choices(['Low', 'Medium'], weights=[0.60, 0.40])[0]
 
@@ -214,7 +185,6 @@ def generate_omc_master():
             'risk_profile': profile,
             'contact_email': fake.company_email(),
             'phone': fake.phone_number(),
-            # --- NETWORK GRAPH FIELDS ---
             'director_name': director,
             'registered_address': address,
             'incorporation_date': incorp_date,
@@ -224,22 +194,16 @@ def generate_omc_master():
     return pd.DataFrame(omcs)
 
 def generate_loading_and_dispatches(omcs_df, tariffs_df):
-    """Generates physical loading logs and commercial dispatches, injecting temporal & fleet anomalies."""
     omc_data = omcs_df.set_index('omc_id').to_dict('index')
-    
     dispatches = []
     loading_logs = []
     
     start_date = datetime(2025, 1, 1)
     end_date = datetime(2026, 7, 1)
     
-    # --- FRAUD RING GHOST FLEET ---
-    # The shell companies share a small pool of 4 trucks and drivers
     shared_fleet = [f"K{random.choice(['C','D'])}{random.randint(10,99)}{random.choice(['A','B','C','D','E'])}" for _ in range(4)]
     shared_drivers = [f"DRV-{random.randint(1000,9999)}" for _ in range(4)]
     
-    # --- SLEEPER CELL DATES ---
-    # High risk OMCs sit dormant, then execute all transactions in a sudden burst
     burst_start = datetime(2026, 2, 1)
     burst_end = datetime(2026, 4, 30)
 
@@ -249,14 +213,12 @@ def generate_loading_and_dispatches(omcs_df, tariffs_df):
         profile_name = omc['risk_profile']
         profile = LEAKAGE_PROFILES[profile_name]
         
-        # Determine Date & Fleet based on risk profile
         if profile_name == "High":
             event_dt = burst_start + timedelta(days=random.randint(0, (burst_end - burst_start).days), seconds=random.randint(0, 86400))
             truck_reg = random.choice(shared_fleet)
             driver_id = random.choice(shared_drivers)
         else:
             event_dt = start_date + timedelta(days=random.randint(0, (end_date - start_date).days), seconds=random.randint(0, 86400))
-            # Generate a random truck/driver for normal OMCs
             truck_reg = f"K{random.choice(['A','B'])}{random.randint(10,99)}{random.choice(['F','G','H','J'])}"
             driver_id = f"DRV-{random.randint(10000,99999)}"
 
@@ -314,22 +276,17 @@ def generate_loading_and_dispatches(omcs_df, tariffs_df):
             'depot': depot,
             'volume_liters': int(disp_vol),
             'distance_km': dist_km,
-            # --- FLEET LOGISTICS ---
             'truck_reg_number': truck_reg,
             'driver_id': driver_id,
             'transport_tariff_kes': int(transport_fee),
             'storage_tariff_kes': int(storage_fee),
             'value_kes': int(total_val),
-            # Depot clerk who recorded this dispatch — the audit actor,
-            # distinct from driver_id (who moved the fuel, not who logged
-            # the paperwork for it).
             'dispatched_by': random.choice(DEPOT_CLERKS[depot]),
         })
 
     return pd.DataFrame(loading_logs), pd.DataFrame(dispatches)
 
 def inject_fraud_ring(dispatches_df, omcs_df):
-    """Injects high-volume product substitution anomalies into targeted OMC accounts."""
     fraud_omcs = omcs_df[omcs_df['risk_profile'] == 'High']['omc_id'].tolist()
     weird_product = random.choice(["JETA1", "LPG"])
     print(f"⚠️ Injecting Substitution Fraud: {fraud_omcs} -> {weird_product}")
@@ -379,7 +336,6 @@ def generate_invoices(dispatches_df, omcs_df):
 
 def generate_payments(invoices_df, omcs_df):
     omc_profiles = dict(zip(omcs_df['omc_id'], omcs_df['risk_profile']))
-    # Grab the pre-generated bank accounts to ensure consistency
     omc_banks = dict(zip(omcs_df['omc_id'], omcs_df['primary_bank_account']))
     
     payments = []
@@ -499,34 +455,21 @@ def inject_messiness(df, date_col=None, float_col=None):
 # =============================================================================
 # OUTBOUND (STIPEND/DISBURSEMENT) — Inuka Foundation, Stage 2
 # =============================================================================
-# Same structural-leakage philosophy as the inbound section above, mirrored
-# entity-for-entity:
-#   Dispatch -> Attendance/Eligibility Record   OMC -> Beneficiary
-#   Invoice  -> Stipend Authorization            Product -> Pillar
-#   Payment  -> Disbursement                     Depot -> Field Officer / Program Site
-#
-# Leakage is officer-level, not beneficiary-level: each beneficiary is
-# assigned to one officer, and every attendance/authorization/disbursement
-# roll for that beneficiary uses THEIR OFFICER's profile (not an
-# independent per-beneficiary roll) — this is what makes officer-level
-# clustering in the fraud graph meaningful later, same reason
-# generate_invoices()/generate_payments() above key off omc risk_profile
-# rather than rolling fresh dice per dispatch.
 
 OFFICER_LEAKAGE_PROFILES = {
-    "Good": {  # never misses a step
+    "Good": { 
         "authorization_leak": 0.00, "disbursement_leak": 0.00,
         "underpay_rate": 0.00, "overpay_rate": 0.00, "ghost_payment_rate": 0.00,
     },
-    "Small": {  # occasional paperwork slip
+    "Small": { 
         "authorization_leak": 0.02, "disbursement_leak": 0.02,
         "underpay_rate": 0.05, "overpay_rate": 0.02, "ghost_payment_rate": 0.00,
     },
-    "Medium": {  # standard field-office messiness
+    "Medium": { 
         "authorization_leak": 0.08, "disbursement_leak": 0.08,
         "underpay_rate": 0.20, "overpay_rate": 0.05, "ghost_payment_rate": 0.02,
     },
-    "High": {  # targeted for the disbursement ring injection below
+    "High": { 
         "authorization_leak": 0.20, "disbursement_leak": 0.20,
         "underpay_rate": 0.40, "overpay_rate": 0.10, "ghost_payment_rate": 0.15,
     },
@@ -534,8 +477,6 @@ OFFICER_LEAKAGE_PROFILES = {
 
 PILLARS = ["Scholarship", "Plus", "Vocational", "Tech"]
 
-# Standard monthly stipend per pillar — the "eligible amount" an attendance
-# record implies, same role as tariff-derived value_kes on inbound dispatches.
 PILLAR_MONTHLY_RATE_KES = {
     "Scholarship": 15000,
     "Plus": 8000,
@@ -544,14 +485,18 @@ PILLAR_MONTHLY_RATE_KES = {
 }
 
 PROGRAM_SITES = ["Nairobi East", "Kisumu Central", "Mombasa South", "Eldoret North", "Nakuru West"]
-
-# 2025-01 .. 2026-06, 18 months — same overall span as the inbound dataset.
 STIPEND_PERIODS = [f"2025-{m:02d}" for m in range(1, 13)] + [f"2026-{m:02d}" for m in range(1, 7)]
+
+# --- KDPA CONSENT TYPES (Domain 5) ---
+CONSENT_TYPES = [
+    "Photography & Media",
+    "Third-Party Donor Reporting",
+    "Data Processing (KDPA Sec. 25)",
+    "Automated SMS/WhatsApp Communications"
+]
 
 
 def generate_officer_master():
-    """15 officers: 4 Good, 6 Small, 3 Medium, 2 High — proportionally
-    similar spread to the 20-OMC inbound master (3/10/4/3)."""
     profiles = (["Good"] * 4) + (["Small"] * 6) + (["Medium"] * 3) + (["High"] * 2)
     random.shuffle(profiles)
     officers = []
@@ -568,8 +513,6 @@ def generate_officer_master():
 
 
 def generate_beneficiary_master(officers_df, num_beneficiaries=200):
-    """Each beneficiary is assigned to exactly one officer and one pillar —
-    the officer assignment is what the leakage rolls downstream key off."""
     officer_ids = officers_df['officer_id'].tolist()
     beneficiaries = []
     for idx in range(1, num_beneficiaries + 1):
@@ -589,10 +532,54 @@ def generate_beneficiary_master(officers_df, num_beneficiaries=200):
     return pd.DataFrame(beneficiaries)
 
 
+def generate_beneficiary_consents(beneficiaries_df):
+    """
+    Generates dynamic KDPA compliance consent records for beneficiaries.
+    Simulates active, withdrawn, pending, and expired consents with timestamps.
+    """
+    consents = []
+    ben_officer_map = dict(zip(beneficiaries_df['beneficiary_id'], beneficiaries_df['officer_id']))
+    ben_enrollment_map = dict(zip(beneficiaries_df['beneficiary_id'], beneficiaries_df['enrollment_date']))
+
+    consent_counter = 1
+    for ben_id, officer_id in ben_officer_map.items():
+        enroll_dt = datetime.strptime(ben_enrollment_map[ben_id], '%Y-%m-%d')
+
+        for c_type in CONSENT_TYPES:
+            # Generate realistic consent statuses: 85% active, 5% withdrawn, 5% expired, 5% pending
+            status_roll = random.random()
+            if status_roll < 0.85:
+                status = "active"
+            elif status_roll < 0.90:
+                status = "withdrawn"
+            elif status_roll < 0.95:
+                status = "expired"
+            else:
+                status = "pending"
+
+            # Consent usually captured at or shortly after enrollment
+            capture_dt = enroll_dt + timedelta(days=random.randint(0, 14))
+            
+            status_updated_dt = None
+            if status in ["withdrawn", "expired"]:
+                # Simulated withdrawal or expiration happens months later
+                status_updated_dt = capture_dt + timedelta(days=random.randint(30, 200))
+
+            consents.append({
+                'consent_id': f'CON-{consent_counter:06d}',
+                'beneficiary_id': ben_id,
+                'consent_type': c_type,
+                'status': status,
+                'captured_at': capture_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                'captured_by': officer_id,
+                'status_updated_at': status_updated_dt.strftime('%Y-%m-%d %H:%M:%S') if status_updated_dt else None
+            })
+            consent_counter += 1
+
+    return pd.DataFrame(consents)
+
+
 def generate_attendance(beneficiaries_df):
-    """Each beneficiary attends (and is eligible for) a random subset of
-    the 18 stipend periods, not necessarily every month — mirrors how not
-    every OMC dispatches every day."""
     attendance = []
     for _, ben in beneficiaries_df.iterrows():
         rate = PILLAR_MONTHLY_RATE_KES[ben['pillar_id']]
@@ -622,7 +609,7 @@ def generate_stipend_authorizations(attendance_df, officers_df):
         profile = OFFICER_LEAKAGE_PROFILES[officer_profiles[r['officer_id']]]
 
         if random.random() < profile["authorization_leak"]:
-            continue  # structurally skipped -> Missing Authorization
+            continue  
 
         att_dt = datetime.strptime(r['attendance_date'], '%Y-%m-%d')
         auth_dt = att_dt + timedelta(days=random.randint(1, 5))
@@ -652,7 +639,7 @@ def generate_disbursements(authorizations_df, beneficiaries_df, officers_df):
         profile = OFFICER_LEAKAGE_PROFILES[officer_profiles[officer_id]]
 
         if random.random() < profile["disbursement_leak"]:
-            continue  # structurally skipped -> Missing Disbursement
+            continue 
 
         auth_dt = datetime.strptime(r['date'], '%Y-%m-%d')
         disb_dt = auth_dt + timedelta(days=random.randint(3, 21))
@@ -676,12 +663,6 @@ def generate_disbursements(authorizations_df, beneficiaries_df, officers_df):
             'processed_by': random.choice(FOUNDATION_PAYMENTS_STAFF),
         })
 
-    # --- GHOST PAYMENTS ---
-    # Fabricated disbursements with NO backing authorization at all
-    # (authorization_id=None) — not a skipped step like the leaks above,
-    # an extra row that shouldn't exist. Targeted at High-profile officers'
-    # beneficiaries specifically, same as inbound's inject_fraud_ring()
-    # targets High-profile OMCs.
     high_officers = officers_df[officers_df['risk_profile'] == 'High']['officer_id'].tolist()
     for officer_id in high_officers:
         profile = OFFICER_LEAKAGE_PROFILES['High']
@@ -697,7 +678,7 @@ def generate_disbursements(authorizations_df, beneficiaries_df, officers_df):
             ghost_dt = datetime(year, month, random.randint(1, 28))
             disbursements.append({
                 'disbursement_id': f'DISB-{len(disbursements) + 1:06d}',
-                'authorization_id': None,  # <-- the ghost signal
+                'authorization_id': None,  
                 'beneficiary_id': beneficiary_id,
                 'pillar_id': pillar,
                 'period': period,
@@ -705,10 +686,6 @@ def generate_disbursements(authorizations_df, beneficiaries_df, officers_df):
                 'amount_paid': int(PILLAR_MONTHLY_RATE_KES[pillar] * random.uniform(0.9, 1.1)),
                 'channel': random.choice(['mobile_money', 'bank']),
                 'disbursing_account': ben_account.get(beneficiary_id),
-                # Ghost payments still get a processed_by — knowing WHO
-                # processed a payment with no backing authorization is
-                # exactly the forensic detail an investigation needs, not
-                # something to omit because the row itself is fabricated.
                 'processed_by': random.choice(FOUNDATION_PAYMENTS_STAFF),
             })
 
@@ -716,11 +693,6 @@ def generate_disbursements(authorizations_df, beneficiaries_df, officers_df):
 
 
 def inject_disbursement_ring(beneficiaries_df, disbursements_df, officers_df):
-    """Mirrors inject_fraud_ring(): applied post-hoc to 2-3 High-profile
-    officers' beneficiaries — shared mobile money number, clustered
-    enrollment dates, and disbursements bursting into a narrow window.
-    This is the pattern graph_engine.py's outbound Louvain clustering
-    should surface as a correlated fraud ring."""
     high_officers = officers_df[officers_df['risk_profile'] == 'High']['officer_id'].tolist()
     ring_officers = high_officers[:3]
     print(f"⚠️ Injecting Disbursement Ring: {ring_officers}")
@@ -749,8 +721,12 @@ def inject_disbursement_ring(beneficiaries_df, disbursements_df, officers_df):
 
 
 if __name__ == "__main__":
-    output_dir = 'data/raw'
+    # --- ABSOLUTE PATH FIX APPLIED HERE ---
+    # This ensures files generate directly inside backend/scripts/data/raw/
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    output_dir = os.path.join(SCRIPT_DIR, 'data', 'raw')
     os.makedirs(output_dir, exist_ok=True)
+    
     print("⏳ Starting Synthetic Data Generation for KPC Revenue Assurance...")
 
     products_df = generate_product_master()
@@ -790,6 +766,7 @@ if __name__ == "__main__":
 
     officers_df = generate_officer_master()
     beneficiaries_df = generate_beneficiary_master(officers_df)
+    consents_df = generate_beneficiary_consents(beneficiaries_df)
     attendance_df = generate_attendance(beneficiaries_df)
     authorizations_df = generate_stipend_authorizations(attendance_df, officers_df)
     disbursements_df = generate_disbursements(authorizations_df, beneficiaries_df, officers_df)
@@ -798,14 +775,16 @@ if __name__ == "__main__":
 
     officers_messy = inject_messiness(officers_df)
     beneficiaries_messy = inject_messiness(beneficiaries_df, date_col='enrollment_date')
+    consents_messy = inject_messiness(consents_df, date_col='captured_at')
     attendance_messy = inject_messiness(attendance_df, date_col='attendance_date')
     authorizations_messy = inject_messiness(authorizations_df, date_col='date', float_col='amount_authorized')
     disbursements_messy = inject_messiness(disbursements_df, date_col='date', float_col='amount_paid')
 
     officers_messy.to_csv(f'{output_dir}/officers.csv', index=False)
     beneficiaries_messy.to_csv(f'{output_dir}/beneficiaries.csv', index=False)
+    consents_messy.to_csv(f'{output_dir}/beneficiary_consents.csv', index=False)
     attendance_messy.to_csv(f'{output_dir}/attendance.csv', index=False)
     authorizations_messy.to_csv(f'{output_dir}/stipend_authorizations.csv', index=False)
     disbursements_messy.to_csv(f'{output_dir}/disbursements.csv', index=False)
 
-    print(f"✅ Outbound synthetic CSV datasets successfully created in '{output_dir}/' with Disbursement Ring attributes included.")
+    print(f"✅ Outbound synthetic CSV datasets successfully created in '{output_dir}/' with Disbursement Ring & KDPA Consent attributes included.")
