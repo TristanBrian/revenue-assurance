@@ -14,7 +14,10 @@ from app.routes.reports import report_verify
 # import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
+from app.services.audit.anchor_service import run_periodic_anchor_check
 from contextlib import asynccontextmanager
+import asyncio
+import contextlib
 import logging
 import time
 
@@ -34,7 +37,18 @@ async def lifespan(app: FastAPI):
         logger.info(f"✅ Database connected successfully ({safe_url})")
     except Exception as e:
         logger.error(f"❌ Database connection failed ({safe_url}): {e}")
+
+    # Periodic on-chain anchor check (immutable audit trail) — always
+    # started; it's cheap to poll and no-ops immediately if anchoring
+    # isn't configured (no AUDIT_ANCHOR_CONTRACT_ADDRESS / CDP
+    # credentials yet), same as everything else in this app that
+    # degrades gracefully when a third-party integration isn't set up.
+    # See services/audit/anchor_service.py's module docstring.
+    anchor_task = asyncio.create_task(run_periodic_anchor_check())
     yield
+    anchor_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await anchor_task
 
 # ============================================================================
 # FASTAPI APP

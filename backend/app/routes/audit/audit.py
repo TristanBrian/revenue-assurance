@@ -6,8 +6,9 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_permission
 from app.models.auth.user import User
-from app.schemas.audit.audit import AuditLogListResponse, AuditLogOut, AuditSummaryResponse
-from app.services.audit.audit_service import get_audit_log, get_audit_logs, get_audit_summary, get_record_audit_history
+from app.schemas.audit.audit import AuditLogListResponse, AuditLogOut, AuditSummaryResponse, AuditVerifyResponse
+from app.services.audit.audit_service import get_audit_log, get_audit_logs, get_audit_summary, get_record_audit_history, verify_chain_integrity
+from app.services.audit.anchor_service import verify_on_chain_anchor
 
 
 router = APIRouter()  # prefix="/api/audit" and tags=["Audit"] are supplied by main.py's include_router(), matching every other route file
@@ -60,6 +61,37 @@ def audit_summary(
     _: User = Depends(require_permission("view_audit")),
 ):
     return get_audit_summary(db, days=days)
+
+
+@router.get("/verify", response_model=AuditVerifyResponse)
+def verify_audit_trail(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_permission("view_audit")),
+):
+    """
+    Immutable audit trail integrity check — two independent results:
+
+    - local_chain: walks every audit_logs row recomputing its hash,
+      catching any row tampered with directly in the DB (bypassing
+      audit_service.py entirely) — see verify_chain_integrity().
+    - on_chain_anchor: compares the most recent on-chain anchor against
+      what the local chain currently computes for that block_index —
+      the check that can't be defeated by DB access alone, since it
+      reads the comparison value straight from Base Sepolia — see
+      anchor_service.verify_on_chain_anchor().
+
+    Kept as two separate results rather than one combined boolean: a
+    demo showing "local chain intact" and "on-chain anchor confirmed" as
+    two independent green checks (and exactly which one breaks, and
+    where, if a row is tampered with) is the actual point of anchoring
+    at all — collapsing them would hide which guarantee is doing the
+    work.
+    """
+    return {
+        "status": "success",
+        "local_chain": verify_chain_integrity(db),
+        "on_chain_anchor": verify_on_chain_anchor(db),
+    }
 
 
 @router.get("/me", response_model=AuditLogListResponse)

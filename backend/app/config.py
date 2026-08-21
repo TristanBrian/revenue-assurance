@@ -16,6 +16,18 @@ class Settings(BaseSettings):
     algorithm: str = os.getenv("ALGORITHM", "HS256")
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
+    # --- Immutable audit trail: on-chain anchor (Base Sepolia) ---
+    # All optional/empty-default — anchor_service.is_configured() gates
+    # on these being non-empty rather than raising at import time, same
+    # "not configured, not an error" posture as the alerts system's
+    # SMTP_* settings. See web3/.env.example for what each one is.
+    cdp_api_key_id: str = ""
+    cdp_api_key_secret: str = ""
+    cdp_wallet_secret: str = ""
+    base_rpc_url: str = "https://sepolia.base.org"
+    audit_anchor_contract_address: str = ""
+    audit_backend_wallet_name: str = "inuka-audit-backend"
+
     model_config = SettingsConfigDict(env_file=_REPO_ROOT_ENV, extra="ignore")
 
 
