@@ -311,19 +311,19 @@ function ReportsContent() {
       </header>
 
       {/* Compliance & Governance Banner */}
-      <div className="bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-emerald-100 dark:bg-emerald-500/10 rounded-lg text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20 shrink-0">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="bg-emerald-50/90 dark:bg-emerald-950/25 border border-emerald-300/80 dark:border-emerald-500/30 rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm my-2">
+        <div className="flex items-center space-x-4">
+          <div className="p-3.5 bg-emerald-100 dark:bg-emerald-500/15 rounded-xl text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20 shrink-0">
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
           </div>
           <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-extrabold text-emerald-900 dark:text-emerald-400">Governance Health Metric:</span>
-              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">98.4% Verified Active Consent & KRA PIN Coverage</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm sm:text-base font-black text-emerald-950 dark:text-emerald-400 uppercase tracking-wide">Governance Health Metric:</span>
+              <span className="text-sm sm:text-base font-extrabold text-emerald-800 dark:text-emerald-300">98.4% Verified Active Consent & KRA PIN Coverage</span>
             </div>
-            <p className="text-[11px] font-medium text-emerald-900/80 dark:text-zinc-400 mt-0.5">
+            <p className="text-xs sm:text-sm font-medium text-emerald-900/90 dark:text-zinc-400 mt-1.5 leading-relaxed">
               Order-to-Cash exports are cryptographically signed with SHA-256 digests and audited under KDPA standards.
             </p>
           </div>
@@ -332,14 +332,15 @@ function ReportsContent() {
         <button
           type="button"
           onClick={() => setIsVerifierOpen(true)}
-          className="px-3.5 py-1.5 bg-cyan-100 hover:bg-cyan-200 text-cyan-900 border border-cyan-300 dark:bg-cyan-600/20 dark:hover:bg-cyan-600/30 dark:text-cyan-300 dark:border-cyan-500/30 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 shrink-0 shadow-xs cursor-pointer"
+          className="px-5 py-3 bg-cyan-100 hover:bg-cyan-200 text-cyan-950 border border-cyan-300 dark:bg-cyan-600/20 dark:hover:bg-cyan-600/30 dark:text-cyan-300 dark:border-cyan-500/30 rounded-xl text-sm font-bold transition flex items-center space-x-2 shrink-0 shadow-sm cursor-pointer"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
           <span>Verify Report File Signature</span>
         </button>
       </div>
+
 
 
       {error && (
