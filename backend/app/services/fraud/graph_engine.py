@@ -195,6 +195,238 @@ def build_fraud_graph(materiality: float = 0) -> dict:
 
 
 # ==============================================================================
+# Outbound (stipend/disbursement) anomaly-based fraud graph — Stage 2.
+# Mirrors build_fraud_graph_from_dataframes() above (Officer<->Beneficiary in
+# place of OMC<->Depot), with one addition: build_fraud_graph_from_dataframes
+# needs a merge against `dispatches` because the inbound anomaly dict only
+# carries `customer` (an OMC name), not `omc_id`/`depot`. The outbound
+# anomaly dict already carries `officer_id`/`beneficiary_id` directly
+# (see _build_outbound_anomaly() in reconciliation.py), so no merge/second
+# dataframe is required for that part. What outbound needs that inbound
+# doesn't is disbursements_df: inject_disbursement_ring()'s fraud signal is
+# several beneficiaries sharing one `disbursing_account`, and that column
+# doesn't exist anywhere in an anomaly dict (it isn't a reconciliation
+# break, just a ring signal) — so it's added as direct beneficiary<->
+# beneficiary edges from the raw disbursements table, the same role
+# build_omc_depot_graph()'s shared contact_email/phone/kra_pin edges play
+# for OMCs, just inlined here instead of in the separate structural-graph
+# section below (a full parallel /network,/communities,/omc/{id}-style
+# structural subsystem for officers is a bigger lift than this endpoint,
+# the one the dashboard's FraudGraph component actually renders, needs).
+# ==============================================================================
+
+def build_outbound_fraud_graph_from_dataframes(anomalies_df: pd.DataFrame, disbursements_df: Optional[pd.DataFrame] = None) -> dict:
+    """
+    Pure function: build the Officer<->Beneficiary leakage graph from an
+    outbound anomalies DataFrame (dispatch_id, officer_id, beneficiary_id,
+    customer, leakage_kes, ...), plus optional direct beneficiary<->
+    beneficiary edges for shared disbursing_account (ring detection).
+    """
+    if anomalies_df.empty or 'officer_id' not in anomalies_df.columns:
+        return _empty_graph_result()
+
+    pair_source = anomalies_df.dropna(subset=['officer_id', 'beneficiary_id'])
+    if pair_source.empty:
+        return _empty_graph_result()
+
+    pair_stats = pair_source.groupby(['officer_id', 'beneficiary_id', 'customer']).agg(
+        leakage_kes=('leakage_kes', 'sum'),
+        anomaly_count=('dispatch_id', 'count')
+    ).reset_index()
+
+    # Two separate edge weights, deliberately not the same number:
+    # - 'leakage_weight' is real KES leakage, summed into each node's
+    #   displayed leakage_kes/risk_level below — a ring edge contributes 0
+    #   here since sharing a disbursing_account isn't itself a leakage
+    #   amount, just a structural fraud signal, and inflating displayed
+    #   leakage would misrepresent the dashboard's headline numbers.
+    # - 'weight' is what community_louvain.best_partition() clusters on.
+    #   If ring edges used the same real-KES scale as leakage edges,
+    #   Louvain would keep pulling ring beneficiaries into their own
+    #   officer's community (typically far more total leakage on that
+    #   edge than the flat ring signal) instead of grouping them with
+    #   each other — RING_CLUSTER_WEIGHT is set an order of magnitude
+    #   above realistic per-pair leakage sums specifically so shared-
+    #   account beneficiaries reliably land in one community together,
+    #   which is the whole point of surfacing this edge at all.
+    RING_CLUSTER_WEIGHT = 10_000_000.0
+
+    G = nx.Graph()
+    beneficiary_labels: dict = {}
+    for _, row in pair_stats.iterrows():
+        officer_node = f"officer:{row['officer_id']}"
+        beneficiary_node = f"beneficiary:{row['beneficiary_id']}"
+        beneficiary_labels[beneficiary_node] = row['customer']
+        G.add_edge(
+            officer_node, beneficiary_node,
+            weight=float(row['leakage_kes']),
+            leakage_weight=float(row['leakage_kes']),
+            anomaly_count=int(row['anomaly_count'])
+        )
+
+    # Ring signal: beneficiaries paid out of the same disbursing_account.
+    # Direct beneficiary<->beneficiary edges, same pattern as
+    # build_omc_depot_graph()'s shared-identity edges — these are what let
+    # inject_disbursement_ring()'s beneficiaries cluster together in their
+    # own community even when they don't share an officer.
+    if disbursements_df is not None and not disbursements_df.empty and \
+            {'beneficiary_id', 'disbursing_account'}.issubset(disbursements_df.columns):
+        for _, group in disbursements_df.dropna(subset=['disbursing_account']).groupby('disbursing_account')['beneficiary_id']:
+            members = sorted(set(group.tolist()))
+            if len(members) < 2:
+                continue
+            for i in range(len(members)):
+                for j in range(i + 1, len(members)):
+                    a, b = f"beneficiary:{members[i]}", f"beneficiary:{members[j]}"
+                    if G.has_edge(a, b):
+                        G[a][b]['weight'] = G[a][b].get('weight', 0.0) + RING_CLUSTER_WEIGHT
+                        G[a][b]['shared_account'] = True
+                    else:
+                        G.add_edge(a, b, weight=RING_CLUSTER_WEIGHT, leakage_weight=0.0, anomaly_count=0, shared_account=True)
+                    beneficiary_labels.setdefault(a, members[i])
+                    beneficiary_labels.setdefault(b, members[j])
+
+    if G.number_of_edges() == 0:
+        return _empty_graph_result()
+
+    partition = community_louvain.best_partition(G, weight='weight')
+
+    weighted_degree = dict(G.degree(weight='leakage_weight'))
+    anomaly_degree: dict = {n: 0 for n in G.nodes}
+    for u, v, data in G.edges(data=True):
+        anomaly_degree[u] += data.get('anomaly_count', 0)
+        anomaly_degree[v] += data.get('anomaly_count', 0)
+
+    nodes = []
+    for node_id in G.nodes:
+        node_type = 'officer' if node_id.startswith('officer:') else 'beneficiary'
+        raw_id = node_id.split(':', 1)[1]
+        label = beneficiary_labels.get(node_id, raw_id) if node_type == 'beneficiary' else raw_id
+        leakage = weighted_degree.get(node_id, 0.0)
+        nodes.append({
+            'id': node_id,
+            'type': node_type,
+            'label': label,
+            'leakage_kes': leakage,
+            'anomaly_count': anomaly_degree.get(node_id, 0),
+            'community': partition.get(node_id, 0),
+            'risk_level': _risk_level(leakage)
+        })
+
+    edges = [
+        {
+            'source': u,
+            'target': v,
+            # Real leakage_weight, not the boosted 'weight' Louvain
+            # clustered on — a shared_account ring edge should show as
+            # 0 KES here (it isn't leakage), not RING_CLUSTER_WEIGHT.
+            'weight': data.get('leakage_weight', data['weight']),
+            'anomaly_count': data.get('anomaly_count', 0),
+            'shared_account': data.get('shared_account', False),
+        }
+        for u, v, data in G.edges(data=True)
+    ]
+
+    communities_map: dict = {}
+    for node in nodes:
+        cid = node['community']
+        bucket = communities_map.setdefault(cid, {'id': cid, 'node_ids': [], 'total_leakage_kes': 0.0})
+        bucket['node_ids'].append(node['id'])
+        bucket['total_leakage_kes'] += node['leakage_kes']
+
+    communities = []
+    for bucket in communities_map.values():
+        communities.append({
+            'id': bucket['id'],
+            'node_ids': bucket['node_ids'],
+            'member_count': len(bucket['node_ids']),
+            'total_leakage_kes': bucket['total_leakage_kes'],
+            'risk_level': _risk_level(bucket['total_leakage_kes'])
+        })
+    communities.sort(key=lambda c: c['total_leakage_kes'], reverse=True)
+
+    top_risk_entities = sorted(
+        [{'id': n['id'], 'label': n['label'], 'type': n['type'], 'leakage_kes': n['leakage_kes'], 'risk_level': n['risk_level']} for n in nodes],
+        key=lambda n: n['leakage_kes'],
+        reverse=True
+    )[:5]
+
+    result = {
+        'nodes': nodes,
+        'edges': edges,
+        'communities': communities,
+        'summary': {
+            'node_count': len(nodes),
+            'edge_count': len(edges),
+            'community_count': len(communities),
+            'top_risk_entities': top_risk_entities
+        }
+    }
+    return clean_json_values(result)
+
+
+def build_outbound_fraud_graph(materiality: float = 0) -> dict:
+    """DB-backed wrapper for build_outbound_fraud_graph_from_dataframes()."""
+    from app.services.reconciliation.reconciliation import run_outbound_reconciliation
+    result = run_outbound_reconciliation(materiality=materiality)
+    anomalies_df = pd.DataFrame(result.get('anomalies', []))
+
+    engine = get_engine()
+    try:
+        disbursements_df = pd.read_sql("SELECT beneficiary_id, disbursing_account FROM disbursements", engine)
+    except Exception:
+        disbursements_df = None
+
+    return build_outbound_fraud_graph_from_dataframes(anomalies_df, disbursements_df)
+
+
+def _merge_graph_results(a: dict, b: dict) -> dict:
+    """Concatenates two build_fraud_graph_from_dataframes()-shaped results
+    (used for direction="all"). Community ids are re-namespaced with a
+    large integer offset (rather than merged by Louvain across both graphs
+    at once, which would require rebuilding one combined nx.Graph out of
+    two otherwise-disconnected node sets for no analytical benefit — an
+    inbound OMC and an outbound officer never actually interact) so an
+    inbound community id and an outbound community id never collide.
+    Kept as an int offset rather than a string prefix (e.g. "out-3")
+    specifically because GraphNode.community/GraphCommunity.id are typed
+    `int` in schemas/fraud/graph.py — a string would fail response
+    validation on every direction="all" request."""
+    if not a.get('nodes'):
+        return b
+    if not b.get('nodes'):
+        return a
+
+    # Comfortably above any realistic Louvain partition id (community ids
+    # are small sequential ints starting at 0) from either graph.
+    OUTBOUND_COMMUNITY_OFFSET = 100_000
+
+    for community in b['communities']:
+        community['id'] = community['id'] + OUTBOUND_COMMUNITY_OFFSET
+    for node in b['nodes']:
+        node['community'] = node['community'] + OUTBOUND_COMMUNITY_OFFSET
+
+    merged_communities = sorted(a['communities'] + b['communities'], key=lambda c: c['total_leakage_kes'], reverse=True)
+    merged_top_risk = sorted(
+        a['summary']['top_risk_entities'] + b['summary']['top_risk_entities'],
+        key=lambda n: n['leakage_kes'],
+        reverse=True
+    )[:5]
+
+    return {
+        'nodes': a['nodes'] + b['nodes'],
+        'edges': a['edges'] + b['edges'],
+        'communities': merged_communities,
+        'summary': {
+            'node_count': a['summary']['node_count'] + b['summary']['node_count'],
+            'edge_count': a['summary']['edge_count'] + b['summary']['edge_count'],
+            'community_count': a['summary']['community_count'] + b['summary']['community_count'],
+            'top_risk_entities': merged_top_risk,
+        }
+    }
+
+
+# ==============================================================================
 # OMC<->depot structural graph (see module docstring, part 2)
 # ==============================================================================
 
