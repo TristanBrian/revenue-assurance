@@ -66,6 +66,18 @@ NOT_ALEMBIC_MANAGED_TABLES = {
     "ebilling_sync",
     "ebilling_dlq",
     "ebilling_webhook_log",
+    # --- Outbound (stipend/disbursement) — Stage 2. ETL-owned exactly like
+    # the inbound rows above (scripts/etl_pipeline.py's file_mapping/
+    # datasets_clean, dropped+recreated via pandas .to_sql every run).
+    # pillars/stipend_ledger are deliberately NOT in this set — same as
+    # quota_ledger/depot_ledger, they're declared ORM models with no
+    # migration OR ETL step populating them yet (see those two files'
+    # docstrings for the precedent).
+    "officers",
+    "beneficiaries",
+    "attendance",
+    "stipend_authorizations",
+    "disbursements",
 }
 
 

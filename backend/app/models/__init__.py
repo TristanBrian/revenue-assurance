@@ -25,6 +25,14 @@ from app.models.alerts.alert import Alert
 from app.models.alerts.alert_read import AlertRead
 from app.models.auth.terms_document import TermsDocument
 from app.models.auth.consent_record import ConsentRecord
+# --- Outbound (stipend/disbursement) — Stage 2 ---
+from app.models.reconciliation.officer import Officer
+from app.models.reconciliation.pillar import Pillar
+from app.models.reconciliation.beneficiary import Beneficiary
+from app.models.reconciliation.attendance import Attendance
+from app.models.reconciliation.stipend_authorization import StipendAuthorization
+from app.models.reconciliation.disbursement import Disbursement
+from app.models.reconciliation.stipend_ledger import StipendLedger
 
 __all__ = [
     "User",
@@ -44,4 +52,11 @@ __all__ = [
     "AlertRead",
     "TermsDocument",
     "ConsentRecord",
+    "Officer",
+    "Pillar",
+    "Beneficiary",
+    "Attendance",
+    "StipendAuthorization",
+    "Disbursement",
+    "StipendLedger",
 ]
