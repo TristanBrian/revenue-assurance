@@ -23,7 +23,7 @@ from app.schemas.fraud.graph import CommunityOut, FraudGraphResponse, NetworkRes
 from app.services.fraud import detective_service, graph_engine
 from app.core.cache import get_cached_result, set_cached_result
 from app.services.alerts.alert_service import notify_fraud_clusters
-from app.services.reconciliation.reconciliation import run_reconciliation
+from app.services.reconciliation.reconciliation import run_reconciliation, run_outbound_reconciliation
 from app.utils.db_connection import get_engine
 import pandas as pd
 
@@ -39,12 +39,15 @@ router = APIRouter()
 @router.get("", response_model=FraudGraphResponse)
 def fraud_graph(
     materiality: float = Query(100000, description="Min leakage to include"),
+    direction: str = Query("all", description="inbound | outbound | all — defaults to all"),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("view_fraud_graph")),
 ):
     """
-    Returns the OMC<->Depot leakage graph with Louvain community detection.
-    Uses cached reconciliation data to avoid re-running reconciliation.
+    Returns the OMC<->Depot leakage graph (inbound) and/or the
+    Officer<->Beneficiary leakage graph (outbound, Stage 2) with Louvain
+    community detection. Uses cached reconciliation data to avoid
+    re-running reconciliation.
 
     Reuses graph_engine.build_fraud_graph_from_dataframes() — the same
     pure builder build_fraud_graph() delegates to — on both the cache-hit
@@ -59,16 +62,17 @@ def fraud_graph(
     real builder costs nothing extra on the cache-hit path.
     """
     try:
-        cache_key = f"metrics_{materiality}"
+        cache_key = f"metrics_{materiality}_{direction}"
         cached = get_cached_result(cache_key)
 
         is_cache_miss = not (cached and 'anomalies' in cached)
         if not is_cache_miss:
-            logger.info(f"✅ Graph using cached anomalies for materiality={materiality}")
+            logger.info(f"✅ Graph using cached anomalies for materiality={materiality}, direction={direction}")
             anomalies = cached['anomalies']
         else:
             logger.info(f"🔄 Graph cache miss – running reconciliation...")
-            result = run_reconciliation(materiality=materiality)
+            from app.services.reconciliation.reconciliation import run_combined_reconciliation
+            result = run_combined_reconciliation(direction=direction, materiality=materiality)
             anomalies = result.get('anomalies', [])
 
             metrics_data = {
@@ -82,11 +86,24 @@ def fraud_graph(
                 'anomalies': anomalies,
             }
             set_cached_result(cache_key, metrics_data)
-            logger.info(f"✅ Graph cached full result for materiality={materiality}")
+            logger.info(f"✅ Graph cached full result for materiality={materiality}, direction={direction}")
 
         anomalies_df = pd.DataFrame(anomalies)
-        dispatches_df = pd.read_sql("SELECT dispatch_id, omc_id, depot FROM dispatches", get_engine())
-        data = graph_engine.build_fraud_graph_from_dataframes(anomalies_df, dispatches_df)
+        inbound_df = anomalies_df[anomalies_df.get('flow_direction', pd.Series(dtype=object)) != 'outbound'] if not anomalies_df.empty else anomalies_df
+        outbound_df = anomalies_df[anomalies_df.get('flow_direction', pd.Series(dtype=object)) == 'outbound'] if not anomalies_df.empty else anomalies_df
+
+        data = graph_engine._empty_graph_result()
+        if direction in ("inbound", "all"):
+            dispatches_df = pd.read_sql("SELECT dispatch_id, omc_id, depot FROM dispatches", get_engine())
+            inbound_graph = graph_engine.build_fraud_graph_from_dataframes(inbound_df, dispatches_df)
+            data = inbound_graph
+        if direction in ("outbound", "all"):
+            try:
+                disbursements_df = pd.read_sql("SELECT beneficiary_id, disbursing_account FROM disbursements", get_engine())
+            except Exception:
+                disbursements_df = None
+            outbound_graph = graph_engine.build_outbound_fraud_graph_from_dataframes(outbound_df, disbursements_df)
+            data = graph_engine._merge_graph_results(data, outbound_graph) if direction == "all" else outbound_graph
 
         # Gated to the same cache-miss condition as the anomalies above —
         # alert_exists() dedup would make this safe on every request
