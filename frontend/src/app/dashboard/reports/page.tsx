@@ -292,23 +292,8 @@ function ReportsContent() {
             Audit operational drops, financial settlements, and tax declarations.
           </p>
         </div>
-
-        {/* Materiality Control */}
-        <div className="flex items-center gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 shadow-sm shrink-0">
-          <label htmlFor="materiality" className="text-xs font-semibold text-zinc-500">
-            Materiality (KES)
-          </label>
-          <input
-            id="materiality"
-            type="number"
-            min={0}
-            step={25000}
-            value={materiality}
-            onChange={(e) => setMateriality(Number(e.target.value))}
-            className="w-32 rounded border border-zinc-200 dark:border-zinc-700 bg-zinc-55 dark:bg-zinc-950 px-2.5 py-1 text-xs text-indigo-650 dark:text-indigo-400 font-bold font-mono focus:outline-none focus:border-indigo-500 transition-all shadow-inner"
-          />
-        </div>
       </header>
+
 
       {/* Compliance & Governance Banner */}
       <div className="bg-emerald-50/90 dark:bg-emerald-950/25 border border-emerald-300/80 dark:border-emerald-500/30 rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm my-2">
