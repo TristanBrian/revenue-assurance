@@ -25,3 +25,9 @@ httpx==0.28.1
 # Immutable audit trail — on-chain anchor (Base Sepolia)
 cdp-sdk==1.44.0
 web3==7.16.0
+
+# Fraud scoring layer (ML) — XGBoost classifier + Isolation Forest + SHAP
+xgboost==3.4.1
+scikit-learn==1.9.0
+shap==0.52.0
+joblib==1.5.3

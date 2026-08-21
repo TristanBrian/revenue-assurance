@@ -41,6 +41,12 @@ backend/data/clean/*.csv
 !backend/data/raw/.gitkeep
 !backend/data/clean/.gitkeep
 
+# Fraud scoring layer — trained model artifacts, regenerable via
+# scripts/train_fraud_model.py (same "generated, not source" posture as
+# backend/data/ above)
+backend/app/ml_models/*
+!backend/app/ml_models/.gitkeep
+
 # Reports (Generated Excel files)
 *.xlsx
 *.xls
