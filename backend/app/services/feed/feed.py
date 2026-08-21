@@ -1,4 +1,4 @@
-# backend/app/services/feed.py
+# backend/app/services/feed/feed.py
 """
 Live Feed Service – Caches the latest anomalies for real‑time monitoring.
 """

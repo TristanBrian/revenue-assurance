@@ -1,8 +1,8 @@
 """
 Tests for the consent-gated password reset / re-consent flow:
-  - services/terms_service.py: get_active_document, get_required_version,
+  - services/auth/terms_service.py: get_active_document, get_required_version,
     user_needs_consent, record_consent, get_terms_bundle
-  - routes/auth.py: reset_password()'s bundled consent validation,
+  - routes/auth/auth.py: reset_password()'s bundled consent validation,
     login()'s terms_required branch, POST /accept-terms
   - core/dependencies.py: get_current_user's TERMS_ACCEPTANCE_REQUIRED guard
 
@@ -78,7 +78,7 @@ def client(db_session):
 
 @pytest.fixture(autouse=True)
 def no_real_email(monkeypatch):
-    monkeypatch.setattr("app.routes.admin.send_email", lambda *a, **k: True)
+    monkeypatch.setattr("app.routes.auth.admin.send_email", lambda *a, **k: True)
     monkeypatch.setattr("app.services.alerts.alert_service.send_email", lambda *a, **k: True)
 
 

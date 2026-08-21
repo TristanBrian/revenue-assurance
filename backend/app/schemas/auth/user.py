@@ -1,6 +1,6 @@
 """
-Pydantic schemas for routes/auth.py and routes/admin.py (backed by
-app/models/user.py's User/Role/Permission SQLAlchemy models).
+Pydantic schemas for routes/auth/auth.py and routes/auth/admin.py (backed by
+app/models/auth/user.py's User/Role/Permission SQLAlchemy models).
 """
 from datetime import datetime
 from typing import Any, Optional
@@ -109,7 +109,7 @@ class ResetPasswordResponse(BaseModel):
 
 
 class UserOut(BaseModel):
-    """Response shape for /register, /me, and routes/admin.py's user list/
+    """Response shape for /register, /me, and routes/auth/admin.py's user list/
     edit endpoints. Deliberately excludes hashed_password and any raw ORM
     relationship objects — only id, email, full_name, is_active,
     created_at, and flattened role/permission name lists.

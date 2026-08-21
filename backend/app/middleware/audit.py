@@ -14,9 +14,9 @@ so a curated query like get_audit_logs(action="anomaly.resolve") never
 picks up this middleware's rows by mistake.
 
 EXPLICITLY_AUDITED_PATH_PREFIXES lists every path that already gets a
-targeted log_action() call elsewhere (services/user_service.py,
-services/e_billing.py's update_anomaly_status, routes/auth.py's
-login/register, routes/reconcile.py's /update and /sync) — this
+targeted log_action() call elsewhere (services/auth/user_service.py,
+services/ebilling/e_billing.py's update_anomaly_status, routes/auth/auth.py's
+login/register, routes/reconciliation/reconcile.py's /update and /sync) — this
 middleware skips those entirely rather than double-logging the same
 request once specifically and once generically. Keep this list in sync
 whenever a new explicit log_action() call is added.

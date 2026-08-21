@@ -427,7 +427,7 @@ def update_anomaly_status(db: Session, dispatch_id: str, status: str, notes: str
     raw engine/text() upserts — this is a single-record CRUD by primary
     key, not a bulk sync operation, so the ORM is a more natural fit here.
 
-    Takes the caller's request-scoped session (routes/reconcile.py's
+    Takes the caller's request-scoped session (routes/reconciliation/reconcile.py's
     Depends(get_db)) instead of opening its own SessionLocal(), and a
     single db.commit() covers both the AnomalyResolution write and the
     audit_service.log_action() call below — so the audit entry is atomic

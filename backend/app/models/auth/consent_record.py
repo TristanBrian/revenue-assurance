@@ -1,7 +1,7 @@
 """
 ConsentRecord — full audit history of every consent a user has given,
 independent of users.terms_accepted_version/terms_accepted_at (which only
-cache the *latest* state for fast checks — see services/terms_service.py).
+cache the *latest* state for fast checks — see services/auth/terms_service.py).
 One row per document per acceptance event: accepting the combined "Terms &
 Conditions and Privacy Policy" checkbox writes two rows here (one per
 document_type), not one, so each document's version/hash history is

@@ -55,9 +55,9 @@ def get_current_user(
     # check must_reset_password... force-redirect to /reset-password").
     # Structurally, a user can't normally hold a valid access token while
     # must_reset_password is True — login() issues a reset token instead
-    # (see routes/auth.py) — except when an admin sets it on an
+    # (see routes/auth/auth.py) — except when an admin sets it on an
     # *already-active* user who still has an unexpired token from before
-    # (services/user_service.py's regenerate_temp_password). This is the
+    # (services/auth/user_service.py's regenerate_temp_password). This is the
     # guard that closes that gap: a distinct, greppable detail string
     # ("PASSWORD_RESET_REQUIRED") rather than the generic 401 message so
     # the frontend can tell "reset required" apart from "not logged in"
@@ -72,8 +72,8 @@ def get_current_user(
     # is fine but who hasn't accepted the currently-active Terms &
     # Conditions/Privacy Policy version (never accepted at all, or a newer
     # version was published since) is blocked from every other route until
-    # they re-consent via POST /api/auth/accept-terms — see routes/auth.py
-    # and services/terms_service.py. Distinct detail string so the
+    # they re-consent via POST /api/auth/accept-terms — see routes/auth/auth.py
+    # and services/auth/terms_service.py. Distinct detail string so the
     # frontend routes to the consent-only variant of /reset-password
     # instead of the full password-reset form.
     required_version = get_required_version(db)

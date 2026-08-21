@@ -1,6 +1,6 @@
 """
-Pydantic schemas for the terms/consent endpoints in routes/auth.py, backed
-by services/terms_service.py.
+Pydantic schemas for the terms/consent endpoints in routes/auth/auth.py, backed
+by services/auth/terms_service.py.
 """
 from typing import Optional
 

@@ -1,5 +1,5 @@
 """
-Tests for services/alert_service.py + services/alert_types.py.
+Tests for services/alerts/alert_service.py + services/alerts/alert_types.py.
 
 Uses an in-memory SQLite engine bound to the real ORM Base, same convention
 as test_audit_service.py — Alert/AlertRead need Role/Permission/User too

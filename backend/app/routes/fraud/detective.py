@@ -4,9 +4,9 @@ findings, meant for an analyst to pull into their own tools (a notebook,
 Excel, a separate plotting script), not just the built-in dashboard.
 
 Thin routes: parse input, call one service function, return/raise. Same
-convention as routes/auth.py. Gated on "view_risk_analytics", a distinct
+convention as routes/auth/auth.py. Gated on "view_risk_analytics", a distinct
 permission from "view_fraud_graph" — this file has no graph concept, so it
-shouldn't share a permission name with the graph feature (routes/graph.py).
+shouldn't share a permission name with the graph feature (routes/fraud/graph.py).
 """
 import io
 
@@ -16,7 +16,7 @@ from fastapi.responses import StreamingResponse
 from app.core.dependencies import require_permission
 from app.models.auth.user import User
 from app.schemas.fraud.detective import OmcRiskFeatures
-from app.services import detective_service
+from app.services.fraud import detective_service
 from app.utils.db_connection import get_engine
 
 router = APIRouter()  # prefix="/api/detective" and tags supplied by main.py's include_router()

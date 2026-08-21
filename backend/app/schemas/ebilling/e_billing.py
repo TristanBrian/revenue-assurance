@@ -1,8 +1,8 @@
 """
-Pydantic response schemas for routes/e_billing.py.
+Pydantic response schemas for routes/ebilling/e_billing.py.
 
 Field lists below were taken directly from the actual dict literals returned
-by app/services/e_billing.py (verified via AST inspection, not copied from
+by app/services/ebilling/e_billing.py (verified via AST inspection, not copied from
 the old unused schemas in app/models/e_billing.py — those had drifted: e.g.
 the old EBillingSyncResponse was missing 'status' and 'message', which the
 real sync_invoices_to_ebilling() return dict always includes).

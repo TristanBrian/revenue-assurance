@@ -150,7 +150,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         # Password's fine — but the currently-active Terms & Conditions/
         # Privacy Policy version might not be. Bundled into the SAME
         # reset-password screen (consent-only variant) rather than a
-        # separate page — see services/terms_service.py.
+        # separate page — see services/auth/terms_service.py.
         required_version = get_required_version(db)
         if user_needs_consent(user, required_version):
             log_action(

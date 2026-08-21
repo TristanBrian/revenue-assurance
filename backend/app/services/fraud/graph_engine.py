@@ -1,4 +1,4 @@
-# backend/app/services/graph_engine.py
+# backend/app/services/fraud/graph_engine.py
 """
 Two coexisting graph features live here — no name collisions between them,
 so they share this file rather than splitting into two:
@@ -36,7 +36,7 @@ from networkx.algorithms.community import louvain_communities
 
 from app.utils.db_connection import get_engine
 from app.services.reconciliation.reconciliation import run_reconciliation, clean_json_values
-from app.services import detective_service
+from app.services.fraud import detective_service
 
 # Same bins used by calculate_omc_risk() in reconciliation.py, applied here
 # per-node/per-community instead of via pd.cut over a whole column.

@@ -2,10 +2,10 @@
 Tests for the admin-provisioned temp-password / forced-reset flow:
   - core/security.py: generate_temp_password, password_fingerprint,
     create_reset_token/decode_reset_token
-  - services/user_service.py: provision_user_with_temp_password,
+  - services/auth/user_service.py: provision_user_with_temp_password,
     regenerate_temp_password
-  - routes/auth.py: login()'s reset_required branch, POST /reset-password
-  - routes/admin.py: POST /users, POST /users/{id}/resend-temp-password
+  - routes/auth/auth.py: login()'s reset_required branch, POST /reset-password
+  - routes/auth/admin.py: POST /users, POST /users/{id}/resend-temp-password
   - core/dependencies.py: get_current_user's must_reset_password guard and
     reset-token-can't-be-used-as-a-session-token guard
 
@@ -95,7 +95,7 @@ def no_real_email(monkeypatch):
     """Every test in this file gets a mocked send_email — captures calls
     instead of hitting real SMTP. Access via the `sent` list.
 
-    Two separate import bindings need mocking, not one: app.routes.admin's
+    Two separate import bindings need mocking, not one: app.routes.auth.admin's
     (the plaintext temp-password email) and app.services.alerts.alert_service's
     (provisioning a user now also fires a four-eyes admin_sensitive_action
     alert — see user_service.py). Each module did `from app.core.email
@@ -111,7 +111,7 @@ def no_real_email(monkeypatch):
         sent.append({"to": list(to), "subject": subject, "html_body": html_body, "text_body": text_body})
         return True
 
-    monkeypatch.setattr("app.routes.admin.send_email", fake_send_email)
+    monkeypatch.setattr("app.routes.auth.admin.send_email", fake_send_email)
     monkeypatch.setattr("app.services.alerts.alert_service.send_email", lambda *a, **k: True)
     return sent
 
@@ -203,7 +203,7 @@ def test_decode_reset_token_rejects_a_normal_access_token():
 
 
 # ============================================================================
-# services/user_service.py
+# services/auth/user_service.py
 # ============================================================================
 
 def test_provision_user_with_temp_password_never_persists_plaintext(db_session):

@@ -1,7 +1,7 @@
 """
 detective_service.py — statistical/EDA risk-feature layer.
 
-Follows the raw-SQL/pandas pattern used in services/reconciliation.py
+Follows the raw-SQL/pandas pattern used in services/reconciliation/reconciliation.py
 (pd.read_sql against the engine from app.utils.db_connection). NO networkx
 import, no graph concepts — this file must be usable completely
 standalone; an analyst calling these functions/endpoints should never need
@@ -10,7 +10,7 @@ never the reverse.
 
 No caching/background-job infrastructure here — synchronous computation
 only. If this proves slow against real dataset size, a response cache
-similar to services/feed.py's in-memory pattern is a reasonable follow-up,
+similar to services/feed/feed.py's in-memory pattern is a reasonable follow-up,
 but it isn't built speculatively here.
 """
 from typing import Optional
@@ -31,7 +31,7 @@ def _load_tables(engine):
     # value_kes, date, ...) — no total_paid_kes column, unlike the old ETL
     # this was originally written against. Aggregate to one row per
     # invoice_id here (sum of installments, latest payment date), same
-    # shape/semantics services/reconciliation.py's own fallback aggregation
+    # shape/semantics services/reconciliation/reconciliation.py's own fallback aggregation
     # produces, so ghost/aging/z-score logic below is unaffected by this.
     raw_payments = pd.read_sql("SELECT invoice_id, value_kes, date FROM payments", engine)
     payments = raw_payments.groupby("invoice_id", as_index=False).agg(

@@ -6,7 +6,7 @@ version bump is a data change (see scripts/seed_terms_documents.py), not a
 frontend deploy.
 
 Exactly one row per document_type should have is_active=True at a time —
-enforced at the application layer (services/terms_service.py), not a DB
+enforced at the application layer (services/auth/terms_service.py), not a DB
 constraint, since "deactivate the old one, activate the new one" is a
 two-statement operation anyway.
 """

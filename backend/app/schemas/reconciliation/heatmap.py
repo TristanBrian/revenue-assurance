@@ -1,9 +1,9 @@
 """
-Pydantic response schema for routes/heatmap.py.
+Pydantic response schema for routes/reconciliation/heatmap.py.
 
 Note: there is no app/models/heatmap.py to mirror — heatmap.py has no
 backing SQLAlchemy model (it pivots reconciliation results in memory, see
-app/services/heatmap.py). This file exists because routes/heatmap.py still
+app/services/reconciliation/heatmap.py). This file exists because routes/reconciliation/heatmap.py still
 needs a response_model per the schemas-layer requirement; it's named after
 the route it serves rather than force-fit into reconciliation.py's schema
 file.

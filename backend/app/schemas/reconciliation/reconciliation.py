@@ -1,8 +1,8 @@
 """
-Pydantic response schemas for routes/reconcile.py.
+Pydantic response schemas for routes/reconciliation/reconcile.py.
 
 Field lists below were taken directly from the dict literals actually built
-in app/services/reconciliation.py and app/services/e_billing.py's
+in app/services/reconciliation/reconciliation.py and app/services/ebilling/e_billing.py's
 update_anomaly_status() (verified via AST inspection), not copied from the
 old unused schemas in this module — those had drifted from reality: the old
 Metrics was missing 'overpayment_leak', 'pending_count' and 'review_count',
@@ -45,7 +45,7 @@ class Anomaly(BaseModel):
     # Persisted overlay from anomaly_resolutions (app/models/anomaly_resolution.py) —
     # None until someone calls POST /reconcile/update for this dispatch_id.
     # Doesn't affect whether this anomaly appears at all; see
-    # services/reconciliation.py's resolution-overlay comment.
+    # services/reconciliation/reconciliation.py's resolution-overlay comment.
     resolution_status: Optional[str] = None
     resolution_notes: Optional[str] = None
     resolution_updated_at: Optional[str] = None
@@ -179,8 +179,8 @@ class SyncAnomaliesResponse(BaseModel):
 
 
 class UpdateAnomalyResponse(BaseModel):
-    """POST /reconcile/update (update_anomaly_status() in services/e_billing.py
-    — implemented there, but the route it backs lives in routes/reconcile.py)."""
+    """POST /reconcile/update (update_anomaly_status() in services/ebilling/e_billing.py
+    — implemented there, but the route it backs lives in routes/reconciliation/reconcile.py)."""
     status: str
     message: str
     dispatch_id: str

@@ -85,7 +85,7 @@ def db_with_data(sample_data):
     conn.close()
 
     # Point run_reconciliation() at this throwaway SQLite file instead of the
-    # real kpc.db (DB_PATH no longer exists — services/reconciliation.py talks
+    # real kpc.db (DB_PATH no longer exists — services/reconciliation/reconciliation.py talks
     # to the DB via get_engine() since the SQLAlchemy migration).
     import app.services.reconciliation.reconciliation as recon_module
     from sqlalchemy import create_engine

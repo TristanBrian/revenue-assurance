@@ -1,5 +1,5 @@
 """
-Pydantic response schemas for routes/graph.py — two coexisting graph
+Pydantic response schemas for routes/fraud/graph.py — two coexisting graph
 features, each with its own schema set (no shared names):
 
 - Anomaly-based fraud graph (GraphNode/GraphEdge/.../FraudGraphResponse):

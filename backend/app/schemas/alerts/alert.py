@@ -1,5 +1,5 @@
 """
-Pydantic schemas for routes/alerts.py, backed by app/models/alert.py's
+Pydantic schemas for routes/alerts/alerts.py, backed by app/models/alerts/alert.py's
 Alert SQLAlchemy model (see also alert_read.py). Same UUID-stringify
 convention as schemas/audit.py.
 """

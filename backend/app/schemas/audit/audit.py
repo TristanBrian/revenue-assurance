@@ -1,5 +1,5 @@
 """
-Pydantic schemas for routes/audit.py, backed by app/models/audit.py's
+Pydantic schemas for routes/audit/audit.py, backed by app/models/audit/audit.py's
 AuditLog SQLAlchemy model.
 """
 from datetime import datetime

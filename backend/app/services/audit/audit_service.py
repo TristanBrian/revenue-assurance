@@ -1,6 +1,6 @@
 """
 Audit trail service — backs GET /api/audit/logs and /api/audit/logs/{log_id}
-(routes/audit.py), and is called from the other services/routes that record
+(routes/audit/audit.py), and is called from the other services/routes that record
 audit-worthy actions (anomaly resolution, e-billing sync/retry, user
 administration, login attempts).
 

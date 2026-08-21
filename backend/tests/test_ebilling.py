@@ -32,7 +32,7 @@ DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'test_kpc.db'
 def test_db():
     """Create a test database with sample invoices."""
     # Point the service module's engine at a throwaway SQLite file instead of
-    # the real kpc.db (DB_PATH no longer exists — services/e_billing.py talks
+    # the real kpc.db (DB_PATH no longer exists — services/ebilling/e_billing.py talks
     # to the DB via get_engine() since the SQLAlchemy migration).
     import app.services.ebilling.e_billing
     from sqlalchemy import create_engine

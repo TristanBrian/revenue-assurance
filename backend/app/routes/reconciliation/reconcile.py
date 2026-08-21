@@ -1,4 +1,4 @@
-# backend/app/routes/reconcile.py
+# backend/app/routes/reconciliation/reconcile.py
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -122,8 +122,8 @@ def reconcile_metrics(
 
         # Reconciliation-side alert triggers — all gated to the cache-miss
         # path so they run once per fresh reconciliation, not on every
-        # dashboard load. See services/alert_types.py for tier/audience per
-        # trigger, and services/alert_service.py for the notify_* functions.
+        # dashboard load. See services/alerts/alert_types.py for tier/audience per
+        # trigger, and services/alerts/alert_service.py for the notify_* functions.
         # Any failure here is logged and swallowed — an alerting bug must
         # never break the metrics endpoint itself.
         try:

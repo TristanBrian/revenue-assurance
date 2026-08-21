@@ -1,9 +1,9 @@
 """
-Pydantic response schema for routes/feed.py.
+Pydantic response schema for routes/feed/feed.py.
 
 Note: there is no app/models/feed.py to mirror — feed.py has no backing
-SQLAlchemy model (it's an in-memory cache, see app/services/feed.py). This
-file exists because routes/feed.py still needs a response_model per the
+SQLAlchemy model (it's an in-memory cache, see app/services/feed/feed.py). This
+file exists because routes/feed/feed.py still needs a response_model per the
 schemas-layer requirement; it's named after the route it serves rather than
 force-fit into reconciliation.py's schema file.
 """

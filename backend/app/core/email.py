@@ -1,7 +1,7 @@
 """
 SMTP sending mechanics — the "how" of email delivery. The "when/who/what"
 (deciding an alert is worth emailing, picking recipients, composing the
-message) lives one layer up in services/alert_service.py, same split as
+message) lives one layer up in services/alerts/alert_service.py, same split as
 security.py (JWT/password mechanics) vs. user_service.py (orchestration).
 
 Requires env vars (add to .env — see .env.example):

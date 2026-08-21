@@ -1,9 +1,9 @@
 """
-Tests for services/audit_service.py.
+Tests for services/audit/audit_service.py.
 
 Uses an in-memory SQLite engine bound to the real ORM Base (AuditLog's
 JSONB columns fall back to plain JSON under SQLite specifically so this
-works — see app/models/audit.py), rather than DataFrame-only fixtures like
+works — see app/models/audit/audit.py), rather than DataFrame-only fixtures like
 test_reconciliation.py, since log_action()/get_audit_logs()/get_audit_log()
 are thin wrappers around a real Session and need one to exercise.
 

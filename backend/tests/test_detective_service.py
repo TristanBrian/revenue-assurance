@@ -1,5 +1,5 @@
 """
-Tests for services/detective_service.py.
+Tests for services/fraud/detective_service.py.
 
 Uses an in-memory SQLite engine (via to_sql) rather than DataFrame-only
 fixtures like test_reconciliation.py, since compute_omc_risk_features()

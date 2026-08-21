@@ -1,6 +1,6 @@
 """
-Alert model — backs GET/POST /api/alerts and services/alert_service.py.
-Every alert's tier and audience are driven by services/alert_types.py's
+Alert model — backs GET/POST /api/alerts and services/alerts/alert_service.py.
+Every alert's tier and audience are driven by services/alerts/alert_types.py's
 registry (see that module's docstring for the target_permissions vs.
 target_roles distinction) rather than each caller inventing its own.
 """
@@ -14,7 +14,7 @@ from sqlalchemy.orm import relationship
 from app.utils.db_connection import Base
 
 # JSONB in Postgres, falling back to plain JSON under SQLite — same pattern
-# as models/audit.py, for the same reason (tests run against in-memory SQLite).
+# as models/audit/audit.py, for the same reason (tests run against in-memory SQLite).
 _JSONVariant = JSONB().with_variant(JSON(), "sqlite")
 
 

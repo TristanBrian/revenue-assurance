@@ -1,6 +1,6 @@
-# backend/app/routes/graph.py
+# backend/app/routes/fraud/graph.py
 """
-Two coexisting graph features (see services/graph_engine.py's module
+Two coexisting graph features (see services/fraud/graph_engine.py's module
 docstring for the full split):
 
 - GET /api/graph — anomaly-based fraud graph, frontend-compatible shape.
@@ -20,7 +20,7 @@ from app.core.dependencies import get_db, require_permission
 from app.models.auth.user import User
 from app.schemas.fraud.detective import OmcRiskDetail
 from app.schemas.fraud.graph import CommunityOut, FraudGraphResponse, NetworkResponse, OmcDepotEdge, OmcDepotNode
-from app.services import detective_service, graph_engine
+from app.services.fraud import detective_service, graph_engine
 from app.core.cache import get_cached_result, set_cached_result
 from app.services.alerts.alert_service import notify_fraud_clusters
 from app.services.reconciliation.reconciliation import run_reconciliation

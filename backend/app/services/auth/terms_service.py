@@ -1,5 +1,5 @@
 """
-Terms/consent business logic — backs routes/auth.py's terms bundle,
+Terms/consent business logic — backs routes/auth/auth.py's terms bundle,
 reset-password, and accept-terms endpoints. Framework-agnostic on purpose
 (no FastAPI imports), same convention as the other services.
 
@@ -8,7 +8,7 @@ together by convention — scripts/seed_terms_documents.py always seeds them
 with the same version string when bumping either, since the product
 presents them as one combined checkbox/acceptance action, and users only
 has a single terms_accepted_version column to cache against (see
-models/user.py). Nothing here *enforces* the two staying in lockstep — if
+models/auth/user.py). Nothing here *enforces* the two staying in lockstep — if
 you ever need them versioned independently, users would need a second
 cache column and get_required_version()'s "one version to rule them all"
 assumption would need to change with it.
@@ -52,7 +52,7 @@ def user_needs_consent(user: User, required_version: Optional[str]) -> bool:
 
 def get_terms_bundle(db: Session) -> dict:
     """GET /api/auth/terms — the full text + version for both documents,
-    for the frontend to render. No auth required (see routes/auth.py's
+    for the frontend to render. No auth required (see routes/auth/auth.py's
     docstring on why): a user in the middle of the reset/consent flow
     doesn't have a normal session token yet."""
     bundle = {}

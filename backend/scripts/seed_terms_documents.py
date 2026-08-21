@@ -15,7 +15,7 @@ Idempotent / self-healing, same convention as seed_roles.py: re-running
 with an unchanged TERMS_VERSION is a no-op if that version is already the
 active one; bumping TERMS_VERSION deactivates the previous version and
 activates the new one, which is what forces every user back through
-re-consent (see services/terms_service.py, app/core/dependencies.py's guard).
+re-consent (see services/auth/terms_service.py, app/core/dependencies.py's guard).
 
 Run with (from backend/, same as seed_roles.py):
     python scripts/seed_terms_documents.py

@@ -125,7 +125,7 @@ def provision_user_with_temp_password(
     never supplies or sees a password. Generates one, persists only its
     hash plus must_reset_password=True and a 48h expiry, and returns the
     plaintext alongside the created User — the *only* place that plaintext
-    exists outside memory-in-transit. The caller (routes/admin.py) must
+    exists outside memory-in-transit. The caller (routes/auth/admin.py) must
     pass it straight to app.core.email.send_email and then drop it; it
     must never be logged, returned in an API response, or handed to
     alert_service.create_alert() (that persists its message to the DB,

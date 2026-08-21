@@ -45,7 +45,7 @@ class AlertTier(str, Enum):
 
 
 class AlertType(str, Enum):
-    # --- Reconciliation (services/reconciliation.py) ---
+    # --- Reconciliation (services/reconciliation/reconciliation.py) ---
     CRITICAL_ANOMALY = "critical_anomaly"
     ANOMALY_MATERIALITY_SPIKE = "anomaly_materiality_spike"
     OMC_RISK_ESCALATION = "omc_risk_escalation"
@@ -55,12 +55,12 @@ class AlertType(str, Enum):
     REPEATED_RESOLVE_REOPEN = "repeated_resolve_reopen"
     ETL_RUN_FAILED = "etl_run_failed"
 
-    # --- Fraud Graph (services/graph_engine.py) ---
+    # --- Fraud Graph (services/fraud/graph_engine.py) ---
     FRAUD_CLUSTER_NEW = "fraud_cluster_new"
     FRAUD_CLUSTER_RISK_INCREASE = "fraud_cluster_risk_increase"
     FRAUD_CLUSTER_OMC_JOINED = "fraud_cluster_omc_joined"
 
-    # --- E-Billing (services/e_billing.py) ---
+    # --- E-Billing (services/ebilling/e_billing.py) ---
     EBILLING_DLQ = "ebilling_dlq"
     EBILLING_FAILURE_RATE_BREACH = "ebilling_failure_rate_breach"
     EBILLING_FAILURE_RATE_RECOVERED = "ebilling_failure_rate_recovered"
@@ -248,7 +248,7 @@ REGISTRY: dict[AlertType, AlertMeta] = {
         severity="info",
         description="A new admin-provisioned account's temp password.",
         notes=(
-            "Special-cased in routes/admin.py: calls app.core.email.send_email directly, bypassing "
+            "Special-cased in routes/auth/admin.py: calls app.core.email.send_email directly, bypassing "
             "create_alert()/the Alert table entirely, because the message contains the plaintext temp "
             "password and create_alert() always persists its message — exactly what must never happen. "
             "No in-app row for this one, by design."

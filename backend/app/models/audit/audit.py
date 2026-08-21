@@ -1,7 +1,7 @@
 """
 AuditLog model — persists the security/compliance audit trail (anomaly
 resolution, e-billing sync/retry, user administration, login attempts).
-Real ORM class (UUID PK), same pattern as models/user.py, since audit logs
+Real ORM class (UUID PK), same pattern as models/auth/user.py, since audit logs
 need real filtering/querying (by actor, action, target, date range) unlike
 the raw-pandas reconciliation/e-billing tables.
 """

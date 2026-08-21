@@ -1,4 +1,4 @@
-# backend/app/routes/heatmap.py
+# backend/app/routes/reconciliation/heatmap.py
 from fastapi import APIRouter, Depends, Query
 from app.core.dependencies import require_permission
 from app.schemas.reconciliation.heatmap import HeatmapResponse

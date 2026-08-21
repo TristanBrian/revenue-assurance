@@ -1,4 +1,4 @@
-# backend/app/routes/feed.py
+# backend/app/routes/feed/feed.py
 from fastapi import APIRouter, Depends, Query
 from app.core.dependencies import require_permission
 from app.services.feed.feed import get_feed, update_feed

@@ -1,7 +1,7 @@
 """
-Alert / notification service — backs routes/alerts.py, and is called from
+Alert / notification service — backs routes/alerts/alerts.py, and is called from
 every other service/route that generates a system alert. See
-services/alert_types.py for the full trigger -> tier -> audience registry
+services/alerts/alert_types.py for the full trigger -> tier -> audience registry
 this module is driven by; this file is the mechanics (create/read/dedup/
 throttle), that file is the policy (who gets what, why).
 
@@ -44,7 +44,7 @@ _VISIBILITY_SCAN_LIMIT = 5000
 
 # ============================================================================
 # Configurable thresholds for the new reconciliation-side triggers. Same
-# convention as services/reconciliation.py's MATERIALITY_THRESHOLD /
+# convention as services/reconciliation/reconciliation.py's MATERIALITY_THRESHOLD /
 # CRITICAL_AGE_DAYS — plain module constants, not (yet) env-driven.
 # ============================================================================
 MATERIALITY_SPIKE_MULTIPLIER = 5       # a single anomaly >= 5x materiality fires immediately
@@ -284,7 +284,7 @@ def _notify_alert_delivery_failed(db: Session, failed_alert: Alert, recipient_co
 
 
 # ============================================================================
-# RECONCILIATION TRIGGERS (called from routes/reconcile.py's
+# RECONCILIATION TRIGGERS (called from routes/reconciliation/reconcile.py's
 # reconcile_metrics() cache-miss branch)
 # ============================================================================
 
@@ -502,7 +502,7 @@ def notify_duplicate_spike(db: Session, duplicate_anomalies: list[dict]) -> list
 
 
 def notify_anomaly_reopened(db: Session, dispatch_id: str, before_status: Optional[str], new_status: str) -> Optional[Alert]:
-    """Called from services/e_billing.py's update_anomaly_status(). Caller
+    """Called from services/ebilling/e_billing.py's update_anomaly_status(). Caller
     commits alongside the resolution write, same transaction."""
     if before_status != "Resolved" or new_status == "Resolved":
         return None
@@ -518,7 +518,7 @@ def notify_anomaly_reopened(db: Session, dispatch_id: str, before_status: Option
 
 
 def notify_repeated_resolve_reopen(db: Session, dispatch_id: str, actor_user_id, change_count: int) -> Optional[Alert]:
-    """Called from services/e_billing.py's update_anomaly_status() with a
+    """Called from services/ebilling/e_billing.py's update_anomaly_status() with a
     count of status changes on this dispatch within
     REPEATED_RESOLVE_REOPEN_WINDOW_DAYS. Fires once per breach, not once
     per subsequent change past the threshold."""
@@ -552,7 +552,7 @@ def notify_etl_failed(db: Session, error: str) -> Alert:
 
 
 # ============================================================================
-# FRAUD GRAPH TRIGGERS (called from routes/graph.py's fraud_graph() on a
+# FRAUD GRAPH TRIGGERS (called from routes/fraud/graph.py's fraud_graph() on a
 # cache miss)
 # ============================================================================
 
@@ -634,7 +634,7 @@ def notify_fraud_clusters(db: Session, communities: list[dict]) -> list[Alert]:
 # ============================================================================
 
 def notify_ebilling_dlq(db: Session, invoice_id: str, error_message: str) -> Optional[Alert]:
-    """Called from services/e_billing.py's sync_invoices_to_ebilling() on
+    """Called from services/ebilling/e_billing.py's sync_invoices_to_ebilling() on
     each DLQ insert. Deduped per invoice — a retried-and-failed-again
     invoice doesn't re-alert every attempt."""
     if alert_exists(db, category=AlertType.EBILLING_DLQ.value, related_id=invoice_id):

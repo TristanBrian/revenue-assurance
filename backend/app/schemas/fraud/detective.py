@@ -1,7 +1,7 @@
 """
-Pydantic response schemas for routes/detective.py.
+Pydantic response schemas for routes/fraud/detective.py.
 
-Field list matches app/services/detective_service.py's
+Field list matches app/services/fraud/detective_service.py's
 compute_omc_risk_features() output exactly. Every feature except omc_id is
 Optional: an OMC with zero dispatches/invoices/payments (or no
 quota_ledger row) gets NaN for the affected features, not a crash — NaN
