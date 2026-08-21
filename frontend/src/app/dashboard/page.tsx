@@ -10,6 +10,7 @@ import type {
 } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { useMateriality } from "@/context/MaterialityContext";
+import { useDirection } from "@/context/DirectionContext";
 import CsvUploadPanel from "@/components/CsvUploadPanel";
 import LiveFeed from "@/components/LiveFeed";
 
@@ -40,6 +41,7 @@ function formatKesFull(value: number): string {
 export default function ExecutiveDashboardPage() {
   const { user } = useAuth();
   const { materiality, setMateriality } = useMateriality();
+  const { direction } = useDirection();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [omcProfiles, setOmcProfiles] = useState<OmcRiskProfile[]>([]);
   const [reloadToken, setReloadToken] = useState(0);
@@ -69,8 +71,8 @@ export default function ExecutiveDashboardPage() {
     });
 
     const promises = [
-      canViewMetrics ? getMetrics(materiality) : Promise.resolve(null),
-      canViewOmcRisk ? getOmcRiskProfile(materiality) : Promise.resolve(null),
+      canViewMetrics ? getMetrics(materiality, direction) : Promise.resolve(null),
+      canViewOmcRisk ? getOmcRiskProfile(materiality, direction) : Promise.resolve(null),
     ];
 
     Promise.all(promises)
@@ -97,7 +99,7 @@ export default function ExecutiveDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, materiality, reloadToken, source, canViewMetrics, canViewOmcRisk]);
+  }, [user, materiality, direction, reloadToken, source, canViewMetrics, canViewOmcRisk]);
 
   function handleUploaded(data: ReconcileResult) {
     setUploadedResult(data);

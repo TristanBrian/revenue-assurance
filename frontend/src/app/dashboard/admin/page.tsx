@@ -26,6 +26,8 @@ const ROLE_BADGE_CLASS: Record<string, string> = {
   revenue_assurance: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   manager: "bg-sky-500/10 text-sky-400 border-sky-500/20",
   depot_supervisor: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  // Outbound (stipend/disbursement) — Stage 2.
+  inuka_manager: "bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20",
 };
 
 const ACCOUNT_STATUS_CLASS: Record<string, string> = {

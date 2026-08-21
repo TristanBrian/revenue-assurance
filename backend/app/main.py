@@ -2,7 +2,15 @@ from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
 from app.middleware.audit import AuditMiddleware
-from app.routes import reconcile, e_billing, feed, heatmap, auth, detective, graph, admin, audit, alerts, report_verify
+from app.routes.reconciliation import reconcile, heatmap
+from app.routes.ebilling import e_billing
+from app.routes.feed import feed
+from app.routes.auth import auth, admin
+from app.routes.fraud import detective, graph
+from app.routes.audit import audit
+from app.routes.alerts import alerts
+from app.routes.reports import report_verify
+
 # import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine

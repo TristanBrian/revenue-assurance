@@ -5,13 +5,20 @@ Detects Order-to-Cash leakage and integrates with KRA's e-billing (iCMS) system.
 
 ## Overview
 
+The platform reconciles two parallel money-flow domains through the same engine, distinguished by a `flow_direction` discriminator rather than two separate stacks:
+
+- **Inbound** — KPC fuel revenue. Dispatches → Invoices → Payments (OMCs paying KPC).
+- **Outbound** — Inuka Foundation beneficiary stipends. Attendance → Stipend Authorizations → Disbursements (KPC/Inuka paying beneficiaries).
+
 KPC loses revenue in its Order-to-Cash cycle through:
 
 - **Missing invoices** — fuel dispatched, no bill sent
 - **Missing payments** — bills sent, never paid
 - **Underpayments** — paid less than invoiced
 
-This platform reconciles Dispatches → Invoices → Payments, flags these breaks, and exposes the results via a REST API (with Swagger/OpenAPI docs). It also includes a simulated E-Billing integration with KRA iCMS: retry logic, a dead letter queue, webhook callbacks, and failure-rate monitoring.
+Inuka Foundation's stipend program leaks money through the mirror-image breaks — missing authorizations, missing disbursements, underpayments — plus three outbound-specific, always-critical fraud signals: overpayment, duplicate disbursement, and ghost payment (a disbursement with no backing authorization at all). See [Outbound (Stipend/Disbursement) Reconciliation](#outbound-stipenddisbursement-reconciliation) for the full domain mapping and severity rules.
+
+This platform reconciles both three-way chains, flags these breaks, and exposes the results via a REST API (with Swagger/OpenAPI docs) — every reconciliation/heatmap/fraud-graph/export endpoint accepts a `?direction=inbound|outbound|all` filter rather than duplicating endpoints per direction. It also includes a simulated E-Billing integration with KRA iCMS: retry logic, a dead letter queue, webhook callbacks, and failure-rate monitoring (inbound-only — outbound disbursements have no e-billing/KRA concept).
 
 ## Architecture
 
@@ -72,7 +79,9 @@ graph TD
 
 
 
-`Fraud` and the `Fraud Graph` UI: `GET /api/graph` builds an OMC↔depot leakage graph and runs Louvain community detection to surface correlated-leakage clusters (see [Project Status](#project-status)).
+`Fraud` and the `Fraud Graph` UI: `GET /api/graph` builds an OMC↔depot leakage graph (inbound) and/or an Officer↔Beneficiary leakage graph (outbound) and runs Louvain community detection to surface correlated-leakage clusters — including a direct beneficiary↔beneficiary edge for shared disbursement accounts, so a payout ring clusters together even when its members report to different officers (see [Project Status](#project-status)).
+
+This same `ETL`/`Recon`/`Fraud` service layer runs both directions — the boxes above aren't inbound-specific, they're parametrized by `flow_direction`. Nothing here is a duplicated stack: same `ETL Pipeline` (extra CSVs, same quality gates), same `Reconciliation` service (a second three-way-match function reusing every field name/shape the first one already returns), same `Fraud Detection` graph builder, same `API`/`Routes`/`Dashboard` — only the direction toggle and RBAC change what a given user sees.
 
 ## Key Features
 
@@ -90,8 +99,9 @@ graph TD
 | OMC risk profiling       | Aggregates leakage per OMC and assigns a High/Medium/Low risk level.                                           |
 | Data quality scoring     | 0-100% score based on nulls, zeros, and invalid customer references.                                           |
 | CSV upload & templates   | Reconcile ad hoc CSVs without touching the database, or download templates for the expected format.            |
-| Excel export             | Multi-sheet workbook report (summary, anomalies, data quality, risk profile).                                  |
+| Excel export             | Multi-sheet workbook report (summary, anomalies, data quality, risk profile) — splits into separate Inbound/Outbound anomaly tabs on `direction=all`. |
 | Alerts & notifications   | In-app inbox + SMTP email, one module for both. System-triggered (new critical anomalies, e-billing failure-rate breaches) and manual broadcasts (`manage_alerts`). See [Alerts & Notifications](#alerts--notifications). |
+| Outbound (stipend/disbursement) recon | Second three-way match (Attendance → Stipend Authorization → Disbursement) for Inuka Foundation beneficiary payouts, sharing the same engine, dashboard, and fraud graph as inbound via a `flow_direction` toggle. See [Outbound (Stipend/Disbursement) Reconciliation](#outbound-stipenddisbursement-reconciliation). |
 
 
 
@@ -119,12 +129,13 @@ Every API route except `POST /api/auth/login`, `POST /api/auth/register` (bootst
 
 | Role | Description | Key Features |
 | :--- | :--- | :--- |
-| **Depot Supervisor** | Operations Lead – manages daily depot activities. | Live Feed, Upload CSV & Templates, Executive Metrics |
-| **Manager** | Strategic Decision Maker – oversees regional operations. | Live Feed, Heatmap, OMC Risk Profile, Executive Metrics, Anomaly Table, Export Reports, Audit Trail |
-| **Revenue Assurance** | Financial Analyst – investigates and resolves anomalies. | All Manager features + Upload CSV/Templates, Resolve/Review/Assign, E-Billing Sync, Fraud Graph, Risk Analytics, Audit Trail |
+| **Depot Supervisor** | Operations Lead – manages daily depot activities. | Live Feed, Upload CSV & Templates, Executive Metrics — **inbound only**, direction toggle hidden |
+| **Manager** | Strategic Decision Maker – oversees regional operations. | Live Feed, Heatmap, OMC Risk Profile, Executive Metrics, Anomaly Table, Export Reports, Audit Trail — both directions, free toggle |
+| **Revenue Assurance** | Financial Analyst – investigates and resolves anomalies. | All Manager features + Upload CSV/Templates, Resolve/Review/Assign, E-Billing Sync, Fraud Graph, Risk Analytics, Audit Trail — both directions, free toggle |
+| **Inuka Manager** | Inuka Foundation program lead – views (but never resolves) beneficiary stipend/disbursement anomalies. | Live Feed, Heatmap, Risk Profile, Executive Metrics, Anomaly Table, Export Reports, Fraud Graph — **outbound only**, direction toggle hidden, no `resolve_anomaly` |
 | **System Admin** | Platform administrator. Scoped only to user management — no access to any revenue-assurance feature below. | Create/list/edit/delete users, assign roles |
 
-Role names are matched loosely at registration/edit time rather than requiring an exact string: `"supervisor"`, `"depot"`, `"depo"` all map to `depot_supervisor`; `"man"`, `"manager"`, `"MANAGER"` map to `manager`; anything containing `"revenue"` or `"assurance"` maps to `revenue_assurance`.
+Role names are matched loosely at registration/edit time rather than requiring an exact string: `"supervisor"`, `"depot"`, `"depo"` all map to `depot_supervisor`; `"inuka"`, `"inuka manager"` map to `inuka_manager` (checked *before* the plain-manager keywords below, so "inuka manager" doesn't get provisioned as plain Manager); `"man"`, `"manager"`, `"MANAGER"` map to `manager`; anything containing `"revenue"` or `"assurance"` maps to `revenue_assurance`.
 
 ### Admin-provisioned users & forced password reset
 
@@ -134,25 +145,32 @@ On that first login, `POST /api/auth/login` doesn't issue a normal session token
 
 `get_current_user()` also rejects any request from a user with `must_reset_password` still set, even with an otherwise-valid session token — closing the gap where an admin forces a reset on an already-active user mid-session. The admin user list surfaces this as an `account_status` per user: `Invited / Pending first login`, `Reset Required`, or `Active`.
 
+**Terms & Conditions / Privacy Policy consent is bundled into the same reset-password submission**, not a separate screen. `GET /api/auth/terms` serves the current versioned text (server-side, via a `terms_documents` table — see `scripts/seed_terms_documents.py` — so a version bump is a data change, not a frontend deploy). `POST /api/auth/reset-password` requires `checkbox_accepted: true` and a matching `confirm_password` alongside the new password, validated server-side before any mutation — a rejected submission leaves the account exactly as it was (no password set, no consent recorded). On success it also writes two `consent_records` rows (one per document type: `terms_and_conditions`, `privacy_policy`, each with the exact version/hash accepted, IP, and user agent) and updates `users.terms_accepted_version`/`terms_accepted_at`.
+
+The same `get_current_user()` guard also blocks any user whose `terms_accepted_version` is stale (never accepted, or a newer version was published since) — even an already-active user with a valid session, mid-session, once a new version goes active. Since that user's password is fine, they get a lighter re-consent path instead: `POST /api/auth/login` returns `terms_required: true` with a `consent_token` (same self-invalidating, 15-minute, single-purpose shape as `reset_token`), which `POST /api/auth/accept-terms` redeems — no password fields, just the checkbox. Both flows share one `record_consent()` implementation (`app/services/terms_service.py`) and are logged to the audit trail as `consent.accepted`.
+
 ### Permission Mapping
 
-| Feature | Permission code | Depot Supervisor | Manager | Revenue Assurance |
-| :--- | :--- | :---: | :---: | :---: |
-| Live Feed | `view_live_feed` | ✅ | ✅ | ✅ |
-| Upload CSV / Templates | `upload_csv` | ✅ | ❌ | ✅ |
-| Heatmap | `view_heatmap` | ❌ | ✅ | ✅ |
-| OMC Risk Profile | `view_omc_risk_profile` | ❌ | ✅ | ✅ |
-| Executive Metrics | `view_metrics` | ✅ | ✅ | ✅ |
-| Anomaly Table | `view_anomaly_table` | ❌ | ✅ | ✅ |
-| Resolve/Review/Assign | `resolve_anomaly` | ❌ | ❌ | ✅ |
-| E-Billing Sync | `manage_ebilling` | ❌ | ❌ | ✅ |
-| Export Reports | `export_reports` | ❌ | ✅ | ✅ |
-| Fraud Graph (structural network) | `view_fraud_graph` | ❌ | ❌ | ✅ |
-| Risk Analytics (statistical/EDA) | `view_risk_analytics` | ❌ | ❌ | ✅ |
-| Audit Trail | `view_audit` | ❌ | ✅ | ✅ |
-| Broadcast Alerts | `manage_alerts` | ❌ | ✅ | ✅ |
+| Feature | Permission code | Depot Supervisor | Manager | Revenue Assurance | Inuka Manager |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| Live Feed | `view_live_feed` | ✅ | ✅ | ✅ | ✅ |
+| Upload CSV / Templates | `upload_csv` | ✅ | ❌ | ✅ | ❌ |
+| Heatmap | `view_heatmap` | ❌ | ✅ | ✅ | ✅ |
+| OMC/Beneficiary Risk Profile | `view_omc_risk_profile` | ❌ | ✅ | ✅ | ✅ |
+| Executive Metrics | `view_metrics` | ✅ | ✅ | ✅ | ✅ |
+| Anomaly Table | `view_anomaly_table` | ❌ | ✅ | ✅ | ✅ |
+| Resolve/Review/Assign | `resolve_anomaly` | ❌ | ❌ | ✅ | ❌ |
+| E-Billing Sync | `manage_ebilling` | ❌ | ❌ | ✅ | ❌ |
+| Export Reports | `export_reports` | ❌ | ✅ | ✅ | ✅ |
+| Fraud Graph (structural network) | `view_fraud_graph` | ❌ | ❌ | ✅ | ✅ |
+| Risk Analytics (statistical/EDA) | `view_risk_analytics` | ❌ | ❌ | ✅ | ❌ |
+| Audit Trail | `view_audit` | ❌ | ✅ | ✅ | ❌ |
+| Broadcast Alerts | `manage_alerts` | ❌ | ✅ | ✅ | ❌ |
+| Outbound (stipend) data | `view_outgoing_data` | ❌ | ✅ | ✅ | ✅ |
 
 `manage_users` and `manage_permissions` gate user administration (`/api/admin/*`) and are held only by `system_admin` — not shown above since they're not a revenue-assurance feature.
+
+`view_outgoing_data` gates access to `direction=outbound`/`all` on the reconcile/heatmap/fraud-graph/export endpoints — see [Outbound (Stipend/Disbursement) Reconciliation](#outbound-stipenddisbursement-reconciliation) for why it's a modifier permission rather than a full backend-side direction lock, and how the frontend's direction toggle enforces the inbound/outbound boundary in practice for Depot Supervisor and Inuka Manager.
 
 Every role can read its own alert inbox (`GET /api/alerts`) regardless of `manage_alerts` — that permission only gates *creating* a manual broadcast, not *seeing* alerts addressed to you. See [Alerts & Notifications](#alerts--notifications).
 
@@ -160,15 +178,52 @@ Every role can read its own alert inbox (`GET /api/alerts`) regardless of `manag
 
 One module (`app/services/alert_service.py`), two channels (`app/models/alert.py` for the in-app inbox, `app/core/email.py` for SMTP) — every alert is always written in-app and optionally emailed, never one or the other from separate code paths.
 
-**System-triggered:**
-- **Critical anomalies** — `POST /api/reconcile/metrics` alerts everyone holding `resolve_anomaly` when a fresh reconciliation run surfaces new critical anomalies (`status == "Critical"`): one in-app row per anomaly, one digest email per run. De-duplicated by dispatch id, so re-running reconciliation never re-alerts the same anomaly twice.
-- **E-billing failure rate** — after any sync (`POST /api/e-billing/sync` or the async variant), if the failure rate breaches `FAILURE_THRESHOLD`, everyone holding `manage_ebilling` gets an alert. Throttled to at most one per hour.
+**Registry-driven, not ad hoc:** `app/services/alert_types.py` is the single source of truth for every trigger — its tier (`immediate` / `digested` / `throttled` / `transactional`), severity, and audience. Audience is either `target_permissions` (resolves to whoever actually holds that route-access permission — e.g. `view_anomaly_table` naturally means Manager + Revenue Assurance) or `target_roles` (for pure platform-operational concerns like ETL failures or four-eyes admin visibility, where "system_admin" is the right audience because they operate the platform, not because of a feature permission). `create_alert()` takes an `AlertType` and pulls tier/audience from there, so routing policy lives in one file, not scattered per call site.
 
-**Manual:** `POST /api/alerts` (requires `manage_alerts`) broadcasts a one-off alert to everyone holding a given permission, or to one specific user.
+**System-triggered**, spanning reconciliation (new critical anomalies — digested; a single anomaly far exceeding materiality; an OMC escalating to High risk; a data-quality drop; a duplicate-record spike; a reopened anomaly; repeated resolve/reopen cycles; ETL failures), the fraud graph (a newly-detected high-risk cluster — digested), e-billing (an invoice entering the dead-letter queue; a failure-rate breach *and* its recovery — throttled hourly; a webhook failure), and auth/admin (a temp password expiring unused; four-eyes visibility to other admins on user create/delete/role-change; bulk exports; and a self-monitoring fallback alert when an alert's own email delivery genuinely fails). Several trigger types are deliberately unimplemented rather than faked — no job scheduler, login-lockout system, self-service password change, or quota-consumption logic exists yet to hook them into; each says why directly in the registry's `notes`.
+
+**Manual:** `POST /api/alerts` (requires `manage_alerts`) broadcasts a one-off alert to any combination of permissions, roles, or a single user.
 
 **Reading your inbox:** `GET /api/alerts` (own alerts, `unread_only` filter, paginated), `GET /api/alerts/unread-count` (badge count), `POST /api/alerts/{id}/read` / `POST /api/alerts/read-all`.
 
-**Email setup:** optional — see `SMTP_*` in `.env.example`. Without SMTP configured, alerts still work in-app; email sending is skipped and logged, not an error.
+**Email setup:** optional — see `SMTP_*` in `.env.example`. Without SMTP configured, alerts still work in-app; email sending is skipped and logged, not an error (and — deliberately — not itself reported as a delivery failure, since nothing was actually attempted).
+
+## Outbound (Stipend/Disbursement) Reconciliation
+
+A second three-way match for Inuka Foundation's beneficiary stipend program, extending — not forking — the existing engine: same ETL, same reconciliation service, same fraud graph, same dashboard, same anomaly table/heatmap/export components. `flow_direction` (`"inbound"` / `"outbound"`) is a field on each anomaly, not a second database or a second app.
+
+### Domain mapping
+
+| Inbound (fuel revenue) | Outbound (stipends) |
+| :--- | :--- |
+| Dispatch | Attendance / Eligibility Record |
+| Invoice | Stipend Authorization |
+| Payment | Disbursement |
+| OMC | Beneficiary |
+| Product | Pillar (Scholarship / Plus / Vocational / Tech) |
+| Depot | Field Officer / Program Site |
+
+### Severity rules
+
+Missing Authorization, Missing Disbursement, and Underpayment scale with materiality exactly like their inbound equivalents. Three break types are **critical by default regardless of amount**, exempt from the materiality filter entirely:
+
+- **Overpayment** — paid more than authorized.
+- **Duplicate Disbursement** — same beneficiary, same period, paid twice (reuses the existing `detect_duplicates()` logic).
+- **Ghost Payment** — a disbursement with no matching authorization at all (`authorization_id` is null, or refers to an authorization that doesn't exist). This is also the fraud-ring signal `scripts/generate_kpc_data.py`'s `inject_disbursement_ring()` injects via several beneficiaries sharing one `disbursing_account` — surfaced as a direct beneficiary↔beneficiary edge in the fraud graph (see the Architecture section above) so the ring clusters into one Louvain community even when its members report to different field officers.
+
+### Direction filtering
+
+Every reconciliation/heatmap/fraud-graph/export endpoint accepts `?direction=inbound|outbound|all` (default `all`) rather than duplicating endpoints per direction — see [API Endpoints](#api-endpoints). The frontend exposes this as a 3-way "Flow Direction" toggle (Incoming / Outgoing / All) in the sidebar, hard-locked and hidden for roles that only ever see one side (Depot Supervisor → inbound, Inuka Manager → outbound) and freely switchable for Manager/Revenue Assurance.
+
+### RBAC
+
+`view_outgoing_data` gates outbound visibility (see [Permission Mapping](#permission-mapping)); the new **Inuka Manager** role holds every outbound view/export permission but never `resolve_anomaly` — outbound anomalies can be seen and exported, not resolved, by that role. The existing admin-provisioned-user flow (temp password, forced reset, Terms/Privacy consent) covers Inuka Manager with no special-casing — it's just another role in the same `role_name` field.
+
+### What's intentionally not wired up (yet)
+
+- `scripts/live_kpc_stream.py`'s continuous streaming simulation has an outbound event cycle understood but not enabled as a background service — deferred by design, not an oversight.
+- The medallion (bronze/silver/gold) lakehouse tables (`setup_medallion.sql`/`.py`) don't yet have outbound-specific silver/gold views (e.g. a `gold.beneficiary_stipend_summary` mirroring `gold.omc_revenue_summary`) — the main app reads outbound data directly from the ETL-loaded tables, same as it does for inbound.
+- A dedicated Pillar × Region heatmap view — the existing generic Beneficiary × Pillar pivot (reusing the same `customer`/`product` field names inbound uses) covers the acceptance bar for now.
 
 ## Quick Start
 
@@ -183,13 +238,14 @@ One module (`app/services/alert_service.py`), two channels (`app/models/alert.py
 
 ### Demo logins
 
-Auth is real (JWT + RBAC, enforced on every route) — you need to log in. Both setup paths below seed the same four demo accounts automatically, so no one needs to ask a teammate for credentials:
+Auth is real (JWT + RBAC, enforced on every route) — you need to log in. Both setup paths below seed the same five demo accounts automatically, so no one needs to ask a teammate for credentials:
 
 | Role | Email | Password |
 |---|---|---|
 | Depot Supervisor | `depot_supervisor@kpc-demo.co.ke` | `demo-pass-123` |
 | Manager | `manager@kpc-demo.co.ke` | `demo-pass-123` |
 | Revenue Assurance | `revenue_assurance@kpc-demo.co.ke` | `demo-pass-123` |
+| Inuka Manager | `inuka_manager@kpc-demo.co.ke` | `demo-pass-123` |
 | System Admin | `system_admin@kpc-demo.co.ke` | `demo-pass-123` |
 
 These are throwaway local-dev accounts seeded by `backend/scripts/seed_demo_users.py` — never point that script at a real deployment.
@@ -220,13 +276,14 @@ pip install -r requirements.txt
 ./scripts/setup_local_postgres.sh     # prints the DATABASE_URL to put in your repo-root .env
 # (edit .env, then continue)
 
-python scripts/generate_kpc_data.py   # generate synthetic CSVs
+python scripts/generate_kpc_data.py   # generate synthetic CSVs — both inbound (dispatches/invoices/payments/omcs) and outbound (officers/beneficiaries/attendance/stipend_authorizations/disbursements)
 python scripts/etl_pipeline.py        # loads to SQLite always, and to Postgres too if DATABASE_URL is a postgresql:// URI
 
-alembic upgrade head                  # creates users/roles/permissions/user_roles/role_permissions
-python scripts/seed_roles.py          # seeds the roles + permissions in the README's Permission Mapping table above
+alembic upgrade head                  # creates users/roles/permissions/user_roles/role_permissions/alerts/consent tables
+python scripts/seed_roles.py          # seeds the roles + permissions in the README's Permission Mapping table above, including inuka_manager
 python scripts/seed_admin.py          # bootstraps the first system_admin (admin@yopmail.com / Admin@1234) — required before /api/auth/register works, since that route is itself gated behind manage_users
-python scripts/seed_demo_users.py     # seeds the 4 demo logins above
+python scripts/seed_demo_users.py     # seeds the 5 demo logins above
+python scripts/seed_terms_documents.py  # seeds v1 Terms & Conditions / Privacy Policy — every user, including the demo logins above, must (re-)consent once this has run
 
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -248,19 +305,26 @@ Every row below except `/api/auth/login`, `/api/auth/register`, and `/api/e-bill
 
 | Method | Endpoint                          | Permission               | Description                                                  |
 | ------ | ---------------------------------- | ------------------------- | -------------------------------------------------------------- |
-| POST   | `/api/auth/login`                 | —                          | Log in with `{email, password}`, returns a JWT                |
-| POST   | `/api/auth/register`              | `manage_users`             | Create a user and assign a role                                |
+| POST   | `/api/auth/login`                 | —                          | Log in with `{email, password}` — returns a JWT, or a scoped `reset_token`/`consent_token` if a reset/re-consent is required |
+| POST   | `/api/auth/reset-password`        | —                           | Redeem a `reset_token`: set a new password + accept Terms/Privacy in one call |
+| GET    | `/api/auth/terms`                 | —                           | Current Terms & Conditions / Privacy Policy text + required version |
+| POST   | `/api/auth/accept-terms`          | —                           | Redeem a `consent_token` to re-accept a newer Terms/Privacy version (no password change) |
+| POST   | `/api/auth/register`              | `manage_users`             | Create a user and assign a role (takes a password directly — see `POST /api/admin/users` for the no-password flow) |
 | GET    | `/api/auth/me`                    | *(any authenticated)*      | Current user's profile, roles, permissions                     |
 | GET    | `/api/feed`                       | `view_live_feed`           | Live anomaly feed                                               |
-| POST   | `/api/reconcile/metrics`          | `view_metrics`             | Executive metrics (KPIs/summary, DB-backed)                     |
-| GET    | `/api/reconcile/anomalies`        | `view_anomaly_table`       | Paginated anomaly table (DB-backed)                             |
-| GET    | `/api/reconcile/omc-risk-profile` | `view_omc_risk_profile`    | OMC risk profile (DB-backed)                                    |
-| GET    | `/api/heatmap`                    | `view_heatmap`             | OMC × Product leakage heatmap                                   |
-| POST   | `/api/reconcile/upload`           | `upload_csv`                | Run reconciliation against uploaded CSVs                        |
+| POST   | `/api/reconcile/metrics`          | `view_metrics`             | Executive metrics (KPIs/summary, DB-backed). `?direction=inbound\|outbound\|all` (default `all`) |
+| GET    | `/api/reconcile/anomalies`        | `view_anomaly_table`       | Paginated anomaly table (DB-backed). `?direction=inbound\|outbound\|all` |
+| GET    | `/api/reconcile/omc-risk-profile` | `view_omc_risk_profile`    | OMC (inbound) / Beneficiary (outbound) risk profile (DB-backed). `?direction=inbound\|outbound\|all` |
+| GET    | `/api/heatmap`                    | `view_heatmap`             | OMC × Product (inbound) / Beneficiary × Pillar (outbound) leakage heatmap. `?direction=inbound\|outbound\|all` |
+| POST   | `/api/reconcile/upload`           | `upload_csv`                | Run reconciliation against uploaded CSVs — **inbound only** by design (dispatches/invoices/payments) |
 | GET    | `/api/reconcile/template/{type}`  | `upload_csv`                | Download a CSV template                                         |
 | POST   | `/api/reconcile/update`           | `resolve_anomaly`           | Resolve/update an anomaly                                       |
-| GET    | `/api/reconcile/export`           | `export_reports`            | Download an Excel report                                        |
-| POST   | `/api/reconcile/sync`             | `manage_ebilling`           | Sync anomalies to E-Billing                                     |
+| GET    | `/api/reconcile/export`           | `export_reports`            | Download an Excel report. `?direction=inbound\|outbound\|all` — splits into separate Inbound/Outbound anomaly tabs on `all` |
+| POST   | `/api/reconcile/sync`             | `manage_ebilling`           | Sync anomalies to E-Billing — **inbound only** (no e-billing/KRA concept for disbursements) |
+| GET    | `/api/graph`                      | `view_fraud_graph`          | Anomaly-based fraud graph: OMC↔Depot (inbound) and/or Officer↔Beneficiary (outbound), Louvain community detection. `?direction=inbound\|outbound\|all` |
+| GET    | `/api/graph/network`              | `view_fraud_graph`          | Structural OMC↔Depot network (raw dispatch data, not anomalies) — inbound only |
+| GET    | `/api/graph/communities`          | `view_fraud_graph`          | Structural OMC risk communities — inbound only                  |
+| GET    | `/api/graph/omc/{omc_id}`         | `view_fraud_graph`          | Per-OMC risk detail + community membership — inbound only       |
 | GET    | `/api/e-billing/status`           | `manage_ebilling`           | E-Billing integration status                                    |
 | POST   | `/api/e-billing/sync`             | `manage_ebilling`           | Sync invoices to KRA iCMS (synchronous)                         |
 | POST   | `/api/e-billing/sync/async`       | `manage_ebilling`           | Trigger a non-blocking background sync (returns `task_id`)      |
@@ -271,13 +335,20 @@ Every row below except `/api/auth/login`, `/api/auth/register`, and `/api/e-bill
 | POST   | `/api/e-billing/webhook`          | —                           | Simulate a KRA webhook callback (external, no user auth)        |
 | GET    | `/api/e-billing/reconcile`        | `manage_ebilling`           | E-Billing reconciliation dashboard                               |
 | GET    | `/api/e-billing/monitor`          | `manage_ebilling`           | Failure rate monitoring                                          |
-| GET    | `/api/admin/users`                | `manage_users`              | List all users                                                    |
+| GET    | `/api/admin/users`                | `manage_users`              | List all users, with `account_status` (Invited / Reset Required / Active) |
+| POST   | `/api/admin/users`                 | `manage_users`              | Provision a user with no password — generates + emails a temp password, forces reset on first login |
+| POST   | `/api/admin/users/{id}/resend-temp-password` | `manage_users`   | Regenerate + re-email a temp password (expired original, or failed delivery) |
 | PATCH  | `/api/admin/users/{user_id}`      | `manage_users`              | Edit a user's email/name/role/password/active status              |
 | DELETE | `/api/admin/users/{user_id}`      | `manage_users`              | Delete a user (blocked for self and the last `system_admin`)     |
 | GET    | `/api/audit/logs`                 | `view_audit`                | Paginated, filterable audit trail (actor/action/target/date range) |
 | GET    | `/api/audit/logs/{log_id}`        | `view_audit`                | Single audit log entry                                            |
 | GET    | `/api/audit/summary`              | `view_audit`                | Aggregate audit stats (by action/actor) for the last N days       |
 | GET    | `/api/audit/me`                   | `view_audit`                | Current user's own audit trail                                    |
+| GET    | `/api/alerts`                     | *(any authenticated)*       | Current user's alert inbox (`unread_only` filter, paginated)      |
+| GET    | `/api/alerts/unread-count`        | *(any authenticated)*       | Unread alert badge count                                           |
+| POST   | `/api/alerts/{alert_id}/read`     | *(any authenticated)*       | Mark one alert read                                                 |
+| POST   | `/api/alerts/read-all`            | *(any authenticated)*       | Mark every visible alert read                                       |
+| POST   | `/api/alerts`                     | `manage_alerts`             | Broadcast a manual alert to a permission, a role, or one user       |
 | GET    | `/health`                         | —                           | Service health check (DB + API status)                            |
 
 
@@ -290,11 +361,11 @@ revenue-assurance/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py          # FastAPI entry point
-│   │   ├── routes/          # API endpoints
-│   │   ├── services/        # Business logic (reconciliation, e-billing)
-│   │   ├── models/          # Pydantic schemas
+│   │   ├── routes/          # API endpoints, grouped by domain (auth/, reconciliation/, fraud/, alerts/, audit/, ...)
+│   │   ├── services/        # Business logic, grouped the same way (reconciliation.py holds both run_reconciliation() and run_outbound_reconciliation())
+│   │   ├── models/          # SQLAlchemy ORM models — reconciliation/ now includes officer.py, beneficiary.py, pillar.py, attendance.py, stipend_authorization.py, disbursement.py (outbound) alongside omc.py, dispatch.py, invoice.py, payment.py (inbound)
 │   │   └── utils/           # DB connection, data loading helpers
-│   ├── scripts/              # Synthetic data generation + ETL
+│   ├── scripts/              # Synthetic data generation + ETL (generate_kpc_data.py and etl_pipeline.py handle both inbound and outbound CSVs)
 │   ├── data/                 # Raw/clean CSVs (gitignored)
 │   ├── tests/
 │   └── requirements.txt
@@ -410,7 +481,9 @@ Note: `MATERIALITY_THRESHOLD`, `CRITICAL_AGE_DAYS`, and the KRA endpoint/key are
 
 ## Project Status
 
-See [PROGRESS.md](./PROGRESS.md) for the current state of frontend/backend integration. In short: all 7 phases are complete — reconciliation dashboard, CSV upload, the E-Billing panel, Excel export, the fraud graph, and RBAC (backend enforcement + a role-based multi-dashboard frontend, replacing the single page that used to show every feature to every visitor) are all wired to live data and manually verified end-to-end as all 3 roles. CI (GitHub Actions) runs backend tests and frontend lint/typecheck/build on every push/PR to `main`.
+See [PROGRESS.md](./PROGRESS.md) for the current state of frontend/backend integration. In short: all 7 phases are complete — reconciliation dashboard, CSV upload, the E-Billing panel, Excel export, the fraud graph, and RBAC (backend enforcement + a role-based multi-dashboard frontend, replacing the single page that used to show every feature to every visitor) are all wired to live data and manually verified end-to-end as all 3 roles. Since then: admin-provisioned users with a forced, consent-gated password reset (see [Admin-provisioned users & forced password reset](#admin-provisioned-users--forced-password-reset)), a registry-driven in-app + email alerts system (see [Alerts & Notifications](#alerts--notifications)), and the outbound (stipend/disbursement) reconciliation extension (see [Outbound (Stipend/Disbursement) Reconciliation](#outbound-stipenddisbursement-reconciliation)) — all live-verified against the running stack, not just unit-tested. CI (GitHub Actions) runs backend tests and frontend lint/typecheck/build on every push/PR to `main`.
+
+**Note on the seeded Terms & Conditions / Privacy Policy text** (`scripts/seed_terms_documents.py`): it's a functional placeholder — real structure and the required confidentiality/acceptable-use clause, but not reviewed by legal counsel. Replace before any real user relies on it.
 
 ## License
 

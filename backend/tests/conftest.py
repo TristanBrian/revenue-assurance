@@ -30,7 +30,7 @@ def test_engine():
 # Authenticated client fixture - uses only valid User fields
 @pytest.fixture(scope="function")
 def auth_client(db_session):
-    from app.models.user import User
+    from app.models.auth.user import User
     import bcrypt
     # Create a test user (using only valid fields)
     password_hash = bcrypt.hashpw(b"testpass", bcrypt.gensalt()).decode('utf-8')

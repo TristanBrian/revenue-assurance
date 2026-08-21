@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { ApiError, downloadExport, downloadExportWithFields, getMetrics, getEbillingLogs } from "@/lib/api";
 import { useMateriality } from "@/context/MaterialityContext";
+import { useDirection } from "@/context/DirectionContext";
 import RequirePermission from "@/components/RequirePermission";
 import ConsentModal from "@/components/ConsentModal";
 import FieldSelectorModal from "@/components/FieldSelectorModal";
@@ -32,6 +33,7 @@ function formatKesCompact(value: number): string {
 
 function ReportsContent() {
   const { materiality, setMateriality } = useMateriality();
+  const { direction } = useDirection();
   const [reportType, setReportType] = useState<ReportType>("operational");
   
   // Data states
@@ -96,7 +98,7 @@ function ReportsContent() {
       setLoading(true);
       setError(null);
       try {
-        const metricsRes = await getMetrics(materiality);
+        const metricsRes = await getMetrics(materiality, direction);
         if (cancelled) return;
         setMetrics(metricsRes.metrics);
         // ✅ Fix: Use proper type assertion instead of 'any'
@@ -119,7 +121,7 @@ function ReportsContent() {
     return () => {
       cancelled = true;
     };
-  }, [materiality, reportType]);
+  }, [materiality, direction, reportType]);
 
   // Funnel calculations
   const funnelData = useMemo(() => {
@@ -193,7 +195,7 @@ function ReportsContent() {
     setExporting(true);
     setError(null);
     try {
-      const blob = await downloadExportWithFields(materiality, fields);
+      const blob = await downloadExportWithFields(materiality, fields, direction);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -203,6 +205,7 @@ function ReportsContent() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       setIsFieldSelectorOpen(false);
+
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not download the Excel report.");
     } finally {

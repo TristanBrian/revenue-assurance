@@ -7,7 +7,18 @@ export type BreakType =
   | "Missing Payment"
   | "Underpayment"
   | "Overpayment"
-  | "Reconciled";
+  | "Reconciled"
+  // Outbound (stipend/disbursement) — Stage 2. See GHOST_PAYMENT_LABEL /
+  // DUPLICATE_DISBURSEMENT_LABEL / the outbound break_type choices in
+  // backend/app/services/reconciliation/reconciliation.py.
+  | "Missing Authorization"
+  | "Missing Disbursement"
+  | "Ghost Payment"
+  | "Duplicate Disbursement";
+
+// "inbound" (OMC fuel revenue) | "outbound" (Inuka Foundation stipends) —
+// mirrors the Anomaly.flow_direction field below.
+export type FlowDirection = "inbound" | "outbound";
 
 export type AnomalyStatus =
   | "Critical"
@@ -29,6 +40,10 @@ export interface Metrics {
   critical_count: number;
   pending_count: number;
   review_count: number;
+  // Outbound (stipend/disbursement) — Stage 2. Absent/undefined on a
+  // pure-inbound (direction=inbound) result.
+  ghost_payment_leak?: number;
+  duplicate_disbursement_leak?: number;
 }
 
 export interface Anomaly {
@@ -46,6 +61,12 @@ export interface Anomaly {
   ebilling_sync_date: string | null;
   age_days: number;
   created_at: string;
+  // Outbound (stipend/disbursement) — Stage 2. Optional/nullable: not set
+  // at all on a pure-inbound anomaly (see the Optional[str] = None
+  // rationale in backend/app/schemas/reconciliation/reconciliation.py).
+  flow_direction?: FlowDirection | null;
+  officer_id?: string | null;
+  beneficiary_id?: string | null;
 }
 
 export interface DataQuality {
@@ -202,7 +223,9 @@ export interface FailureRateMonitor {
 // Mirrors backend/app/services/graph_engine.py's build_fraud_graph() shape.
 
 export type RiskLevel = "Low" | "Medium" | "High";
-export type GraphNodeType = "omc" | "depot";
+// "officer"/"beneficiary" are the outbound (stipend/disbursement) node
+// types — Stage 2, graph_engine.build_outbound_fraud_graph_from_dataframes().
+export type GraphNodeType = "omc" | "depot" | "officer" | "beneficiary";
 
 export interface GraphNode {
   id: string;
@@ -219,6 +242,10 @@ export interface GraphEdge {
   target: string;
   weight: number;
   anomaly_count: number;
+  // Outbound-only (Stage 2): true for a direct beneficiary<->beneficiary
+  // shared-disbursing_account ring edge rather than an officer<->
+  // beneficiary leakage edge. See schemas/fraud/graph.py's GraphEdge.
+  shared_account?: boolean;
 }
 
 export interface GraphCommunity {
@@ -333,6 +360,7 @@ export const ROLE_NAMES = [
   "depot_supervisor",
   "manager",
   "revenue_assurance",
+  "inuka_manager",
   "system_admin",
 ] as const;
 export type RoleName = (typeof ROLE_NAMES)[number];

@@ -11,8 +11,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.models.permission import Permission
-from app.models.role import Role
+from app.models.auth.permission import Permission
+from app.models.auth.role import Role
 from app.utils.db_connection import SessionLocal
 
 PERMISSIONS = [
@@ -31,25 +31,56 @@ PERMISSIONS = [
     ("manage_users", "Create, edit, deactivate users and assign roles to them"),
     ("manage_permissions", "Create/edit permissions and assign them to roles"),
     ("manage_alerts", "Broadcast manual in-app/email alerts to a role or a specific user"),
+    # --- Outbound (stipend/disbursement) — Stage 2 ---
+    ("view_outgoing_data", "View outbound (stipend/disbursement) reconciliation data — gates access to direction=outbound/all on the existing reconcile/heatmap/fraud-graph/export endpoints"),
 ]
 
 # Feature permission matrix:
 #
-# | Feature                | Depot Supervisor | Manager | Revenue Assurance |
-# |-------------------------|:---:|:---:|:---:|
-# | Live Feed                | Y | Y | Y |
-# | Upload CSV / Templates    | Y | N | Y |
-# | Heatmap                  | N | Y | Y |
-# | OMC Risk Profile          | N | Y | Y |
-# | Executive Metrics         | Y | Y | Y |
-# | Anomaly Table             | N | Y | Y |
-# | Resolve/Review/Assign     | N | N | Y |
-# | E-Billing Sync            | N | N | Y |
-# | Export Reports            | N | Y | Y |
-# | Audit Trail               | N | Y | Y |
+# | Feature                | Depot Supervisor | Manager | Revenue Assurance | Inuka Manager |
+# |-------------------------|:---:|:---:|:---:|:---:|
+# | Live Feed                | Y | Y | Y | Y |
+# | Upload CSV / Templates    | Y | N | Y | N |
+# | Heatmap                  | N | Y | Y | Y |
+# | OMC/Beneficiary Risk Profile | N | Y | Y | Y |
+# | Executive Metrics         | Y | Y | Y | Y |
+# | Anomaly Table             | N | Y | Y | Y |
+# | Resolve/Review/Assign     | N | N | Y | N |
+# | E-Billing Sync            | N | N | Y | N |
+# | Export Reports            | N | Y | Y | Y |
+# | Audit Trail               | N | Y | Y | N |
+# | Fraud Graph               | N | N | Y | Y |
+# | Outbound (stipend) data   | N | Y | Y | Y (outbound only) |
+#
+# Depot Supervisor and Revenue Assurance/Manager see inbound (fuel revenue)
+# data; Inuka Manager sees outbound (stipend/disbursement) data — enforced
+# by the frontend's direction toggle (dashboard/layout.tsx), since these
+# view_* permission codes are shared across both directions (see the
+# ROLE_PERMISSIONS comment above for why view_outgoing_data alone isn't a
+# backend-side direction lock).
 #
 # system_admin is scoped ONLY to user/permission control, not
-# revenue-assurance features.
+# revenue-assurance features — deliberately NOT given view_outgoing_data
+# either (Stage 2): that boundary predates the outbound work and granting
+# view_outgoing_data alone wouldn't let system_admin see anything anyway
+# (every route still gates primarily on view_metrics/view_anomaly_table/
+# etc.; view_outgoing_data only matters to a role that already has one of
+# those). Depot Supervisor also deliberately excluded — inbound-only by
+# design (uploads dispatch/invoice/payment CSVs, nothing outbound to see).
+#
+# Inuka Manager (Stage 2): outbound-only, read-only mirror of Manager —
+# same view_*/export_reports shape, minus manage_alerts (Manager-specific
+# broadcast capability) and view_audit (not part of the spec's outbound
+# scope), and explicitly WITHOUT resolve_anomaly — "read-only" per the
+# spec means it can view and export outbound anomalies but never resolve
+# them. Its view_* permissions are the SAME codes inbound roles use
+# (view_metrics, view_anomaly_table, ...) since there's no separate
+# "view_outbound_metrics" etc. — view_outgoing_data is what actually
+# scopes it to outbound data; the frontend additionally hard-locks its
+# direction toggle to outbound (see dashboard/layout.tsx) rather than
+# relying on the backend to refuse an explicit direction=inbound request,
+# since nothing here stops a mixed-permission role from requesting any
+# direction it already has the base view_* permission for.
 ROLE_PERMISSIONS = {
     "system_admin": ["manage_users", "manage_permissions"],
     "depot_supervisor": [
@@ -66,6 +97,7 @@ ROLE_PERMISSIONS = {
         "export_reports",
         "view_audit",
         "manage_alerts",
+        "view_outgoing_data",
     ],
     "revenue_assurance": [
         "view_live_feed",
@@ -81,6 +113,17 @@ ROLE_PERMISSIONS = {
         "view_risk_analytics",
         "view_audit",
         "manage_alerts",
+        "view_outgoing_data",
+    ],
+    "inuka_manager": [
+        "view_live_feed",
+        "view_heatmap",
+        "view_omc_risk_profile",
+        "view_metrics",
+        "view_anomaly_table",
+        "export_reports",
+        "view_fraud_graph",
+        "view_outgoing_data",
     ],
 }
 
@@ -89,6 +132,7 @@ ROLE_DESCRIPTIONS = {
     "depot_supervisor": "Depot Supervisor",
     "manager": "Manager",
     "revenue_assurance": "Revenue Assurance",
+    "inuka_manager": "Inuka Manager",
 }
 
 

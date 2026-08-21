@@ -76,7 +76,7 @@ def generate_temp_password(length: int = 12) -> str:
     """Cryptographically secure random password (secrets, not random),
     guaranteed at least one uppercase/lowercase/digit/symbol character.
     Never stored or logged anywhere by callers — only its hash is
-    persisted (see services/user_service.py) and the plaintext is handed
+    persisted (see services/auth/user_service.py) and the plaintext is handed
     once to app.core.email.send_email for delivery."""
     if length < 4:
         raise ValueError("length must be at least 4 to fit one of each character class")
