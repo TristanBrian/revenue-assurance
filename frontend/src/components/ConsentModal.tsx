@@ -9,16 +9,14 @@ interface ConsentModalProps {
 const STORAGE_KEY = "kpc_report_confidentiality_accepted";
 
 export default function ConsentModal({ onAccept }: ConsentModalProps) {
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
+  const [open, setOpen] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       const accepted = window.sessionStorage.getItem(STORAGE_KEY);
-      if (!accepted) {
-        setOpen(true);
-      }
+      return !accepted;
     }
-  }, []);
+    return false;
+  });
+
 
   const handleAgree = () => {
     if (typeof window !== "undefined") {

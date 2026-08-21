@@ -513,57 +513,42 @@ async def update_anomaly(
 @router.get("/reconcile/export")
 def export_report(
     materiality: float = Query(100000),
-<<<<<<< HEAD:backend/app/routes/reconcile.py
-    fields: Optional[str] = Query(None, description="Comma-separated field names for data minimization"),
-=======
     direction: str = Query("all", description="inbound | outbound | all — defaults to all"),
->>>>>>> origin/main:backend/app/routes/reconciliation/reconcile.py
+    fields: Optional[str] = Query(None, description="Comma-separated field names for data minimization"),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("export_reports")),
 ):
     try:
-<<<<<<< HEAD:backend/app/routes/reconcile.py
-        result = run_reconciliation(materiality=materiality)
-        anomalies_df = pd.DataFrame(result['anomalies'])
-=======
         result = run_combined_reconciliation(direction=direction, materiality=materiality)
->>>>>>> origin/main:backend/app/routes/reconciliation/reconcile.py
-
-        # Data Minimization: filter columns if specified
-        selected_fields_list = None
-        if fields:
-            selected_fields_list = [f.strip() for f in fields.split(",") if f.strip()]
-            valid_cols = [col for col in selected_fields_list if col in anomalies_df.columns]
-            if valid_cols:
-                anomalies_df = anomalies_df[valid_cols]
 
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             pd.DataFrame([result['metrics']]).to_excel(writer, sheet_name='Summary', index=False)
-<<<<<<< HEAD:backend/app/routes/reconcile.py
-            anomalies_df.to_excel(writer, sheet_name='Anomalies', index=False)
-=======
-            # direction="all" mixes inbound (OMC/dispatch) and outbound
-            # (beneficiary/attendance) anomalies, which share field NAMES
-            # (customer, dispatch_id, ...) but not field MEANING — splitting
-            # into two tabs by flow_direction keeps the export readable
-            # instead of interleaving rows from two different domains.
-            # inbound/outbound-only requests already contain a single
-            # direction, so one "Anomalies" sheet is enough there.
-            if direction == "all":
-                anomalies = result.get('anomalies', [])
-                inbound_anomalies = [a for a in anomalies if a.get('flow_direction') != 'outbound']
-                outbound_anomalies = [a for a in anomalies if a.get('flow_direction') == 'outbound']
-                pd.DataFrame(inbound_anomalies).to_excel(writer, sheet_name='Anomalies (Inbound)', index=False)
-                pd.DataFrame(outbound_anomalies).to_excel(writer, sheet_name='Anomalies (Outbound)', index=False)
+
+            anomalies = result.get('anomalies', [])
+            anomalies_df = pd.DataFrame(anomalies)
+
+            # Data Minimization: filter columns if specified
+            if fields and not anomalies_df.empty:
+                selected_fields_list = [f.strip() for f in fields.split(",") if f.strip()]
+                valid_cols = [col for col in selected_fields_list if col in anomalies_df.columns]
+                if valid_cols:
+                    anomalies_df = anomalies_df[valid_cols]
+
+            if direction == "all" and not anomalies_df.empty and "flow_direction" in anomalies_df.columns:
+                inbound_df = anomalies_df[anomalies_df['flow_direction'] != 'outbound']
+                outbound_df = anomalies_df[anomalies_df['flow_direction'] == 'outbound']
+                inbound_df.to_excel(writer, sheet_name='Anomalies (Inbound)', index=False)
+                outbound_df.to_excel(writer, sheet_name='Anomalies (Outbound)', index=False)
             else:
-                pd.DataFrame(result['anomalies']).to_excel(writer, sheet_name='Anomalies', index=False)
->>>>>>> origin/main:backend/app/routes/reconciliation/reconcile.py
+                anomalies_df.to_excel(writer, sheet_name='Anomalies', index=False)
+
             pd.DataFrame([result['data_quality']]).to_excel(writer, sheet_name='Data Quality', index=False)
             if result.get('omc_risk_profile'):
                 pd.DataFrame(result['omc_risk_profile']).to_excel(writer, sheet_name='OMC Risk Profile', index=False)
             if result.get('duplicate_anomalies'):
                 pd.DataFrame(result['duplicate_anomalies']).to_excel(writer, sheet_name='Duplicates', index=False)
+
         
         file_bytes = output.getvalue()
         file_hash, signature = sign_report_bytes(file_bytes)
