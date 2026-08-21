@@ -343,12 +343,10 @@ function ReportsContent() {
           <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-7 shadow-md flex flex-col gap-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 dark:border-slate-800 pb-5">
               <div>
-                <h2 className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider flex items-center space-x-3">
-                  <span>Revenue Lifecycle & Leakage State</span>
-                  <span className="text-xs px-3 py-1 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/30 rounded-full normal-case font-bold">
-                    Interactive Workspace
-                  </span>
+                <h2 className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">
+                  Revenue Lifecycle & Leakage State
                 </h2>
+
                 <p className="text-sm font-medium text-zinc-600 dark:text-slate-400 mt-1.5">
                   Click any stage or leakage card below to filter the audit preview table in real time.
                 </p>
