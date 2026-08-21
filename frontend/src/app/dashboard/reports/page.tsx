@@ -370,7 +370,10 @@ function ReportsContent() {
                 <div className="w-8 h-8 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin"></div>
                 <span className="text-xs text-zinc-500">Loading live aggregates...</span>
               </div>
-            ) :               <div className="flex flex-col gap-6">
+            ) : (
+              <div className="flex flex-col gap-6">
+
+
                 
                 {/* 1. HERO RECOVERY STAT BANNER (Lead with 93.7% Settled Recovery) */}
                 <div className="bg-gradient-to-r from-emerald-900/90 via-slate-900 to-slate-900 border border-emerald-500/40 p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
