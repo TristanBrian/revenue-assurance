@@ -38,6 +38,11 @@ class GraphEdge(BaseModel):
     target: str
     weight: float
     anomaly_count: int
+    # Outbound-only (Stage 2): True for a direct beneficiary<->beneficiary
+    # edge from graph_engine.build_outbound_fraud_graph_from_dataframes()'s
+    # shared-disbursing_account ring signal, rather than an officer<->
+    # beneficiary leakage edge. Always False/absent for inbound edges.
+    shared_account: Optional[bool] = False
 
 
 class GraphCommunity(BaseModel):
