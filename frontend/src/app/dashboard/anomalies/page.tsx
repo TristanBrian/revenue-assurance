@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useMateriality } from "@/context/MaterialityContext";
 import { useDirection } from "@/context/DirectionContext";
-import { getAnomalies, updateAnomalyStatus, ApiError } from "@/lib/api";
-import type { Anomaly } from "@/lib/types";
+import { getAnomalies, updateAnomalyStatus, ApiError, type FraudFeedbackLabel } from "@/lib/api";
+import type { Anomaly, FraudTier } from "@/lib/types";
 import AnomalyTable from "@/components/AnomalyTable";
+import FraudExplainPanel from "@/components/FraudExplainPanel";
 import RequirePermission from "@/components/RequirePermission";
 
 function formatKes(value: number): string {
@@ -31,6 +32,12 @@ function AnomaliesContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [breakTypeFilter, setBreakTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  // Fraud tier filtering is client-side, over the currently-loaded page —
+  // unlike break_type/status (server-side, since the full anomaly set is
+  // far larger than one page), fraud_tier's only real use case is
+  // triaging what's already in view, so a server round-trip isn't worth
+  // adding a new query param for.
+  const [fraudTierFilter, setFraudTierFilter] = useState<"All" | FraudTier>("All");
 
   const [resolving, setResolving] = useState(false);
 
@@ -88,12 +95,17 @@ function AnomaliesContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [materiality, direction, breakTypeFilter, statusFilter, searchQuery]);
 
-  async function handleResolve(dispatchId: string) {
+  // fraudFeedbackLabel is optional — an investigator can resolve without
+  // giving a fraud judgment (undefined), same as before this feature
+  // existed. When given, it feeds the fraud-scoring layer's retraining
+  // loop (fraud_feedback table) — real investigator judgment, weighted
+  // higher than the synthetic ground truth once retraining runs.
+  async function handleResolve(dispatchId: string, fraudFeedbackLabel?: FraudFeedbackLabel) {
     if (!confirm("Are you sure you want to mark this anomaly as resolved?"))
       return;
     setResolving(true);
     try {
-      await updateAnomalyStatus(dispatchId, "Resolved");
+      await updateAnomalyStatus(dispatchId, "Resolved", "", fraudFeedbackLabel);
       await loadAnomalies();
       setSelectedAnomaly(null);
     } catch (err) {
@@ -156,6 +168,18 @@ function AnomaliesContent() {
               <option value="Resolved">Resolved</option>
             </select>
           </div>
+          <div className="flex flex-col gap-1 w-40">
+            <select
+              value={fraudTierFilter}
+              onChange={(e) => setFraudTierFilter(e.target.value as "All" | FraudTier)}
+              className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 focus:outline-none transition-all cursor-pointer shadow-sm"
+            >
+              <option value="All">All Fraud Tiers</option>
+              <option value="Likely Fraud">Likely Fraud</option>
+              <option value="Suspicious">Suspicious</option>
+              <option value="Likely Benign">Likely Benign</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -173,7 +197,11 @@ function AnomaliesContent() {
 
       {!loading && !error && (
         <AnomalyTable
-          anomalies={anomalies}
+          anomalies={
+            fraudTierFilter === "All"
+              ? anomalies
+              : anomalies.filter((a) => a.fraud_tier === fraudTierFilter)
+          }
           onSelectAnomaly={setSelectedAnomaly}
           selectedAnomalyId={selectedAnomaly?.dispatch_id}
         />
@@ -419,17 +447,41 @@ function AnomaliesContent() {
                   </div>
                 </div>
               </div>
+
+              {/* Fraud scoring layer (ML) — SHAP explanation + chat-style explain */}
+              <div className="flex flex-col gap-3 border-t border-zinc-200 dark:border-zinc-800 pt-6">
+                <FraudExplainPanel anomalyId={selectedAnomaly.dispatch_id} />
+              </div>
             </div>
 
             {/* Drawer Footer Actions */}
             {canResolve && selectedAnomaly.status !== "Resolved" && (
-              <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 flex flex-col">
+              <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 flex flex-col gap-2">
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
+                  Resolve with a fraud judgment (optional — feeds model retraining)
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleResolve(selectedAnomaly.dispatch_id, "confirmed_fraud")}
+                    disabled={resolving}
+                    className="rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed py-2.5 text-xs font-semibold text-white active:scale-[0.98] transition-all"
+                  >
+                    Confirmed Fraud
+                  </button>
+                  <button
+                    onClick={() => handleResolve(selectedAnomaly.dispatch_id, "false_positive")}
+                    disabled={resolving}
+                    className="rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed py-2.5 text-xs font-semibold text-white active:scale-[0.98] transition-all"
+                  >
+                    False Positive
+                  </button>
+                </div>
                 <button
                   onClick={() => handleResolve(selectedAnomaly.dispatch_id)}
                   disabled={resolving}
                   className="w-full rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-200 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {resolving ? "Resolving..." : "Mark Anomaly as Resolved"}
+                  {resolving ? "Resolving..." : "Mark Resolved (no fraud judgment)"}
                 </button>
               </div>
             )}
