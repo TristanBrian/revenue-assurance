@@ -49,6 +49,20 @@ class Anomaly(BaseModel):
     resolution_status: Optional[str] = None
     resolution_notes: Optional[str] = None
     resolution_updated_at: Optional[str] = None
+    # --- Outbound (stipend/disbursement) — Stage 2 ---
+    # "inbound" | "outbound". Optional (not required) rather than a plain
+    # str: run_reconciliation_on_dataframes()/run_outbound_reconciliation_
+    # on_dataframes() are pure functions tests call directly without
+    # necessarily setting it — only the DB-wrapper functions
+    # (run_reconciliation/run_outbound_reconciliation) tag it before
+    # anything reaches the API. Defaulting to None rather than
+    # required=True/default="inbound" means a caller that forgets to tag
+    # gets an honest gap in the response, not a silently wrong label.
+    flow_direction: Optional[str] = None
+    # Outbound-only detail — see services/reconciliation/reconciliation.py's
+    # _build_outbound_anomaly(). None for inbound anomalies.
+    officer_id: Optional[str] = None
+    beneficiary_id: Optional[str] = None
 
 
 class Metrics(BaseModel):
@@ -65,6 +79,12 @@ class Metrics(BaseModel):
     critical_count: int
     pending_count: int
     review_count: int
+    # Outbound-only leak breakdowns (Stage 2) — 0/absent-equivalent on a
+    # pure-inbound result, since Metrics is built as a plain dict literal
+    # (not this schema) and these two keys are only ever added by
+    # run_outbound_reconciliation_on_dataframes().
+    ghost_payment_leak: Optional[int] = None
+    duplicate_disbursement_leak: Optional[int] = None
 
 
 class ReconciliationSummary(BaseModel):
