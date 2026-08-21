@@ -28,7 +28,8 @@ const NAV_ITEMS: NavItem[] = [
     label: "Dashboard",
     icon: (
       <svg
-        className="w-6 h-6 mr-3.5 shrink-0"
+        className="w-5 h-5 shrink-0"
+
 
         fill="none"
         viewBox="0 0 24 24"
@@ -50,7 +51,8 @@ const NAV_ITEMS: NavItem[] = [
     badgeKey: "anomalies",
     icon: (
       <svg
-        className="w-6 h-6 mr-3.5 shrink-0"
+        className="w-5 h-5 shrink-0"
+
 
         fill="none"
         viewBox="0 0 24 24"
@@ -71,7 +73,8 @@ const NAV_ITEMS: NavItem[] = [
     anyOf: ["view_heatmap"],
     icon: (
       <svg
-        className="w-6 h-6 mr-3.5 shrink-0"
+        className="w-5 h-5 shrink-0"
+
 
         fill="none"
         viewBox="0 0 24 24"
@@ -93,7 +96,8 @@ const NAV_ITEMS: NavItem[] = [
     badgeKey: "omc_risk",
     icon: (
       <svg
-        className="w-6 h-6 mr-3.5 shrink-0"
+        className="w-5 h-5 shrink-0"
+
 
         fill="none"
         viewBox="0 0 24 24"
@@ -114,7 +118,8 @@ const NAV_ITEMS: NavItem[] = [
     anyOf: ["view_fraud_graph"],
     icon: (
       <svg
-        className="w-6 h-6 mr-3.5 shrink-0"
+        className="w-5 h-5 shrink-0"
+
 
         fill="none"
         viewBox="0 0 24 24"
@@ -136,7 +141,8 @@ const NAV_ITEMS: NavItem[] = [
     badgeKey: "ebilling",
     icon: (
       <svg
-        className="w-6 h-6 mr-3.5 shrink-0"
+        className="w-5 h-5 shrink-0"
+
 
         fill="none"
         viewBox="0 0 24 24"
@@ -157,7 +163,8 @@ const NAV_ITEMS: NavItem[] = [
     anyOf: ["export_reports"],
     icon: (
       <svg
-        className="w-6 h-6 mr-3.5 shrink-0"
+        className="w-5 h-5 shrink-0"
+
 
         fill="none"
         viewBox="0 0 24 24"
@@ -178,7 +185,8 @@ const NAV_ITEMS: NavItem[] = [
     anyOf: ["manage_users"],
     icon: (
       <svg
-        className="w-6 h-6 mr-3.5 shrink-0"
+        className="w-5 h-5 shrink-0"
+
 
         fill="none"
         viewBox="0 0 24 24"
@@ -288,7 +296,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Sidebar Nav Items */}
-        <nav className="flex flex-1 flex-col gap-2">
+        <nav className="flex flex-1 flex-col gap-2.5">
           {visibleItems.map((item) => {
             const active = pathname === item.href;
 
@@ -302,18 +310,33 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center justify-between rounded-xl px-4 py-3.5 text-sm sm:text-base font-bold tracking-wide transition-all duration-150 ${
+                className={`group flex items-center justify-between rounded-2xl p-3 sm:p-3.5 text-sm sm:text-base font-extrabold tracking-wide transition-all duration-200 border cursor-pointer ${
                   active
-                    ? "bg-zinc-200/80 dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs border border-zinc-300/50 dark:border-zinc-800"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-200/50 dark:hover:bg-zinc-900/40"
+                    ? "bg-emerald-600 dark:bg-emerald-950/85 text-white dark:text-emerald-300 border-emerald-500 dark:border-emerald-500/80 shadow-md shadow-emerald-600/25 dark:shadow-emerald-950/60"
+                    : "bg-white dark:bg-zinc-900/60 text-zinc-700 dark:text-zinc-300 border-zinc-200/90 dark:border-zinc-800/80 hover:border-emerald-500/50 dark:hover:border-emerald-500/40 hover:bg-emerald-50/50 dark:hover:bg-zinc-900 shadow-2xs"
                 }`}
               >
-                <div className="flex items-center space-x-1">
-                  {item.icon}
-                  <span className="font-extrabold">{item.label}</span>
+                <div className="flex items-center space-x-3">
+                  <div
+                    className={`p-2 rounded-xl border transition-colors ${
+                      active
+                        ? "bg-white/20 dark:bg-emerald-500/20 text-white dark:text-emerald-300 border-white/20 dark:border-emerald-500/30"
+                        : "bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 border-zinc-200/60 dark:border-zinc-700/60 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 group-hover:bg-emerald-100/50 dark:group-hover:bg-emerald-950/40"
+                    }`}
+                  >
+                    {item.icon}
+                  </div>
+                  <span className="font-extrabold tracking-tight">{item.label}</span>
                 </div>
+
                 {count > 0 && (
-                  <span className="flex h-5.5 min-w-5.5 items-center justify-center rounded-lg bg-rose-600 px-2 text-xs font-black text-white shadow-xs">
+                  <span
+                    className={`flex h-6 min-w-6 items-center justify-center rounded-xl px-2 text-xs font-black font-mono shadow-xs ${
+                      active
+                        ? "bg-white text-emerald-800 dark:bg-emerald-400 dark:text-emerald-950"
+                        : "bg-rose-600 text-white"
+                    }`}
+                  >
                     {count}
                   </span>
                 )}
@@ -321,6 +344,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
+
 
         {/* Materiality Threshold Summary in the bottom-left sidebar */}
         <div className="mt-6 border-t border-zinc-200 dark:border-zinc-900 pt-5 flex flex-col gap-1.5">
