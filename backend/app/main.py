@@ -8,8 +8,8 @@ from app.routes.feed import feed
 from app.routes.auth import auth, admin
 from app.routes.fraud import detective, graph
 from app.routes.audit import audit
-from app.routes.alerts import alerts
-from app.routes.reports import report_verify
+from app.routes import report_verify
+
 
 # import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text

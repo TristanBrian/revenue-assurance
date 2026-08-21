@@ -360,6 +360,23 @@ export async function downloadExport(materiality = 100000, direction: Direction 
   saveBlob(await res.blob(), "reconciliation_report.xlsx");
 }
 
+export async function downloadExportWithFields(
+  materiality = 100000,
+  fields?: string[],
+  direction: Direction = "all",
+): Promise<Blob> {
+  const url = new URL("/api/reconcile/export", API_URL);
+  url.searchParams.set("materiality", String(materiality));
+  url.searchParams.set("direction", direction);
+  if (fields && fields.length > 0) {
+    url.searchParams.set("fields", fields.join(","));
+  }
+  const res = await authFetch(url);
+  if (!res.ok) throw new ApiError(await parseErrorDetail(res), res.status);
+  return await res.blob();
+}
+
+
 export async function getEbillingStatus(): Promise<EbillingIntegrationStatus> {
   const res = await authFetch(new URL("/api/e-billing/status", API_URL));
   const body = await unwrap<{ integration: EbillingIntegrationStatus }>(res);
