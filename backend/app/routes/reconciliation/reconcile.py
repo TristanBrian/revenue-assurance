@@ -494,11 +494,20 @@ async def update_anomaly(
     dispatch_id: str = Query(...),
     status: str = Query(...),
     notes: str = Query(''),
+    fraud_feedback_label: Optional[str] = Query(
+        None,
+        description="Optional fraud judgment, independent of `status`: "
+                    "confirmed_fraud | false_positive | resolved_benign. "
+                    "Feeds the fraud-scoring layer's retraining loop.",
+    ),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("resolve_anomaly")),
 ):
     try:
-        result = update_anomaly_status(db, dispatch_id, status, notes, actor_user_id=user.id)
+        result = update_anomaly_status(
+            db, dispatch_id, status, notes, actor_user_id=user.id,
+            fraud_feedback_label=fraud_feedback_label,
+        )
         invalidate_cache()
         logger.info(f"✅ Cache invalidated after resolving anomaly {dispatch_id}")
         return result
