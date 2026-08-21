@@ -39,6 +39,12 @@ class RoleNotFoundError(Exception):
 
 _ROLE_KEYWORDS: list[tuple[str, list[str]]] = [
     ("depot_supervisor", ["depot_supervisor", "supervisor", "depot", "depo"]),
+    # inuka_manager must be checked BEFORE manager: normalize_role_name
+    # returns the first match, and "manager"/"mgr"/"man" are all
+    # substrings of inputs like "inuka manager" — listing manager first
+    # would silently provision every "inuka manager" as a plain Manager
+    # instead of the outbound-only Inuka Manager role (Stage 2).
+    ("inuka_manager", ["inuka_manager", "inuka manager", "inuka"]),
     ("manager", ["manager", "mgr", "man"]),
     ("revenue_assurance", ["revenue_assurance", "revenue", "assurance"]),
 ]
