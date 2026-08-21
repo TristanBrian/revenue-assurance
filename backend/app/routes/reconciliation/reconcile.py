@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.core.dependencies import get_db, require_permission
 from app.models.auth.user import User
-from app.services.reconciliation.reconciliation import run_reconciliation, run_reconciliation_on_dataframes
+from app.services.reconciliation.reconciliation import run_reconciliation, run_reconciliation_on_dataframes, run_combined_reconciliation
 from app.services.ebilling.e_billing import sync_anomalies_to_ebilling, update_anomaly_status
 from app.services.feed.feed import update_feed
 from app.services.audit.audit_service import log_action
@@ -98,14 +98,15 @@ def deep_sanitize(obj):
 @router.post("/reconcile/metrics", response_model=MetricsResponse)
 def reconcile_metrics(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
+    direction: str = Query("all", description="inbound | outbound | all — defaults to all"),
     db: Session = Depends(get_db),
     _: User = Depends(require_permission("view_metrics")),
 ):
     try:
-        cache_key = f"metrics_{materiality}"
+        cache_key = f"metrics_{materiality}_{direction}"
         cached = get_cached_result(cache_key)
         if cached:
-            logger.info(f"✅ Metrics cache hit for materiality={materiality}")
+            logger.info(f"✅ Metrics cache hit for materiality={materiality}, direction={direction}")
             return {
                 'status': 'success',
                 'metrics': cached['metrics'],
@@ -116,8 +117,8 @@ def reconcile_metrics(
                 'duplicate_anomalies': cached.get('duplicate_anomalies', []),
             }
 
-        logger.info(f"🔄 Metrics cache miss for materiality={materiality}, running reconciliation...")
-        result = run_reconciliation(materiality=materiality)
+        logger.info(f"🔄 Metrics cache miss for materiality={materiality}, direction={direction}, running reconciliation...")
+        result = run_combined_reconciliation(direction=direction, materiality=materiality)
         update_feed(result.get('anomalies', []))
 
         # Reconciliation-side alert triggers — all gated to the cache-miss
@@ -171,6 +172,7 @@ def reconcile_anomalies(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     page: int = Query(1, description="Page number", ge=1),
     page_size: int = Query(20, description="Items per page", ge=1, le=100),
+    direction: str = Query("all", description="inbound | outbound | all — defaults to all"),
     break_type: Optional[str] = Query(None, description="Filter by break type (e.g. Overpayment, Underpayment, Missing Invoice, Missing Payment)"),
     status: Optional[str] = Query(None, description="Filter by status (e.g. Critical, Pending, Review Required, Reconciled)"),
     search: Optional[str] = Query(None, description="Search across OMC, dispatch ID, product, invoice ID"),
@@ -181,14 +183,14 @@ def reconcile_anomalies(
     Uses cached reconciliation data to avoid re-running full reconciliation.
     """
     try:
-        cache_key = f"metrics_{materiality}"
+        cache_key = f"metrics_{materiality}_{direction}"
         cached = get_cached_result(cache_key)
         if cached:
-            logger.info(f"✅ Anomalies cache hit for materiality={materiality}")
+            logger.info(f"✅ Anomalies cache hit for materiality={materiality}, direction={direction}")
             all_anomalies = cached.get('anomalies', [])
         else:
             logger.info(f"🔄 Anomalies cache miss – running reconciliation...")
-            result = run_reconciliation(materiality=materiality)
+            result = run_combined_reconciliation(direction=direction, materiality=materiality)
             update_feed(result.get('anomalies', []))
             metrics_data = {
                 'metrics': result['metrics'],
@@ -255,20 +257,21 @@ def reconcile_anomalies(
 @router.get("/reconcile/omc-risk-profile", response_model=OmcRiskProfileResponse)
 def reconcile_omc_risk_profile(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
+    direction: str = Query("all", description="inbound | outbound | all — defaults to all"),
     _: User = Depends(require_permission("view_omc_risk_profile")),
 ):
     try:
-        cache_key = f"metrics_{materiality}"
+        cache_key = f"metrics_{materiality}_{direction}"
         cached = get_cached_result(cache_key)
         if cached:
-            logger.info(f"✅ OMC Risk Profile cache hit for materiality={materiality}")
+            logger.info(f"✅ OMC Risk Profile cache hit for materiality={materiality}, direction={direction}")
             return {
                 'status': 'success',
                 'omc_risk_profile': cached.get('omc_risk_profile', [])
             }
 
         logger.info(f"🔄 OMC Risk Profile cache miss – running reconciliation...")
-        result = run_reconciliation(materiality=materiality)
+        result = run_combined_reconciliation(direction=direction, materiality=materiality)
         metrics_data = {
             'metrics': result['metrics'],
             'summary': result['summary'],
@@ -507,11 +510,12 @@ async def update_anomaly(
 @router.get("/reconcile/export")
 def export_report(
     materiality: float = Query(100000),
+    direction: str = Query("all", description="inbound | outbound | all — defaults to all"),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("export_reports")),
 ):
     try:
-        result = run_reconciliation(materiality=materiality)
+        result = run_combined_reconciliation(direction=direction, materiality=materiality)
 
         try:
             notify_bulk_export(db, actor_user_id=user.id, row_count=len(result.get('anomalies', [])))
@@ -523,7 +527,21 @@ def export_report(
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             pd.DataFrame([result['metrics']]).to_excel(writer, sheet_name='Summary', index=False)
-            pd.DataFrame(result['anomalies']).to_excel(writer, sheet_name='Anomalies', index=False)
+            # direction="all" mixes inbound (OMC/dispatch) and outbound
+            # (beneficiary/attendance) anomalies, which share field NAMES
+            # (customer, dispatch_id, ...) but not field MEANING — splitting
+            # into two tabs by flow_direction keeps the export readable
+            # instead of interleaving rows from two different domains.
+            # inbound/outbound-only requests already contain a single
+            # direction, so one "Anomalies" sheet is enough there.
+            if direction == "all":
+                anomalies = result.get('anomalies', [])
+                inbound_anomalies = [a for a in anomalies if a.get('flow_direction') != 'outbound']
+                outbound_anomalies = [a for a in anomalies if a.get('flow_direction') == 'outbound']
+                pd.DataFrame(inbound_anomalies).to_excel(writer, sheet_name='Anomalies (Inbound)', index=False)
+                pd.DataFrame(outbound_anomalies).to_excel(writer, sheet_name='Anomalies (Outbound)', index=False)
+            else:
+                pd.DataFrame(result['anomalies']).to_excel(writer, sheet_name='Anomalies', index=False)
             pd.DataFrame([result['data_quality']]).to_excel(writer, sheet_name='Data Quality', index=False)
             if result.get('omc_risk_profile'):
                 pd.DataFrame(result['omc_risk_profile']).to_excel(writer, sheet_name='OMC Risk Profile', index=False)
