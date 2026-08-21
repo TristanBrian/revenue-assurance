@@ -10,8 +10,10 @@ import {
   MaterialityProvider,
   useMateriality,
 } from "@/context/MaterialityContext";
+import { DirectionProvider, useDirection } from "@/context/DirectionContext";
 import { useTheme } from "@/context/ThemeContext";
 import { BRAND_CONFIG } from "@/lib/brand-config";
+import type { Direction } from "@/lib/api";
 
 interface NavItem {
   href: string;
@@ -198,6 +200,7 @@ function formatKes(value: number): string {
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading, logout } = useAuth();
   const { materiality } = useMateriality();
+  const { direction, setDirection, canToggle } = useDirection();
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
@@ -214,13 +217,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     // its nav item — a role without it would otherwise 403 on every
     // dashboard load for a badge it can't even see, on every page.
     if (user.permissions.includes("view_metrics")) {
-      getMetrics(materiality)
+      getMetrics(materiality, direction)
         .then((data) => setAnomalyCount(data.metrics.anomaly_count))
         .catch(() => {});
     }
 
     if (user.permissions.includes("view_omc_risk_profile")) {
-      getOmcRiskProfile(materiality)
+      getOmcRiskProfile(materiality, direction)
         .then((profiles) => {
           const highRisk = profiles.filter(
             (p) => p.risk_level === "High",
@@ -235,7 +238,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         .then((status) => setFailedSyncCount(status.failed_count))
         .catch(() => {});
     }
-  }, [user, materiality]);
+  }, [user, materiality, direction]);
 
   function handleLogout() {
     logout();
@@ -314,6 +317,34 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
+
+        {/* Direction toggle (Stage 2) — hidden for locked roles (Depot
+            Supervisor: inbound-only, Inuka Manager: outbound-only), shown
+            as a 3-way segmented control for roles with view_outgoing_data
+            that aren't hard-locked to one side (Manager, Revenue Assurance). */}
+        {canToggle && (
+          <div className="mt-4 border-t border-zinc-900 pt-4 flex flex-col gap-1.5">
+            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">
+              Flow Direction
+            </span>
+            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900/50 p-1 border border-zinc-200 dark:border-zinc-800 rounded-lg">
+              {(["inbound", "outbound", "all"] as Direction[]).map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setDirection(opt)}
+                  className={`flex-1 px-2 py-1 text-[9px] font-black uppercase tracking-wider rounded transition-all duration-150 ${
+                    direction === opt
+                      ? "bg-white dark:bg-zinc-800 text-[#0A2E5C] dark:text-white shadow-sm border border-zinc-200 dark:border-zinc-700"
+                      : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  }`}
+                >
+                  {opt === "inbound" ? "Incoming" : opt === "outbound" ? "Outgoing" : "All"}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Materiality Threshold Summary in the bottom-left sidebar */}
         <div className="mt-4 border-t border-zinc-900 pt-4 flex flex-col gap-1">
@@ -451,7 +482,9 @@ export default function DashboardLayout({
 }) {
   return (
     <MaterialityProvider>
-      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      <DirectionProvider>
+        <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      </DirectionProvider>
     </MaterialityProvider>
   );
 }
