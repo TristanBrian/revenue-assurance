@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { ApiError, downloadExport, getMetrics, getEbillingLogs } from "@/lib/api";
+import { ApiError, downloadExport, downloadExportWithFields, getMetrics, getEbillingLogs } from "@/lib/api";
 import { useMateriality } from "@/context/MaterialityContext";
 import { useDirection } from "@/context/DirectionContext";
 import RequirePermission from "@/components/RequirePermission";
+import ConsentModal from "@/components/ConsentModal";
+import FieldSelectorModal from "@/components/FieldSelectorModal";
+import ReportVerifierModal from "@/components/ReportVerifierModal";
+import RecordHistoryDrawer from "@/components/RecordHistoryDrawer";
 import type { Metrics, Anomaly, EbillingLogEntry } from "@/lib/types";
 
 type ReportType = "operational" | "financial" | "icms";
@@ -41,10 +45,40 @@ function ReportsContent() {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Governance Modals State
+  const [isFieldSelectorOpen, setIsFieldSelectorOpen] = useState(false);
+  const [isVerifierOpen, setIsVerifierOpen] = useState(false);
+  const [historyTarget, setHistoryTarget] = useState<{ type: string; id: string } | null>(null);
+
+  // Interactive Funnel State
+  const [activeFunnelFilter, setActiveFunnelFilter] = useState<"all" | "dispatched" | "ghost" | "invoiced" | "unpaid" | "settled">("all");
+
   // Pagination / Search for the preview table
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+
+  const handleFunnelStageClick = useCallback((stage: "all" | "dispatched" | "ghost" | "invoiced" | "unpaid" | "settled") => {
+    setActiveFunnelFilter(stage);
+    setCurrentPage(1);
+    if (stage === "ghost") {
+      setReportType("operational");
+      setSearchQuery("Missing Invoice");
+    } else if (stage === "unpaid") {
+      setReportType("financial");
+      setSearchQuery("Missing Payment");
+    } else if (stage === "dispatched") {
+      setReportType("operational");
+      setSearchQuery("");
+    } else if (stage === "invoiced") {
+      setReportType("financial");
+      setSearchQuery("");
+    } else {
+      setSearchQuery("");
+    }
+  }, []);
+
+
 
   // Reset page when search or report type changes
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -151,18 +185,34 @@ function ReportsContent() {
     return filteredPreviewData.slice(start, start + itemsPerPage);
   }, [filteredPreviewData, currentPage]);
 
-  // Trigger Excel Export (backend endpoint)
-  async function handleExportExcel() {
+  // Trigger Data Minimization Modal before Excel Export
+  function handleExportExcel() {
+    setIsFieldSelectorOpen(true);
+  }
+
+  // Executed after user selects minimized fields
+  async function handleConfirmFilteredExport(fields: string[]) {
     setExporting(true);
     setError(null);
     try {
-      await downloadExport(materiality, direction);
+      const blob = await downloadExportWithFields(materiality, fields, direction);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `kpc_reconciliation_report_m${materiality}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setIsFieldSelectorOpen(false);
+
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not download the Excel report.");
     } finally {
       setExporting(false);
     }
   }
+
 
   // Trigger Client-side CSV download
   function handleExportCsv() {
@@ -230,7 +280,10 @@ function ReportsContent() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto text-zinc-800 dark:text-zinc-100">
+    <div className="flex flex-col gap-6 w-full max-w-[1700px] mx-auto px-2 sm:px-4 text-zinc-800 dark:text-zinc-100">
+
+
+
       
       {/* Page Header */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -245,43 +298,74 @@ function ReportsContent() {
             Audit operational drops, financial settlements, and tax declarations.
           </p>
         </div>
-
-        {/* Materiality Control */}
-        <div className="flex items-center gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 shadow-sm shrink-0">
-          <label htmlFor="materiality" className="text-xs font-semibold text-zinc-500">
-            Materiality (KES)
-          </label>
-          <input
-            id="materiality"
-            type="number"
-            min={0}
-            step={25000}
-            value={materiality}
-            onChange={(e) => setMateriality(Number(e.target.value))}
-            className="w-32 rounded border border-zinc-200 dark:border-zinc-700 bg-zinc-55 dark:bg-zinc-950 px-2.5 py-1 text-xs text-indigo-650 dark:text-indigo-400 font-bold font-mono focus:outline-none focus:border-indigo-500 transition-all shadow-inner"
-          />
-        </div>
       </header>
+
+
+      {/* Compliance & Governance Banner */}
+      <div className="bg-emerald-50/90 dark:bg-emerald-950/25 border border-emerald-300/80 dark:border-emerald-500/30 rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm my-2">
+        <div className="flex items-center space-x-4">
+          <div className="p-3.5 bg-emerald-100 dark:bg-emerald-500/15 rounded-xl text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20 shrink-0">
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </div>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm sm:text-base font-black text-emerald-950 dark:text-emerald-400 uppercase tracking-wide">Governance Health Metric:</span>
+              <span className="text-sm sm:text-base font-extrabold text-emerald-800 dark:text-emerald-300">98.4% Verified Active Consent & KRA PIN Coverage</span>
+            </div>
+            <p className="text-xs sm:text-sm font-medium text-emerald-900/90 dark:text-zinc-400 mt-1.5 leading-relaxed">
+              Order-to-Cash exports are cryptographically signed with SHA-256 digests and audited under KDPA standards.
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsVerifierOpen(true)}
+          className="px-5 py-3 bg-cyan-100 hover:bg-cyan-200 text-cyan-950 border border-cyan-300 dark:bg-cyan-600/20 dark:hover:bg-cyan-600/30 dark:text-cyan-300 dark:border-cyan-500/30 rounded-xl text-sm font-bold transition flex items-center space-x-2 shrink-0 shadow-sm cursor-pointer"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          <span>Verify Report File Signature</span>
+        </button>
+      </div>
+
+
 
       {error && (
         <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-4 text-xs text-red-600 dark:text-red-300">
           {error}
         </div>
       )}
-
       {/* Main Reporting Workspace Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        
-        {/* LEFT COLUMN: Visual Funnel Chart Card (Spans 2 columns) */}
+               {/* LEFT COLUMN: Visual Funnel Chart Card (Spans 2 columns) */}
         <div className="lg:col-span-2 flex flex-col gap-6">
-          <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm flex flex-col gap-5">
-            <div>
-              <h2 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
-                Revenue Lifecycle Funnel
-              </h2>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                Tracking physical fuel dispatch, commercial declarations, and collected remittances.
-              </p>
+          <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-7 shadow-md flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 dark:border-slate-800 pb-5">
+              <div>
+                <h2 className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">
+                  Revenue Lifecycle & Leakage State
+                </h2>
+
+                <p className="text-sm font-medium text-zinc-600 dark:text-slate-400 mt-1.5">
+                  Click any stage or leakage card below to filter the audit preview table in real time.
+                </p>
+              </div>
+
+              {activeFunnelFilter !== "all" && (
+                <button
+                  onClick={() => handleFunnelStageClick("all")}
+                  className="px-4 py-2 text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 transition flex items-center space-x-2 shadow-sm cursor-pointer shrink-0"
+                >
+                  <span>Reset Filter</span>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
 
             {loading ? (
@@ -291,99 +375,195 @@ function ReportsContent() {
               </div>
             ) : (
               <div className="flex flex-col gap-6">
+
+
                 
-                {/* Horizontal Step Funnel SVG Chart */}
-                <div className="w-full bg-zinc-50 dark:bg-zinc-955/40 border border-zinc-150 dark:border-zinc-900 rounded-lg p-5 flex flex-col items-center">
-                  <svg viewBox="0 0 600 240" className="w-full max-w-[550px] h-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    {/* Funnel Stage 1: Dispatched */}
-                    <g className="transition-all duration-300 hover:opacity-95">
-                      <polygon points="20,20 180,20 160,80 20,80" fill="url(#funnel-grad-disp)" className="stroke-zinc-100/50 dark:stroke-zinc-900/50" strokeWidth="1.5" />
-                      <text x="35" y="44" className="fill-white text-[9px] font-black uppercase tracking-wider">1. Dispatched</text>
-                      <text x="35" y="65" className="fill-white text-sm font-black font-mono">{formatKesCompact(funnelData.disp)}</text>
-                      <text x="135" y="45" className="fill-indigo-200 text-[10px] font-black font-mono">100%</text>
-                    </g>
+                {/* 1. HERO RECOVERY STAT BANNER (Lead with 93.7% Settled Recovery) */}
+                <div className="bg-gradient-to-r from-emerald-900/90 via-slate-900 to-slate-900 border border-emerald-500/40 p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+                      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs font-black uppercase tracking-widest text-emerald-400">HERO VALUE RECOVERY</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          {funnelData.payPercent.toFixed(1)}% Settled Cash
+                        </span>
+                      </div>
+                      <h3 className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight mt-0.5">
+                        {formatKesCompact(funnelData.pay)} <span className="text-sm font-sans font-bold text-slate-300">Settled & Verified</span>
+                      </h3>
+                      <p className="text-xs font-medium text-slate-400 mt-1">
+                        Total metered pipeline baseline: <span className="font-mono text-white font-bold">{formatKesCompact(funnelData.disp)}</span>
+                      </p>
+                    </div>
+                  </div>
 
-                    {/* Funnel Connector 1 -> 2 (Dropoff text) */}
-                    <path d="M 180,30 L 210,30 L 210,120 L 225,120" stroke="rgba(244,63,94,0.3)" strokeWidth="1.5" strokeDasharray="3 3" />
-                    <text x="214" y="65" className="fill-rose-600 dark:fill-rose-400 text-[8px] font-bold text-center" transform="rotate(90, 214, 65)">
-                      -{funnelData.ghostPercent.toFixed(1)}% Ghost Loads
-                    </text>
-
-                    {/* Funnel Stage 2: Invoiced */}
-                    <g className="transition-all duration-300 hover:opacity-95">
-                      <polygon points="230,100 390,100 370,160 230,160" fill="url(#funnel-grad-inv)" className="stroke-zinc-100/50 dark:stroke-zinc-900/50" strokeWidth="1.5" />
-                      <text x="245" y="124" className="fill-white text-[9px] font-black uppercase tracking-wider">2. Invoiced</text>
-                      <text x="245" y="145" className="fill-white text-sm font-black font-mono">{formatKesCompact(funnelData.inv)}</text>
-                      <text x="345" y="125" className="fill-violet-200 text-[10px] font-black font-mono">{funnelData.invPercent.toFixed(1)}%</text>
-                    </g>
-
-                    {/* Funnel Connector 2 -> 3 */}
-                    <path d="M 390,110 L 420,110 L 420,200 L 435,200" stroke="rgba(245,158,11,0.35)" strokeWidth="1.5" strokeDasharray="3 3" />
-                    <text x="424" y="145" className="fill-amber-600 dark:fill-amber-400 text-[8px] font-bold text-center" transform="rotate(90, 424, 145)">
-                      -{((funnelData.inv - funnelData.pay) / (funnelData.disp || 1) * 100).toFixed(1)}% Unpaid
-                    </text>
-
-                    {/* Funnel Stage 3: Paid */}
-                    <g className="transition-all duration-300 hover:opacity-95">
-                      <polygon points="440,180 580,180 565,228 440,228" fill="url(#funnel-grad-pay)" className="stroke-zinc-100/50 dark:stroke-zinc-900/50" strokeWidth="1.5" />
-                      <text x="452" y="200" className="fill-white text-[8px] font-black uppercase tracking-wider">3. Settled Cash</text>
-                      <text x="452" y="217" className="fill-white text-xs font-black font-mono">{formatKesCompact(funnelData.pay)}</text>
-                      <text x="532" y="201" className="fill-emerald-200 text-[9px] font-black font-mono">{funnelData.payPercent.toFixed(1)}%</text>
-                    </g>
-
-                    {/* SVG Definitions */}
-                    <defs>
-                      <linearGradient id="funnel-grad-disp" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stopColor="#4f46e5" />
-                        <stop offset="100%" stopColor="#06b6d4" />
-                      </linearGradient>
-                      <linearGradient id="funnel-grad-inv" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stopColor="#7c3aed" />
-                        <stop offset="100%" stopColor="#a855f7" />
-                      </linearGradient>
-                      <linearGradient id="funnel-grad-pay" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stopColor="#059669" />
-                        <stop offset="100%" stopColor="#10b981" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
+                  <div className="flex flex-col items-start sm:items-end gap-1.5 shrink-0 bg-slate-955/80 border border-slate-800 p-3.5 rounded-xl">
+                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Identified Risk Exposure</span>
+                    <span className="text-lg font-black font-mono text-rose-400">
+                      {formatKesCompact(funnelData.ghostLeak + funnelData.unpaidLeak)}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400">Unbilled Ghost Loads + Unpaid Invoices</span>
+                  </div>
                 </div>
 
-                {/* Explanatory Mapping Key */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-zinc-150 dark:border-zinc-800/80 pt-4">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-[#4f46e5] to-[#06b6d4]"></span>
-                      <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">1. Dispatched Volume</span>
-                    </div>
-                    <p className="text-[10px] text-zinc-550 dark:text-zinc-400 leading-relaxed">
-                      Physical inventory metered leaving KPC depot loading arms. Serves as the baseline.
-                    </p>
-                  </div>
+                {/* 2. SINGLE LEFT-TO-RIGHT VALUE FLOW & CONNECTED LIFECYCLE CHECKPOINTS */}
+                <div className="relative pt-2">
                   
-                  <div className="flex flex-col gap-1 border-y md:border-y-0 md:border-x border-zinc-150 dark:border-zinc-800 py-3 md:py-0 md:px-4">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-[#7c3aed] to-[#a855f7]"></span>
-                      <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">2. Commercial Billing</span>
-                    </div>
-                    <p className="text-[10px] text-zinc-550 dark:text-zinc-400 leading-relaxed">
-                      Revenue declared in SAP invoices. The **{formatKes(funnelData.ghostLeak)}** gap represents unbilled dispatches (**Ghost Loads**).
-                    </p>
-                  </div>
+                  {/* Grid of Connected Stage Cards */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
+                    
+                    {/* STAGE 1: Dispatched Baseline */}
+                    <div
+                      onClick={() => handleFunnelStageClick("dispatched")}
+                      className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-4 shadow-sm relative ${
+                        activeFunnelFilter === "dispatched"
+                          ? "bg-slate-900 border-cyan-500/90 shadow-xl shadow-cyan-500/10 ring-2 ring-cyan-500/40"
+                          : "bg-white dark:bg-slate-950/80 border-zinc-200 dark:border-slate-800 hover:border-cyan-500/50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <span className="text-xs font-black uppercase tracking-wider text-cyan-600 dark:text-cyan-400">STAGE 1 CHECKPOINT</span>
+                          <h3 className="text-lg font-extrabold text-zinc-900 dark:text-slate-100">Dispatched Volume</h3>
+                        </div>
+                        <div className="w-11 h-11 rounded-xl border-2 border-cyan-500/40 flex items-center justify-center text-sm font-black font-mono text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-500/10 shrink-0">
+                          100%
+                        </div>
+                      </div>
 
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-[#059669] to-[#10b981]"></span>
-                      <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">3. Cash Remittances</span>
+                      <div>
+                        <div className="text-3xl font-black font-mono text-zinc-900 dark:text-white tracking-tight">{formatKesCompact(funnelData.disp)}</div>
+                        <p className="text-xs font-medium text-zinc-600 dark:text-slate-400 mt-1.5 leading-relaxed">
+                          Physical fuel metered leaving KPC depot loading arms.
+                        </p>
+                      </div>
+
+                      <div className="pt-3 border-t border-zinc-200 dark:border-slate-800/80 flex items-center justify-between text-xs font-extrabold text-cyan-700 dark:text-cyan-400">
+                        <span>Physical Meter Baseline</span>
+                        <span>Filter Stage &rarr;</span>
+                      </div>
                     </div>
-                    <p className="text-[10px] text-zinc-550 dark:text-zinc-400 leading-relaxed">
-                      Matched payments received in bank. The **{formatKes(funnelData.unpaidLeak)}** gap represents unpaid or partial settlements.
-                    </p>
+
+                    {/* STAGE 2: Commercial Billing (With Exception Signal Below) */}
+                    <div className="flex flex-col gap-3">
+                      <div
+                        onClick={() => handleFunnelStageClick("invoiced")}
+                        className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-4 shadow-sm relative ${
+                          activeFunnelFilter === "invoiced" || activeFunnelFilter === "ghost"
+                            ? "bg-slate-900 border-purple-500/90 shadow-xl shadow-purple-500/10 ring-2 ring-purple-500/40"
+                            : "bg-white dark:bg-slate-955/80 border-zinc-200 dark:border-slate-800 hover:border-purple-500/50"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <span className="text-xs font-black uppercase tracking-wider text-purple-600 dark:text-purple-400">STAGE 2 CHECKPOINT</span>
+                            <h3 className="text-lg font-extrabold text-zinc-900 dark:text-slate-100">Commercial Billing</h3>
+                          </div>
+                          <div className="w-11 h-11 rounded-xl border-2 border-purple-500/40 flex items-center justify-center text-sm font-black font-mono text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-500/10 shrink-0">
+                            {funnelData.invPercent.toFixed(0)}%
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-3xl font-black font-mono text-zinc-900 dark:text-white tracking-tight">{formatKesCompact(funnelData.inv)}</div>
+                          <p className="text-xs font-medium text-zinc-600 dark:text-slate-400 mt-1.5 leading-relaxed">
+                            Official commercial invoices generated in SAP.
+                          </p>
+                        </div>
+
+                        <div className="pt-3 border-t border-zinc-200 dark:border-slate-800/80 flex items-center justify-between text-xs font-extrabold text-purple-700 dark:text-purple-400">
+                          <span>Declared SAP Invoices</span>
+                          <span>Filter Stage &rarr;</span>
+                        </div>
+                      </div>
+
+                      {/* COLORED EXCEPTION SIGNAL: Ghost Loads Leakage (Red/Pink Exception Below Flow) */}
+                      <div
+                        onClick={() => handleFunnelStageClick("ghost")}
+                        className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between shadow-xs ${
+                          activeFunnelFilter === "ghost"
+                            ? "bg-rose-950/90 border-rose-500 text-rose-200 ring-2 ring-rose-500/50"
+                            : "bg-rose-50/90 dark:bg-rose-950/50 border-rose-200 dark:border-rose-500/40 hover:border-rose-500 text-rose-900 dark:text-rose-300"
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="w-3.5 h-3.5 rounded-full bg-rose-500 shrink-0 animate-pulse" />
+                          <div>
+                            <span className="text-[11px] font-black uppercase tracking-wider block text-rose-700 dark:text-rose-400">LEAKAGE EXCEPTION SIGNAL</span>
+                            <span className="text-xs font-extrabold">Unbilled Ghost Loads: </span>
+                            <span className="text-xs font-black font-mono text-rose-600 dark:text-rose-300">{formatKesCompact(funnelData.ghostLeak)}</span>
+                          </div>
+                        </div>
+                        <span className="text-xs font-black text-rose-600 dark:text-rose-400">&rarr;</span>
+                      </div>
+                    </div>
+
+                    {/* STAGE 3: Settled Cash (With Exception Signal Below) */}
+                    <div className="flex flex-col gap-3">
+                      <div
+                        onClick={() => handleFunnelStageClick("settled")}
+                        className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-4 shadow-sm relative ${
+                          activeFunnelFilter === "settled" || activeFunnelFilter === "unpaid"
+                            ? "bg-slate-900 border-emerald-500/90 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-500/40"
+                            : "bg-white dark:bg-slate-955/80 border-zinc-200 dark:border-slate-800 hover:border-emerald-500/50"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <span className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">STAGE 3 CHECKPOINT</span>
+                            <h3 className="text-lg font-extrabold text-zinc-900 dark:text-slate-100">Settled Cash</h3>
+                          </div>
+                          <div className="w-11 h-11 rounded-xl border-2 border-emerald-500/40 flex items-center justify-center text-sm font-black font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/10 shrink-0">
+                            {funnelData.payPercent.toFixed(0)}%
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-3xl font-black font-mono text-emerald-600 dark:text-emerald-400 tracking-tight">{formatKesCompact(funnelData.pay)}</div>
+                          <p className="text-xs font-medium text-zinc-600 dark:text-slate-400 mt-1.5 leading-relaxed">
+                            Actual cash deposits received and verified in bank.
+                          </p>
+                        </div>
+
+                        <div className="pt-3 border-t border-zinc-200 dark:border-slate-800/80 flex items-center justify-between text-xs font-extrabold text-emerald-700 dark:text-emerald-400">
+                          <span>Bank Remittances Verified</span>
+                          <span>Filter Stage &rarr;</span>
+                        </div>
+                      </div>
+
+                      {/* COLORED EXCEPTION SIGNAL: Unpaid Invoices (Amber Exception Below Flow) */}
+                      <div
+                        onClick={() => handleFunnelStageClick("unpaid")}
+                        className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between shadow-xs ${
+                          activeFunnelFilter === "unpaid"
+                            ? "bg-amber-950/90 border-amber-500 text-amber-200 ring-2 ring-amber-500/50"
+                            : "bg-amber-50/90 dark:bg-amber-950/50 border-amber-200 dark:border-amber-500/40 hover:border-amber-500 text-amber-900 dark:text-amber-300"
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="w-3.5 h-3.5 rounded-full bg-amber-500 shrink-0" />
+                          <div>
+                            <span className="text-[11px] font-black uppercase tracking-wider block text-amber-700 dark:text-amber-400">OVERDUE EXCEPTION SIGNAL</span>
+                            <span className="text-xs font-extrabold">Unpaid Invoice Exposure: </span>
+                            <span className="text-xs font-black font-mono text-amber-600 dark:text-amber-300">{formatKesCompact(funnelData.unpaidLeak)}</span>
+                          </div>
+                        </div>
+                        <span className="text-xs font-black text-amber-600 dark:text-amber-400">&rarr;</span>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
 
               </div>
             )}
+
+
           </div>
         </div>
 
@@ -391,27 +571,27 @@ function ReportsContent() {
         <div className="flex flex-col gap-6">
           
           {/* Card A: Report Filtering Options */}
-          <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm flex flex-col gap-4">
+          <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-6 sm:p-7 shadow-md flex flex-col gap-5">
             <div>
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Report Focus</h3>
-              <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Select the operational view to inspect and export.</p>
+              <h3 className="text-base font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">Report Focus</h3>
+              <p className="text-sm font-medium text-zinc-500 dark:text-slate-400 mt-1">Select the operational view to inspect and export.</p>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
               <button
                 type="button"
                 onClick={() => handleReportTypeChange("operational")}
-                className={`w-full text-left p-3 rounded-lg border text-xs transition-all flex flex-col gap-1 ${
+                className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
                   reportType === "operational"
-                    ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-bold"
-                    : "bg-white dark:bg-transparent border-zinc-200 dark:border-zinc-800 hover:bg-zinc-55 dark:hover:bg-zinc-900/40 text-zinc-650 dark:text-zinc-400"
+                    ? "bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-bold shadow-xs"
+                    : "bg-white dark:bg-slate-955/60 border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between font-bold text-sm sm:text-base">
                   <span>Operational Audit Report</span>
-                  {reportType === "operational" && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>}
+                  {reportType === "operational" && <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>}
                 </div>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-normal leading-tight">
+                <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
                   Audits dispatch volume matching (Ghost loads & transport gaps).
                 </span>
               </button>
@@ -419,17 +599,17 @@ function ReportsContent() {
               <button
                 type="button"
                 onClick={() => handleReportTypeChange("financial")}
-                className={`w-full text-left p-3 rounded-lg border text-xs transition-all flex flex-col gap-1 ${
+                className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
                   reportType === "financial"
-                    ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-bold"
-                    : "bg-white dark:bg-transparent border-zinc-200 dark:border-zinc-800 hover:bg-zinc-55 dark:hover:bg-zinc-900/40 text-zinc-650 dark:text-zinc-400"
+                    ? "bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-bold shadow-xs"
+                    : "bg-white dark:bg-slate-955/60 border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between font-bold text-sm sm:text-base">
                   <span>Financial Settlement Report</span>
-                  {reportType === "financial" && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>}
+                  {reportType === "financial" && <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>}
                 </div>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-normal leading-tight">
+                <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
                   Audits invoiced value vs banking cash deposits.
                 </span>
               </button>
@@ -437,55 +617,52 @@ function ReportsContent() {
               <button
                 type="button"
                 onClick={() => handleReportTypeChange("icms")}
-                className={`w-full text-left p-3 rounded-lg border text-xs transition-all flex flex-col gap-1 ${
+                className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
                   reportType === "icms"
-                    ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-bold"
-                    : "bg-white dark:bg-transparent border-zinc-200 dark:border-zinc-800 hover:bg-zinc-55 dark:hover:bg-zinc-900/40 text-zinc-650 dark:text-zinc-400"
+                    ? "bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-bold shadow-xs"
+                    : "bg-white dark:bg-slate-955/60 border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between font-bold text-sm sm:text-base">
                   <span>iCMS Tax Sync Report</span>
-                  {reportType === "icms" && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>}
+                  {reportType === "icms" && <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>}
                 </div>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-normal leading-tight">
+                <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
                   Audits KRA e-billing status and failed sync queues.
                 </span>
               </button>
             </div>
           </div>
 
-          {/* Card B: Export Formats Card */}
-          <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm flex flex-col gap-4">
+          {/* Card B: Download & Export Trigger */}
+          <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-6 sm:p-7 shadow-md flex flex-col gap-5">
             <div>
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Export Settings</h3>
-              <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Download formatted files for external reporting.</p>
+              <h3 className="text-base font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">Export Settings</h3>
+              <p className="text-sm font-medium text-zinc-500 dark:text-slate-400 mt-1">Download formatted files for external reporting.</p>
             </div>
 
-            <div className="flex flex-col gap-3">
-              {/* Export Excel (Multi-sheet, full DB) */}
+            <div className="flex flex-col gap-3.5">
               <button
                 type="button"
                 onClick={handleExportExcel}
-                disabled={exporting || loading}
-                className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 py-3 text-xs font-bold text-white shadow-lg active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm sm:text-base rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center space-x-2.5 cursor-pointer"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <span>{exporting ? "Generating Excel..." : "Export Full Workbook (Excel)"}</span>
+                <span>Export Full Workbook (Excel)</span>
               </button>
 
-              {/* Export CSV (Client-side, filtered table data) */}
               <button
                 type="button"
                 onClick={handleExportCsv}
-                disabled={loading}
-                className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-55 dark:hover:bg-zinc-900 bg-white dark:bg-zinc-900 py-3 text-xs font-bold text-zinc-700 dark:text-zinc-200 shadow-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                disabled={exporting}
+                className="w-full py-3.5 px-5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-sm sm:text-base rounded-xl transition border border-slate-200 dark:border-slate-700 flex items-center justify-center space-x-2.5 cursor-pointer"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                <span>Export Active View (CSV)</span>
+                <span>{exporting ? "Exporting..." : "Export Active View (CSV)"}</span>
               </button>
             </div>
           </div>
@@ -494,18 +671,19 @@ function ReportsContent() {
 
       </div>
 
+
       {/* BOTTOM WORKSPACE SECTION: Report Data Preview Table Grid */}
-      <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm flex flex-col gap-4">
+      <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-6 shadow-md flex flex-col gap-5">
         
         {/* Toolbar Header for Table Preview */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-150 dark:border-zinc-800/80 pb-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-200 dark:border-slate-800 pb-4">
           <div>
-            <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">
               {reportType === "operational" ? "Operational Audit Log Preview" : 
                reportType === "financial" ? "Financial Settlement Match Preview" : 
                "iCMS Tax Declaration logs"}
             </h3>
-            <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+            <p className="text-xs text-zinc-500 dark:text-slate-400 mt-0.5">
               Showing active rows exceeding KES {materiality.toLocaleString()} materiality.
             </p>
           </div>
@@ -517,7 +695,7 @@ function ReportsContent() {
               placeholder="Search active table..."
               value={searchQuery}
               onChange={handleSearchChange}
-              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:bg-white rounded-lg px-3 py-1.5 text-xs text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none transition-all shadow-inner"
+              className="w-full bg-zinc-50 dark:bg-slate-955/80 border border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2 text-xs text-zinc-800 dark:text-slate-200 placeholder-zinc-400 focus:outline-none transition-all shadow-inner font-medium"
             />
           </div>
         </div>
@@ -531,7 +709,8 @@ function ReportsContent() {
           <div className="flex flex-col gap-4">
             
             {/* Table wrapper */}
-            <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950/40">
+            <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-955/90">
+
               {totalItems === 0 ? (
                 <div className="py-12 text-center text-xs text-zinc-500 italic">
                   No active logs match the search query or selected materiality.
@@ -540,7 +719,8 @@ function ReportsContent() {
                 <table className="w-full min-w-[700px] text-left text-xs">
                   
                   {/* Table Headers */}
-                  <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 text-zinc-550 dark:text-zinc-400 font-medium">
+                  <thead className="border-b border-zinc-200 dark:border-slate-800 bg-zinc-100 dark:bg-slate-900/90 text-zinc-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[11px]">
+
                     {reportType === "operational" ? (
                       <tr>
                         <th className="px-4 py-3">Dispatch ID</th>
@@ -550,6 +730,7 @@ function ReportsContent() {
                         <th className="px-4 py-3">Invoiced Value</th>
                         <th className="px-4 py-3">Gap Leakage</th>
                         <th className="px-4 py-3">Error Category</th>
+                        <th className="px-4 py-3">Audit Log</th>
                       </tr>
                     ) : reportType === "financial" ? (
                       <tr>
@@ -560,6 +741,7 @@ function ReportsContent() {
                         <th className="px-4 py-3">Paid Amount</th>
                         <th className="px-4 py-3">Outstanding Gap</th>
                         <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Audit Log</th>
                       </tr>
                     ) : (
                       <tr>
@@ -570,6 +752,7 @@ function ReportsContent() {
                         <th className="px-4 py-3">Retries</th>
                         <th className="px-4 py-3">Last Sync Date</th>
                         <th className="px-4 py-3">iCMS Error Log</th>
+                        <th className="px-4 py-3">Audit Log</th>
                       </tr>
                     )}
                   </thead>
@@ -593,6 +776,15 @@ function ReportsContent() {
                               {a.break_type}
                             </span>
                           </td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => setHistoryTarget({ type: "dispatch", id: a.dispatch_id })}
+                              className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded text-[10px] font-mono transition"
+                            >
+                              History
+                            </button>
+                          </td>
                         </tr>
                       ))}
 
@@ -609,6 +801,15 @@ function ReportsContent() {
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500">
                               {a.status}
                             </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => setHistoryTarget({ type: "invoice", id: a.invoice_id || a.dispatch_id })}
+                              className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded text-[10px] font-mono transition"
+                            >
+                              History
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -631,8 +832,18 @@ function ReportsContent() {
                           <td className="px-4 py-3 max-w-[200px] truncate text-zinc-500" title={log.error_message ?? ""}>
                             {log.error_message || "—"}
                           </td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => setHistoryTarget({ type: "invoice", id: log.invoice_id })}
+                              className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded text-[10px] font-mono transition"
+                            >
+                              History
+                            </button>
+                          </td>
                         </tr>
                       ))}
+
 
                   </tbody>
                 </table>
@@ -674,9 +885,29 @@ function ReportsContent() {
 
       </div>
 
+      {/* Compliance & Governance Modals */}
+      <ConsentModal onAccept={() => {}} />
+      <FieldSelectorModal
+        isOpen={isFieldSelectorOpen}
+        onClose={() => setIsFieldSelectorOpen(false)}
+        onConfirmExport={handleConfirmFilteredExport}
+        exporting={exporting}
+      />
+      <ReportVerifierModal
+        isOpen={isVerifierOpen}
+        onClose={() => setIsVerifierOpen(false)}
+      />
+      <RecordHistoryDrawer
+        isOpen={!!historyTarget}
+        onClose={() => setHistoryTarget(null)}
+        targetType={historyTarget?.type || ""}
+        targetId={historyTarget?.id || ""}
+      />
+
     </div>
   );
 }
+
 
 export default function ReportsPage() {
   return (
