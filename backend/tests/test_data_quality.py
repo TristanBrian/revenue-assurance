@@ -10,7 +10,7 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from app.services.reconciliation import calculate_data_quality, DataQualityReport
+from app.services.reconciliation.reconciliation import calculate_data_quality, DataQualityReport
 
 
 class TestDataQualityValidation:

@@ -22,9 +22,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.security import hash_password
-from app.models.role import Role
-from app.models.user import User
-from app.services.user_service import EmailAlreadyRegisteredError, register_user
+from app.models.auth.role import Role
+from app.models.auth.user import User
+from app.services.auth.user_service import EmailAlreadyRegisteredError, register_user
 from app.utils.db_connection import SessionLocal
 
 DEMO_PASSWORD = "demo-pass-123"
@@ -34,6 +34,9 @@ DEMO_USERS = [
     ("manager@kpc-demo.co.ke", "Demo Manager", "manager"),
     ("revenue_assurance@kpc-demo.co.ke", "Demo Revenue Assurance", "revenue_assurance"),
     ("system_admin@kpc-demo.co.ke", "Demo System Admin", "system_admin"),
+    # Outbound (stipend/disbursement) — Stage 2. Read-only, outbound-only —
+    # see seed_roles.py's ROLE_PERMISSIONS comment.
+    ("inuka_manager@kpc-demo.co.ke", "Demo Inuka Manager", "inuka_manager"),
 ]
 
 
@@ -57,7 +60,7 @@ def seed():
     finally:
         db.close()
 
-    print(f"\nDemo login password (all 4 accounts): {DEMO_PASSWORD}")
+    print(f"\nDemo login password (all {len(DEMO_USERS)} accounts): {DEMO_PASSWORD}")
 
 
 if __name__ == "__main__":

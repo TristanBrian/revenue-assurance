@@ -3,7 +3,23 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { ApiError, getFraudGraph } from "@/lib/api";
 import { useMateriality } from "@/context/MaterialityContext";
+import { useDirection } from "@/context/DirectionContext";
 import type { FraudGraphData, GraphNode } from "@/lib/types";
+
+// Outbound (stipend/disbursement) — Stage 2. "officer"/"beneficiary" nodes
+// (graph_engine.build_outbound_fraud_graph_from_dataframes()) join the
+// same node-type vocabulary "omc"/"depot" nodes already use here. OUTER_TYPES
+// is the "hub" role in each direction's graph — OMC/Officer are drawn on
+// the outer ring as circles; Depot/Beneficiary are the inner ring as
+// squares — same visual grammar reused for both directions rather than a
+// second graph component.
+const OUTER_TYPES = new Set(["omc", "officer"]);
+const NODE_TYPE_LABEL: Record<string, string> = {
+  omc: "OMC",
+  depot: "Depot",
+  officer: "Officer",
+  beneficiary: "Beneficiary",
+};
 
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", {
@@ -67,6 +83,7 @@ const HEIGHT = 460;
 
 export default function FraudGraph() {
   const { materiality } = useMateriality(); // ✅ Get from context
+  const { direction } = useDirection();
   const [graph, setGraph] = useState<FraudGraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +95,7 @@ export default function FraudGraph() {
   useEffect(() => {
     let cancelled = false;
 
-    getFraudGraph(materiality) // ✅ Pass the materiality
+    getFraudGraph(materiality, direction) // ✅ Pass the materiality
       .then((data) => {
         if (!cancelled) setGraph(data);
       })
@@ -97,7 +114,7 @@ export default function FraudGraph() {
     return () => {
       cancelled = true;
     };
-  }, [materiality]); // ✅ Re-run when slider changes
+  }, [materiality, direction]); // ✅ Re-run when slider or direction changes
 
   const laidOutNodes = useMemo(() => {
     if (!graph) return [];
@@ -107,14 +124,14 @@ export default function FraudGraph() {
     const omcRadius = Math.min(WIDTH, HEIGHT) / 2 - 70;
 
     const omcNodes = [...graph.nodes]
-      .filter((n) => n.type === "omc")
+      .filter((n) => OUTER_TYPES.has(n.type))
       .sort(
         (a, b) =>
           RISK_RANK[b.risk_level] - RISK_RANK[a.risk_level] ||
           b.leakage_kes - a.leakage_kes,
       );
     const depotNodes = [...graph.nodes]
-      .filter((n) => n.type !== "omc")
+      .filter((n) => !OUTER_TYPES.has(n.type))
       .sort((a, b) => b.leakage_kes - a.leakage_kes);
     const depotRadius =
       depotNodes.length > 1 ? Math.min(60, 16 + depotNodes.length * 6) : 0;
@@ -142,7 +159,7 @@ export default function FraudGraph() {
 
     return graph.nodes.map((n) => {
       const pos = positions.get(n.id) ?? { x: centerX, y: centerY };
-      const isDepot = n.type === "depot";
+      const isDepot = !OUTER_TYPES.has(n.type);
       const base = isDepot ? 9 : 6;
       const extra = isDepot ? 9 : 13;
       const maxLeakage = isDepot ? maxDepotLeakage : maxOmcLeakage;
@@ -360,7 +377,7 @@ export default function FraudGraph() {
                         />
                       )}
 
-                      {node.type === "omc" ? (
+                      {OUTER_TYPES.has(node.type) ? (
                         <circle
                           cx={node.x}
                           cy={node.y}
@@ -420,7 +437,7 @@ export default function FraudGraph() {
                     {hover.node.label}
                   </p>
                   <p className="text-zinc-500 dark:text-zinc-400 capitalize">
-                    {hover.node.type === "omc" ? "OMC" : "Depot"} · Community #
+                    {NODE_TYPE_LABEL[hover.node.type] ?? hover.node.type} · Community #
                     {hover.node.community}
                   </p>
                   <div className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400 font-bold mt-1">
@@ -456,9 +473,7 @@ export default function FraudGraph() {
                         </span>
                       </div>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 capitalize">
-                        {selectedNode.type === "omc"
-                          ? "OMC Customer"
-                          : "Physical Depot"}{" "}
+                        {NODE_TYPE_LABEL[selectedNode.type] ?? selectedNode.type}{" "}
                         · Community #{selectedNode.community}
                       </p>
                     </div>

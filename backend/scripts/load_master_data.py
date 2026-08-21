@@ -25,9 +25,15 @@ POSTGRES_URI = os.getenv("DATABASE_URL")
 if POSTGRES_URI and POSTGRES_URI.startswith("postgres://"):
     POSTGRES_URI = POSTGRES_URI.replace("postgres://", "postgresql://", 1)
 
-engine = create_engine(POSTGRES_URI)
+# Deliberately NOT create_engine(POSTGRES_URI) at import time: this script
+# runs from start.sh in every environment, including plain SQLite-only
+# local dev where DATABASE_URL is unset — create_engine(None) raises
+# immediately, which would crash the whole startup script over an
+# optional step. load_data() below checks POSTGRES_URI itself and skips
+# gracefully, same pattern as etl_pipeline.py's DatabaseLoader.load_to_postgres.
+engine = create_engine(POSTGRES_URI) if POSTGRES_URI and POSTGRES_URI.startswith("postgresql") else None
 
-RAW_DATA_DIR = os.path.join(os.getcwd(), 'data', 'raw')
+RAW_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'raw')
 
 # Map the CSV filenames to the table names we want in the database
 FILES_TO_LOAD = {
@@ -43,8 +49,12 @@ FILES_TO_LOAD = {
 # 2. LOAD PROCESS
 # ==========================================
 def load_data():
+    if engine is None:
+        logger.info("⏭️ Skipping master data load — DATABASE_URL isn't a postgresql:// URI (SQLite-only local dev).")
+        return
+
     logger.info("🚀 Starting Master Data Load...")
-    
+
     try:
         # Create the new 'master' schema if it doesn't exist
         with engine.begin() as conn:

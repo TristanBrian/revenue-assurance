@@ -206,9 +206,16 @@ export async function getCurrentUser(): Promise<AuthUser> {
 // can't see the anomaly table doesn't need to hit an endpoint that could
 // return it at all. Each of the three below matches one.
 
-export async function getMetrics(materiality = 100000): Promise<MetricsResult> {
+// "inbound" | "outbound" | "all" — mirrors backend's ?direction= query
+// param, added to reconcile/heatmap/fraud-graph/export in Stage 2 rather
+// than as new endpoints. Defaults to "all" everywhere it's optional here,
+// matching the backend's own default.
+export type Direction = "inbound" | "outbound" | "all";
+
+export async function getMetrics(materiality = 100000, direction: Direction = "all"): Promise<MetricsResult> {
   const url = new URL("/api/reconcile/metrics", API_URL);
   url.searchParams.set("materiality", String(materiality));
+  url.searchParams.set("direction", direction);
   const res = await authFetch(url, { method: "POST" });
   return unwrap<MetricsResult>(res);
 }
@@ -224,11 +231,13 @@ export async function getAnomalies(
   page = 1,
   pageSize = 20,
   filters: AnomalyFilters = {},
+  direction: Direction = "all",
 ): Promise<AnomalyTableResult> {
   const url = new URL("/api/reconcile/anomalies", API_URL);
   url.searchParams.set("materiality", String(materiality));
   url.searchParams.set("page", String(page));
   url.searchParams.set("page_size", String(pageSize));
+  url.searchParams.set("direction", direction);
   if (filters.breakType) url.searchParams.set("break_type", filters.breakType);
   if (filters.status) url.searchParams.set("status", filters.status);
   if (filters.search) url.searchParams.set("search", filters.search);
@@ -236,9 +245,10 @@ export async function getAnomalies(
   return unwrap<AnomalyTableResult>(res);
 }
 
-export async function getOmcRiskProfile(materiality = 100000): Promise<OmcRiskProfile[]> {
+export async function getOmcRiskProfile(materiality = 100000, direction: Direction = "all"): Promise<OmcRiskProfile[]> {
   const url = new URL("/api/reconcile/omc-risk-profile", API_URL);
   url.searchParams.set("materiality", String(materiality));
+  url.searchParams.set("direction", direction);
   const res = await authFetch(url);
   const body = await unwrap<OmcRiskProfileResult>(res);
   return body.omc_risk_profile;
@@ -341,9 +351,10 @@ export async function downloadTemplate(fileType: TemplateType): Promise<void> {
   saveBlob(await res.blob(), `${fileType}_template.csv`);
 }
 
-export async function downloadExport(materiality = 100000): Promise<void> {
+export async function downloadExport(materiality = 100000, direction: Direction = "all"): Promise<void> {
   const url = new URL("/api/reconcile/export", API_URL);
   url.searchParams.set("materiality", String(materiality));
+  url.searchParams.set("direction", direction);
   const res = await authFetch(url);
   if (!res.ok) throw new ApiError(await parseErrorDetail(res), res.status);
   saveBlob(await res.blob(), "reconciliation_report.xlsx");
@@ -386,9 +397,10 @@ export async function retryEbillingSync(invoiceId: string): Promise<RetrySyncRes
   return unwrap<RetrySyncResult>(res);
 }
 
-export async function getFraudGraph(materiality = 0): Promise<FraudGraphData> {
+export async function getFraudGraph(materiality = 0, direction: Direction = "all"): Promise<FraudGraphData> {
   const url = new URL("/api/graph", API_URL);
   url.searchParams.set("materiality", String(materiality));
+  url.searchParams.set("direction", direction);
   const res = await authFetch(url);
   const body = await unwrap<{ status: string; data: FraudGraphData; message?: string }>(res);
   if (body.status === "error") {
@@ -408,9 +420,10 @@ export async function getFeed(limit = 20): Promise<FeedData> {
   return body.data;
 }
 
-export async function getHeatmap(materiality = 0): Promise<HeatmapData> {
+export async function getHeatmap(materiality = 0, direction: Direction = "all"): Promise<HeatmapData> {
   const url = new URL("/api/heatmap", API_URL);
   url.searchParams.set("materiality", String(materiality));
+  url.searchParams.set("direction", direction);
   const res = await authFetch(url);
   const body = await unwrap<{ status: string; data: HeatmapData; message?: string }>(res);
   if (body.status === "error") {

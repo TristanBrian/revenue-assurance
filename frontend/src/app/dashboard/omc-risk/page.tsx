@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { ApiError, getOmcRiskProfile } from "@/lib/api";
 import type { OmcRiskProfile as OmcRiskProfileEntry } from "@/lib/types";
 import { useMateriality } from "@/context/MaterialityContext";
+import { useDirection } from "@/context/DirectionContext";
 import OmcRiskProfile from "@/components/OmcRiskProfile";
 import RequirePermission from "@/components/RequirePermission";
 
 export default function OmcRiskPage() {
   const { materiality } = useMateriality();
+  const { direction } = useDirection();
   const [profiles, setProfiles] = useState<OmcRiskProfileEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +24,7 @@ export default function OmcRiskPage() {
       }
     });
 
-    getOmcRiskProfile(materiality)
+    getOmcRiskProfile(materiality, direction)
       .then((data) => {
         if (!cancelled) setProfiles(data);
       })
@@ -37,7 +39,7 @@ export default function OmcRiskPage() {
     return () => {
       cancelled = true;
     };
-  }, [materiality]);
+  }, [materiality, direction]);
 
   return (
     <RequirePermission code="view_omc_risk_profile">

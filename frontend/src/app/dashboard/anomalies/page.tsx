@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useMateriality } from "@/context/MaterialityContext";
+import { useDirection } from "@/context/DirectionContext";
 import { getAnomalies, updateAnomalyStatus, ApiError } from "@/lib/api";
 import type { Anomaly } from "@/lib/types";
 import AnomalyTable from "@/components/AnomalyTable";
@@ -19,6 +20,7 @@ function formatKes(value: number): string {
 function AnomaliesContent() {
   const { user } = useAuth();
   const { materiality } = useMateriality();
+  const { direction } = useDirection();
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [selectedAnomaly, setSelectedAnomaly] = useState<Anomaly | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,7 +61,7 @@ function AnomaliesContent() {
         breakType: breakTypeFilter === "All" ? undefined : breakTypeFilter,
         status: statusFilter === "All" ? undefined : statusFilter,
         search: searchQuery || undefined,
-      });
+      }, direction);
       setAnomalies(data.anomalies);
       // If we had a selected anomaly, update it with fresh data
       if (selectedAnomaly) {
@@ -84,7 +86,7 @@ function AnomaliesContent() {
     // .finally deferral pattern used everywhere else in this codebase.
     Promise.resolve().then(() => loadAnomalies());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materiality, breakTypeFilter, statusFilter, searchQuery]);
+  }, [materiality, direction, breakTypeFilter, statusFilter, searchQuery]);
 
   async function handleResolve(dispatchId: string) {
     if (!confirm("Are you sure you want to mark this anomaly as resolved?"))

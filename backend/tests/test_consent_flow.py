@@ -1,8 +1,8 @@
 """
 Tests for the consent-gated password reset / re-consent flow:
-  - services/terms_service.py: get_active_document, get_required_version,
+  - services/auth/terms_service.py: get_active_document, get_required_version,
     user_needs_consent, record_consent, get_terms_bundle
-  - routes/auth.py: reset_password()'s bundled consent validation,
+  - routes/auth/auth.py: reset_password()'s bundled consent validation,
     login()'s terms_required branch, POST /accept-terms
   - core/dependencies.py: get_current_user's TERMS_ACCEPTANCE_REQUIRED guard
 
@@ -26,23 +26,23 @@ os.environ.setdefault("SECRET_KEY", "test-secret-for-consent-tests")
 from app.core import security  # noqa: E402
 from app.core.dependencies import get_db  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models.alert import Alert  # noqa: E402
-from app.models.alert_read import AlertRead  # noqa: E402
-from app.models.associations import role_permissions, user_roles  # noqa: E402
-from app.models.audit import AuditLog  # noqa: E402
-from app.models.consent_record import ConsentRecord  # noqa: E402
-from app.models.permission import Permission  # noqa: E402
-from app.models.role import Role  # noqa: E402
-from app.models.terms_document import TermsDocument  # noqa: E402
-from app.models.user import User  # noqa: E402
-from app.services.terms_service import (  # noqa: E402
+from app.models.alerts.alert import Alert  # noqa: E402
+from app.models.alerts.alert_read import AlertRead  # noqa: E402
+from app.models.auth.associations import role_permissions, user_roles  # noqa: E402
+from app.models.audit.audit import AuditLog  # noqa: E402
+from app.models.auth.consent_record import ConsentRecord  # noqa: E402
+from app.models.auth.permission import Permission  # noqa: E402
+from app.models.auth.role import Role  # noqa: E402
+from app.models.auth.terms_document import TermsDocument  # noqa: E402
+from app.models.auth.user import User  # noqa: E402
+from app.services.auth.terms_service import (  # noqa: E402
     get_active_document,
     get_required_version,
     get_terms_bundle,
     record_consent,
     user_needs_consent,
 )
-from app.services.user_service import provision_user_with_temp_password  # noqa: E402
+from app.services.auth.user_service import provision_user_with_temp_password  # noqa: E402
 from app.utils.db_connection import Base  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -78,8 +78,8 @@ def client(db_session):
 
 @pytest.fixture(autouse=True)
 def no_real_email(monkeypatch):
-    monkeypatch.setattr("app.routes.admin.send_email", lambda *a, **k: True)
-    monkeypatch.setattr("app.services.alert_service.send_email", lambda *a, **k: True)
+    monkeypatch.setattr("app.routes.auth.admin.send_email", lambda *a, **k: True)
+    monkeypatch.setattr("app.services.alerts.alert_service.send_email", lambda *a, **k: True)
 
 
 @pytest.fixture

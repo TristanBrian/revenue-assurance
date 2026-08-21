@@ -1,9 +1,9 @@
 """
-Tests for services/audit_service.py.
+Tests for services/audit/audit_service.py.
 
 Uses an in-memory SQLite engine bound to the real ORM Base (AuditLog's
 JSONB columns fall back to plain JSON under SQLite specifically so this
-works — see app/models/audit.py), rather than DataFrame-only fixtures like
+works — see app/models/audit/audit.py), rather than DataFrame-only fixtures like
 test_reconciliation.py, since log_action()/get_audit_logs()/get_audit_log()
 are thin wrappers around a real Session and need one to exercise.
 
@@ -20,9 +20,9 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.models.audit import AuditLog  # noqa: E402 — registers the table on Base.metadata
+from app.models.audit.audit import AuditLog  # noqa: E402 — registers the table on Base.metadata
 from app.utils.db_connection import Base  # noqa: E402
-from app.services.audit_service import get_audit_log, get_audit_logs, log_action  # noqa: E402
+from app.services.audit.audit_service import get_audit_log, get_audit_logs, log_action  # noqa: E402
 
 
 @pytest.fixture
