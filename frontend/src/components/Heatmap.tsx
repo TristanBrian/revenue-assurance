@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { ApiError, getHeatmap } from "@/lib/api";
 import { useMateriality } from "@/context/MaterialityContext";
+import { useDirection } from "@/context/DirectionContext";
 import type { HeatmapData } from "@/lib/types";
 
 function formatKes(value: number): string {
@@ -53,6 +54,7 @@ interface HoveredCell {
 
 export default function Heatmap() {
   const { materiality } = useMateriality(); // ✅ Get from context
+  const { direction } = useDirection();
   const [heatmap, setHeatmap] = useState<HeatmapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export default function Heatmap() {
   useEffect(() => {
     let cancelled = false;
 
-    getHeatmap(materiality) // ✅ Pass the materiality
+    getHeatmap(materiality, direction) // ✅ Pass the materiality
       .then((data) => {
         if (!cancelled) setHeatmap(data);
       })
@@ -77,7 +79,7 @@ export default function Heatmap() {
     return () => {
       cancelled = true;
     };
-  }, [materiality]); // ✅ Re-run when slider changes
+  }, [materiality, direction]); // ✅ Re-run when slider or direction changes
 
   const CELL_W = 110;
   const CELL_H = 46;
