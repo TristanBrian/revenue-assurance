@@ -20,6 +20,21 @@ function statusClass(status: string) {
   }
 }
 
+// Fraud scoring layer (ML). fraud_tier is null whenever the model isn't
+// trained yet — see Anomaly.fraud_tier's comment in lib/types.ts — the
+// badge just doesn't render in that case rather than showing a
+// misleading "Likely Benign" default.
+function fraudTierClass(tier: string) {
+  switch (tier) {
+    case "Likely Fraud":
+      return "bg-red-500/10 text-red-500 border border-red-500/20";
+    case "Suspicious":
+      return "bg-amber-500/10 text-amber-500 border border-amber-500/20";
+    default:
+      return "bg-zinc-500/10 text-zinc-500 border border-zinc-500/20";
+  }
+}
+
 interface Column {
   key: keyof Anomaly;
   label: string;
@@ -30,6 +45,7 @@ const columns: Column[] = [
   { key: "break_type", label: "Anomaly Type" },
   { key: "leakage_kes", label: "Leakage" },
   { key: "age_days", label: "Age" },
+  { key: "fraud_score", label: "Fraud Score" },
 ];
 
 interface AnomalyTableProps {
@@ -49,6 +65,14 @@ export default function AnomalyTable({
   const sorted = [...anomalies].sort((a, b) => {
     const valA = a[sortKey];
     const valB = b[sortKey];
+
+    // fraud_score is null whenever the model isn't trained yet — push
+    // those to the bottom regardless of sort direction rather than
+    // letting them interleave via a numeric/string comparison that
+    // treats null unpredictably.
+    if (valA == null && valB == null) return 0;
+    if (valA == null) return 1;
+    if (valB == null) return -1;
 
     if (typeof valA === "number" && typeof valB === "number") {
       return sortDesc ? valB - valA : valA - valB;
@@ -126,6 +150,22 @@ export default function AnomalyTable({
                   {formatKes(a.leakage_kes)}
                 </td>
                 <td className="px-4 py-3.5 text-zinc-550 dark:text-zinc-400">{a.age_days}</td>
+                <td className="px-4 py-3.5">
+                  {a.fraud_tier != null ? (
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${fraudTierClass(a.fraud_tier)}`}
+                      >
+                        {a.fraud_tier}
+                      </span>
+                      <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                        {a.fraud_score?.toFixed(0)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-zinc-400 dark:text-zinc-600">—</span>
+                  )}
+                </td>
                 <td className="px-4 py-3.5">
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusClass(a.status)}`}
