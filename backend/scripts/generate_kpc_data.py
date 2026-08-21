@@ -80,6 +80,38 @@ DEPOT_DISTANCES_KM = {
     "Eldoret": 700,
 }
 
+# --- ACTOR ATTRIBUTION (audit trail — Domain 5, Problem 10) ---
+# The audit trail attributes every ingested record to whoever the source
+# record itself names as having done it, not a generic "ETL system"
+# actor. These are the depot/KPC-side and Foundation-side staff pools that
+# make that possible — a small, mostly-consistent-per-depot cast (like
+# shared_fleet/shared_drivers above), not a fresh random name per row,
+# since that's what a real depot/finance desk roster looks like.
+DEPOT_CLERKS = {
+    # depot.split(' ')[0][:3] alone collides for "Mombasa (KOSF)" and
+    # "Mombasa (Kipevu)" (both -> "MOM") — the parenthesized suffix (if
+    # any) disambiguates them into distinct clerk-id prefixes.
+    depot: [
+        f"CLERK-{depot.split(' ')[0][:3].upper()}{('-' + depot.split('(')[1][:3].upper()) if '(' in depot else ''}-{n:02d}"
+        for n in range(1, 4)
+    ]
+    for depot in DEPOT_DISTANCES_KM
+}
+# KPC billing/finance staff who prepare invoices — deliberately a
+# separate pool from depot clerks (segregation of duties: the person who
+# records a dispatch isn't the one who bills for it).
+KPC_FINANCE_STAFF = [f"FIN-{n:03d}" for n in range(1, 6)]
+# Inuka Foundation payments desk — deliberately a separate pool from
+# field officers (segregation of duties: the officer who authorizes a
+# stipend isn't the one who processes the payout).
+FOUNDATION_PAYMENTS_STAFF = [f"PAY-{n:03d}" for n in range(1, 5)]
+# payments.csv has no analogous actor field: a payment here is a bank-to-
+# bank remittance from the OMC's own banking system settling an invoice,
+# not a KPC/OMC staff action — there's no real single named individual to
+# attribute it to (see remitting_bank_account, already the closest thing
+# to "who/what sent this"). Audited with a null actor, which is the
+# realistic attribution, not a gap.
+
 OMC_NAMES = [
     "TotalEnergies Kenya", "Vivo Energy", "Rubis Energy", "Gulf Energy",
     "PetroOil Kenya", "Hashi Energy", "Kobil", "National Oil",
@@ -287,7 +319,11 @@ def generate_loading_and_dispatches(omcs_df, tariffs_df):
             'driver_id': driver_id,
             'transport_tariff_kes': int(transport_fee),
             'storage_tariff_kes': int(storage_fee),
-            'value_kes': int(total_val)
+            'value_kes': int(total_val),
+            # Depot clerk who recorded this dispatch — the audit actor,
+            # distinct from driver_id (who moved the fuel, not who logged
+            # the paperwork for it).
+            'dispatched_by': random.choice(DEPOT_CLERKS[depot]),
         })
 
     return pd.DataFrame(loading_logs), pd.DataFrame(dispatches)
@@ -336,7 +372,8 @@ def generate_invoices(dispatches_df, omcs_df):
             'customer_name': r['customer_name'],
             'product': r['product'],
             'date': inv_dt.strftime('%Y-%m-%d'),
-            'value_kes': int(val)
+            'value_kes': int(val),
+            'prepared_by': random.choice(KPC_FINANCE_STAFF),
         })
     return pd.DataFrame(invoices)
 
@@ -636,6 +673,7 @@ def generate_disbursements(authorizations_df, beneficiaries_df, officers_df):
             'amount_paid': int(amount),
             'channel': random.choice(['mobile_money', 'bank']),
             'disbursing_account': ben_account.get(r['beneficiary_id']),
+            'processed_by': random.choice(FOUNDATION_PAYMENTS_STAFF),
         })
 
     # --- GHOST PAYMENTS ---
@@ -667,6 +705,11 @@ def generate_disbursements(authorizations_df, beneficiaries_df, officers_df):
                 'amount_paid': int(PILLAR_MONTHLY_RATE_KES[pillar] * random.uniform(0.9, 1.1)),
                 'channel': random.choice(['mobile_money', 'bank']),
                 'disbursing_account': ben_account.get(beneficiary_id),
+                # Ghost payments still get a processed_by — knowing WHO
+                # processed a payment with no backing authorization is
+                # exactly the forensic detail an investigation needs, not
+                # something to omit because the row itself is fabricated.
+                'processed_by': random.choice(FOUNDATION_PAYMENTS_STAFF),
             })
 
     return pd.DataFrame(disbursements)
