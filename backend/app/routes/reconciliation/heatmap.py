@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from app.core.dependencies import require_permission
 from app.schemas.reconciliation.heatmap import HeatmapResponse
 from app.core.cache import get_cached_result, set_cached_result
-from app.services.reconciliation.reconciliation import run_reconciliation
+from app.services.reconciliation.reconciliation import run_combined_reconciliation
 from app.models.auth.user import User
 import pandas as pd
 import logging
@@ -16,23 +16,32 @@ router = APIRouter()
 @router.get("/heatmap", response_model=HeatmapResponse)
 def heatmap(
     materiality: float = Query(100000, description="Min leakage to include"),
+    direction: str = Query("all", description="inbound | outbound | all — defaults to all"),
     _=Depends(require_permission("view_heatmap")),
 ):
     """
-    Returns leakage heatmap data: OMC × Product matrix.
+    Returns leakage heatmap data: rows/columns are 'customer'/'product' as
+    labeled generically as they are in the Anomaly schema itself — that's
+    OMC x Product for inbound anomalies and Beneficiary x Pillar for
+    outbound ones (see _build_outbound_anomaly()'s field-mapping comment
+    in services/reconciliation/reconciliation.py). direction="all" pivots
+    both together in one matrix, same as reconcile_metrics()'s merged
+    totals — the frontend's direction toggle is expected to pass an
+    explicit inbound/outbound value whenever mixing rows from two
+    different entity types would be confusing to show together.
     Uses cached reconciliation data to avoid re-running reconciliation.
     """
     try:
         # Try to get full reconciliation result from cache
-        cache_key = f"metrics_{materiality}"
+        cache_key = f"metrics_{materiality}_{direction}"
         cached = get_cached_result(cache_key)
 
         if cached and 'anomalies' in cached:
-            logger.info(f"✅ Heatmap using cached anomalies for materiality={materiality}")
+            logger.info(f"✅ Heatmap using cached anomalies for materiality={materiality}, direction={direction}")
             anomalies = cached['anomalies']
         else:
             logger.info(f"🔄 Heatmap cache miss – running reconciliation...")
-            result = run_reconciliation(materiality=materiality)
+            result = run_combined_reconciliation(direction=direction, materiality=materiality)
             anomalies = result.get('anomalies', [])
             metrics_data = {
                 'metrics': result['metrics'],
