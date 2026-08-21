@@ -34,6 +34,9 @@ DEMO_USERS = [
     ("manager@kpc-demo.co.ke", "Demo Manager", "manager"),
     ("revenue_assurance@kpc-demo.co.ke", "Demo Revenue Assurance", "revenue_assurance"),
     ("system_admin@kpc-demo.co.ke", "Demo System Admin", "system_admin"),
+    # Outbound (stipend/disbursement) — Stage 2. Read-only, outbound-only —
+    # see seed_roles.py's ROLE_PERMISSIONS comment.
+    ("inuka_manager@kpc-demo.co.ke", "Demo Inuka Manager", "inuka_manager"),
 ]
 
 
@@ -57,7 +60,7 @@ def seed():
     finally:
         db.close()
 
-    print(f"\nDemo login password (all 4 accounts): {DEMO_PASSWORD}")
+    print(f"\nDemo login password (all {len(DEMO_USERS)} accounts): {DEMO_PASSWORD}")
 
 
 if __name__ == "__main__":
