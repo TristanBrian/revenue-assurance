@@ -809,3 +809,56 @@ if __name__ == "__main__":
     disbursements_messy.to_csv(f'{output_dir}/disbursements.csv', index=False)
 
     print(f"✅ Outbound synthetic CSV datasets successfully created in '{output_dir}/' with Disbursement Ring attributes included.")
+
+    # =========================================================================
+    # FRAUD GROUND TRUTH (Fraud Scoring Layer — ML) — hidden from the app
+    # =========================================================================
+    # Written to its own file, never added to file_mapping/datasets_clean in
+    # etl_pipeline.py — it never reaches a Postgres table the reconciliation
+    # engine, the API, or the frontend can query. Only
+    # scripts/train_fraud_model.py reads this file directly, offline, to
+    # compute real precision/recall against a label the running app never
+    # sees (a real deployment wouldn't have this at all — the running app
+    # stays exactly as "blind" as production would be).
+    #
+    # Ground truth rule: a record is fraud iff its owning OMC (dispatches) or
+    # officer (attendance/disbursements) has risk_profile == "High". This is
+    # a deliberate simplification, not an approximation of something more
+    # complex: tracing inject_fraud_ring()/inject_disbursement_ring()/the
+    # ghost-payment injection block, every one of them operates on a subset
+    # of High-profile OMCs/officers already (fraud_omcs/high_officers are
+    # themselves filtered to risk_profile == "High" before injection runs)
+    # — so "High profile" already exactly covers every deliberately-injected
+    # fraud case, with no separate ring-membership tracking needed. Small/
+    # Medium profile anomalies are exactly the "ordinary operational noise"
+    # this fraud-scoring layer exists to separate real fraud from (see those
+    # profiles' own "very minor, occasional errors" framing above).
+    print("⏳ Writing hidden fraud ground truth for offline model training...")
+
+    omc_is_high = dict(zip(omcs_df['omc_id'], omcs_df['risk_profile'] == 'High'))
+    officer_is_high = dict(zip(officers_df['officer_id'], officers_df['risk_profile'] == 'High'))
+    ben_officer_for_gt = dict(zip(beneficiaries_df['beneficiary_id'], beneficiaries_df['officer_id']))
+
+    ground_truth_rows = []
+    for dispatch_id, omc_id in zip(dispatches_df['dispatch_id'], dispatches_df['omc_id']):
+        ground_truth_rows.append({
+            'record_type': 'dispatch',
+            'record_id': dispatch_id,
+            'is_fraud_ground_truth': bool(omc_is_high.get(omc_id, False)),
+        })
+    for attendance_id, officer_id in zip(attendance_df['attendance_id'], attendance_df['officer_id']):
+        ground_truth_rows.append({
+            'record_type': 'attendance',
+            'record_id': attendance_id,
+            'is_fraud_ground_truth': bool(officer_is_high.get(officer_id, False)),
+        })
+    for disbursement_id, beneficiary_id in zip(disbursements_df['disbursement_id'], disbursements_df['beneficiary_id']):
+        owning_officer = ben_officer_for_gt.get(beneficiary_id)
+        ground_truth_rows.append({
+            'record_type': 'disbursement',
+            'record_id': disbursement_id,
+            'is_fraud_ground_truth': bool(officer_is_high.get(owning_officer, False)),
+        })
+
+    pd.DataFrame(ground_truth_rows).to_csv(f'{output_dir}/fraud_ground_truth.csv', index=False)
+    print(f"✅ Wrote {len(ground_truth_rows)} fraud ground-truth labels to '{output_dir}/fraud_ground_truth.csv' (offline training only).")
