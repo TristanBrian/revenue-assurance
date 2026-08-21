@@ -70,6 +70,22 @@ else
 fi
 
 # ------------------------------------------------------------------
+# 2b. Medallion lakehouse foundation (bronze/silver/gold) — always run.
+# Parallel to the main app's data path above, not a replacement for it:
+# the running API still reads the plain public-schema tables ETL just
+# loaded. This only creates the bronze/silver/gold schemas and loads
+# static/historical CSVs into a separate 'master' schema; nothing reads
+# from either yet. Both scripts no-op cleanly if DATABASE_URL isn't
+# Postgres. live_kpc_stream.py (continuous bronze->silver->gold feed) is
+# deliberately NOT run here — still a manual/separate step for now.
+# ------------------------------------------------------------------
+echo "🔄 Setting up medallion schema (bronze/silver/gold)..."
+python scripts/setup_medallion.py
+
+echo "🔄 Loading master data (master schema)..."
+python scripts/load_master_data.py
+
+# ------------------------------------------------------------------
 # 3. Always run migrations and seeding (idempotent)
 # ------------------------------------------------------------------
 echo "🔄 Running Alembic migrations..."
