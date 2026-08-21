@@ -7,10 +7,12 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_db, require_permission
 from app.models.auth.user import User
 from app.schemas.audit.audit import AuditLogListResponse, AuditLogOut, AuditSummaryResponse, AuditVerifyResponse
-from app.services.audit.audit_service import get_audit_log, get_audit_logs, get_audit_summary, verify_chain_integrity
+from app.services.audit.audit_service import get_audit_log, get_audit_logs, get_audit_summary, get_record_audit_history, verify_chain_integrity
 from app.services.audit.anchor_service import verify_on_chain_anchor
 
+
 router = APIRouter()  # prefix="/api/audit" and tags=["Audit"] are supplied by main.py's include_router(), matching every other route file
+
 
 
 @router.get("/logs", response_model=AuditLogListResponse)
@@ -106,3 +108,19 @@ def my_audit_logs(
     """
     items, total = get_audit_logs(db, actor_user_id=str(user.id), page=page, page_size=page_size)
     return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
+@router.get("/history/{target_type}/{target_id}")
+def read_record_history(
+    target_type: str,
+    target_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_permission("view_audit")),
+):
+    """
+    Returns full chronological audit log history for a specific record (target_type, target_id).
+    Used for record history provenance timeline in the UI.
+    """
+    rows = get_record_audit_history(db, target_type=target_type, target_id=target_id)
+    return {"target_type": target_type, "target_id": target_id, "history": rows}
+

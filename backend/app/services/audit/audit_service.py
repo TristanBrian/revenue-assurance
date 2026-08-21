@@ -543,6 +543,16 @@ def get_audit_summary(db: Session, days: int = 7) -> dict:
     }
 
 
+def get_record_audit_history(db: Session, target_type: str, target_id: str) -> list[AuditLog]:
+    """Retrieves all historical audit log entries for a given target record (provenance timeline)."""
+    return (
+        db.query(AuditLog)
+        .filter(AuditLog.target_type == target_type, AuditLog.target_id == target_id)
+        .order_by(AuditLog.created_at.desc())
+        .all()
+    )
+
+
 def verify_chain_integrity(db: Session) -> dict:
     """
     Local half of GET /audit/verify (routes/audit/audit.py) — the other
@@ -683,3 +693,4 @@ def recompute_block_hash_at(db: Session, block_index: int) -> Optional[str]:
         recomputed_prev = recomputed_hash
 
     return recomputed_hash
+
