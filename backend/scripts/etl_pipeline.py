@@ -218,7 +218,13 @@ def main():
         "dispatches": "dispatches.csv",
         "invoices": "invoices.csv",
         "payments": "payments.csv",
-        "depot_daily_inventory": "depot_daily_inventory.csv"
+        "depot_daily_inventory": "depot_daily_inventory.csv",
+        # --- Outbound (stipend/disbursement) — Stage 2 ---
+        "officers": "officers.csv",
+        "beneficiaries": "beneficiaries.csv",
+        "attendance": "attendance.csv",
+        "stipend_authorizations": "stipend_authorizations.csv",
+        "disbursements": "disbursements.csv",
     }
 
     raw_dfs = {}
@@ -270,6 +276,36 @@ def main():
     inv_ledger_clean = dq.gate_a_deduplicate(raw_dfs["depot_daily_inventory"], "depot_daily_inventory")
     inv_ledger_clean = dq.gate_c_standardize_dates(inv_ledger_clean, "depot_daily_inventory", ["date"])
 
+    # C. Clean Outbound Tables (Stage 2 — same 4 gates, no new gate logic)
+    officers_clean = dq.gate_a_deduplicate(raw_dfs["officers"], "officers")
+
+    beneficiaries_clean = dq.gate_a_deduplicate(raw_dfs["beneficiaries"], "beneficiaries")
+    beneficiaries_clean = dq.gate_c_standardize_dates(beneficiaries_clean, "beneficiaries", ["enrollment_date"])
+    beneficiaries_clean = dq.gate_d_referential_integrity(beneficiaries_clean, "beneficiaries", "officer_id", officers_clean, "officer_id")
+
+    attendance_clean = dq.gate_a_deduplicate(raw_dfs["attendance"], "attendance")
+    attendance_clean = dq.gate_c_standardize_dates(attendance_clean, "attendance", ["attendance_date"])
+    attendance_clean = dq.gate_d_referential_integrity(attendance_clean, "attendance", "beneficiary_id", beneficiaries_clean, "beneficiary_id")
+
+    auth_clean = dq.gate_a_deduplicate(raw_dfs["stipend_authorizations"], "stipend_authorizations")
+    auth_clean = dq.gate_b_clean_currency(auth_clean, "stipend_authorizations", ["amount_authorized"])
+    auth_clean = dq.gate_c_standardize_dates(auth_clean, "stipend_authorizations", ["date"])
+    auth_clean = dq.gate_d_referential_integrity(auth_clean, "stipend_authorizations", "attendance_id", attendance_clean, "attendance_id")
+
+    # disbursements.authorization_id is intentionally left un-checked by
+    # Gate D here — ghost payments (authorization_id = NULL, injected by
+    # generate_disbursements()) must NOT be quarantined as a data-quality
+    # defect; they're a real anomaly the reconciliation service is meant
+    # to detect and flag critical. Gate D's own orphan_mask already skips
+    # null FKs (`& child_df[fk].notna()`), so this call is safe to make —
+    # only a disbursement with a NON-null, NON-existent authorization_id
+    # would be quarantined, which is a genuine data-quality defect, not a
+    # ghost payment.
+    disb_clean = dq.gate_a_deduplicate(raw_dfs["disbursements"], "disbursements")
+    disb_clean = dq.gate_b_clean_currency(disb_clean, "disbursements", ["amount_paid"])
+    disb_clean = dq.gate_c_standardize_dates(disb_clean, "disbursements", ["date"])
+    disb_clean = dq.gate_d_referential_integrity(disb_clean, "disbursements", "authorization_id", auth_clean, "authorization_id")
+
     # 3. COMPILE CLEAN DATASETS
     datasets_clean = {
         "products": products_clean,
@@ -281,24 +317,31 @@ def main():
         "invoices": inv_clean,
         "payments": pay_clean,
         "depot_daily_inventory": inv_ledger_clean,
+        "officers": officers_clean,
+        "beneficiaries": beneficiaries_clean,
+        "attendance": attendance_clean,
+        "stipend_authorizations": auth_clean,
+        "disbursements": disb_clean,
         "quarantine_audit_log": qm.get_quarantine_dataframe()
     }
 
     logger.info(f"\n Total quarantined records captured for governance audit: {len(datasets_clean['quarantine_audit_log'])}")
 
-    # 4. ENVIRONMENT-AWARE DATABASE LOAD (Updated for CI/CD)
-    
-    # Check if the script is being run by GitHub Actions or Pytest
-    is_testing_env = os.getenv("CI") == "true" or os.getenv("PYTEST_CURRENT_TEST") is not None
-    
-    if is_testing_env:
-        logger.info("\n--- Test Environment Detected: Generating SQLite DB for Pytest ---")
-        # Generates kpc.db ONLY for the test runner so that your assertions pass
-        DatabaseLoader.load_to_sqlite(datasets_clean)
-    else:
-        logger.info("\n--- Bypassing Database Load ---")
-        logger.info("Database ingestion skipped to prevent modifying live PostgreSQL schemas.")
-        logger.info("ETL quality checks and transformations completed successfully in-memory.")
+    # 4. DATABASE LOAD
+    #
+    # Unconditional, not gated on CI/pytest: this is the only thing that
+    # actually gets clean data into the database the running app queries
+    # (services/reconciliation/reconciliation.py reads these tables directly
+    # via pd.read_sql — nothing else populates them). A CI-only gate here
+    # previously meant a normal run (start.sh, or a developer running this
+    # by hand) did all the extract/clean/quarantine work and then discarded
+    # it, leaving Postgres empty. SQLite is always written too (cheap, and
+    # is what the test suite reads); the Postgres branch already no-ops
+    # gracefully via DatabaseLoader.load_to_postgres's own guard when
+    # DATABASE_URL isn't a postgresql:// URI, so there's no environment
+    # check needed here — the two loaders already know when to skip themselves.
+    DatabaseLoader.load_to_sqlite(datasets_clean)
+    DatabaseLoader.load_to_postgres(datasets_clean)
 
     logger.info("==================================================")
     logger.info(" KPC REVENUE ETL PIPELINE EXECUTION COMPLETE")
