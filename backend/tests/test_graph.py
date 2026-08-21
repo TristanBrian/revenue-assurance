@@ -24,8 +24,8 @@ from sqlalchemy import create_engine
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.services import detective_service
-from app.services.reconciliation import run_reconciliation_on_dataframes
-from app.services.graph_engine import build_fraud_graph_from_dataframes, build_omc_depot_graph, detect_risk_communities
+from app.services.reconciliation.reconciliation import run_reconciliation_on_dataframes
+from app.services.fraud.graph_engine import build_fraud_graph_from_dataframes, build_omc_depot_graph, detect_risk_communities
 
 
 # ==============================================================================

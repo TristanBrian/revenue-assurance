@@ -79,6 +79,7 @@ echo "🔄 Seeding roles and users..."
 python scripts/seed_roles.py
 python scripts/seed_admin.py
 python scripts/seed_demo_users.py
+python scripts/seed_terms_documents.py
 
 echo "🚀 Starting Uvicorn server..."
 exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}

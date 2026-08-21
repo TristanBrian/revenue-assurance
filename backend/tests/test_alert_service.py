@@ -22,16 +22,16 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.models.alert import Alert  # noqa: E402
-from app.models.alert_read import AlertRead  # noqa: E402
-from app.models.audit import AuditLog  # noqa: E402
-from app.models.user import User  # noqa: E402
-from app.models.role import Role  # noqa: E402
-from app.models.permission import Permission  # noqa: E402
-from app.models.associations import user_roles, role_permissions  # noqa: E402
+from app.models.alerts.alert import Alert  # noqa: E402
+from app.models.alerts.alert_read import AlertRead  # noqa: E402
+from app.models.audit.audit import AuditLog  # noqa: E402
+from app.models.auth.user import User  # noqa: E402
+from app.models.auth.role import Role  # noqa: E402
+from app.models.auth.permission import Permission  # noqa: E402
+from app.models.auth.associations import user_roles, role_permissions  # noqa: E402
 from app.utils.db_connection import Base  # noqa: E402
-from app.services.alert_types import REGISTRY, AlertTier, AlertType  # noqa: E402
-from app.services.alert_service import (  # noqa: E402
+from app.services.alerts.alert_types import REGISTRY, AlertTier, AlertType  # noqa: E402
+from app.services.alerts.alert_service import (  # noqa: E402
     alert_exists,
     create_alert,
     get_unread_count,

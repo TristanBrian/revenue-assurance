@@ -11,8 +11,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.models.permission import Permission
-from app.models.role import Role
+from app.models.auth.permission import Permission
+from app.models.auth.role import Role
 from app.utils.db_connection import SessionLocal
 
 PERMISSIONS = [

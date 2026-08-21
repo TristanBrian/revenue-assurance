@@ -26,7 +26,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.models.terms_document import TermsDocument
+from app.models.auth.terms_document import TermsDocument
 from app.utils.db_connection import SessionLocal
 
 TERMS_VERSION = "1.0"

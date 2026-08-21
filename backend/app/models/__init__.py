@@ -8,23 +8,23 @@ would fail. Since importing any single app.models.* submodule already runs
 this __init__.py first, that's enough to make the whole set safe regardless
 of which one gets imported first elsewhere in the app.
 """
-from app.models.user import User
-from app.models.role import Role
-from app.models.permission import Permission
-from app.models.omc import OMC
-from app.models.quota_ledger import QuotaLedger
-from app.models.depot import Depot
-from app.models.product import Product
-from app.models.dispatch import Dispatch
-from app.models.invoice import Invoice
-from app.models.payment import Payment
-from app.models.depot_ledger import DepotLedger
-from app.models.anomaly_resolution import AnomalyResolution
-from app.models.audit import AuditLog
-from app.models.alert import Alert
-from app.models.alert_read import AlertRead
-from app.models.terms_document import TermsDocument
-from app.models.consent_record import ConsentRecord
+from app.models.auth.user import User
+from app.models.auth.role import Role
+from app.models.auth.permission import Permission
+from app.models.reconciliation.omc import OMC
+from app.models.reconciliation.quota_ledger import QuotaLedger
+from app.models.reconciliation.depot import Depot
+from app.models.reconciliation.product import Product
+from app.models.reconciliation.dispatch import Dispatch
+from app.models.reconciliation.invoice import Invoice
+from app.models.reconciliation.payment import Payment
+from app.models.reconciliation.depot_ledger import DepotLedger
+from app.models.reconciliation.anomaly_resolution import AnomalyResolution
+from app.models.audit.audit import AuditLog
+from app.models.alerts.alert import Alert
+from app.models.alerts.alert_read import AlertRead
+from app.models.auth.terms_document import TermsDocument
+from app.models.auth.consent_record import ConsentRecord
 
 __all__ = [
     "User",

@@ -22,7 +22,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.services.reconciliation import (
+from app.services.reconciliation.reconciliation import (
     run_reconciliation,
     calculate_data_quality,
     run_reconciliation_on_dataframes,
@@ -87,7 +87,7 @@ def db_with_data(sample_data):
     # Point run_reconciliation() at this throwaway SQLite file instead of the
     # real kpc.db (DB_PATH no longer exists — services/reconciliation.py talks
     # to the DB via get_engine() since the SQLAlchemy migration).
-    import app.services.reconciliation as recon_module
+    import app.services.reconciliation.reconciliation as recon_module
     from sqlalchemy import create_engine
     test_engine = create_engine(f'sqlite:///{db_path}')
     original_get_engine = recon_module.get_engine

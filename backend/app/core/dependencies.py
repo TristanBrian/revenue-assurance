@@ -6,8 +6,8 @@ from jose import JWTError
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
-from app.models.user import User
-from app.services.terms_service import get_required_version, user_needs_consent
+from app.models.auth.user import User
+from app.services.auth.terms_service import get_required_version, user_needs_consent
 from app.utils.db_connection import SessionLocal
 
 bearer_scheme = HTTPBearer(auto_error=False)

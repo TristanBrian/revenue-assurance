@@ -134,6 +134,10 @@ On that first login, `POST /api/auth/login` doesn't issue a normal session token
 
 `get_current_user()` also rejects any request from a user with `must_reset_password` still set, even with an otherwise-valid session token — closing the gap where an admin forces a reset on an already-active user mid-session. The admin user list surfaces this as an `account_status` per user: `Invited / Pending first login`, `Reset Required`, or `Active`.
 
+**Terms & Conditions / Privacy Policy consent is bundled into the same reset-password submission**, not a separate screen. `GET /api/auth/terms` serves the current versioned text (server-side, via a `terms_documents` table — see `scripts/seed_terms_documents.py` — so a version bump is a data change, not a frontend deploy). `POST /api/auth/reset-password` requires `checkbox_accepted: true` and a matching `confirm_password` alongside the new password, validated server-side before any mutation — a rejected submission leaves the account exactly as it was (no password set, no consent recorded). On success it also writes two `consent_records` rows (one per document type: `terms_and_conditions`, `privacy_policy`, each with the exact version/hash accepted, IP, and user agent) and updates `users.terms_accepted_version`/`terms_accepted_at`.
+
+The same `get_current_user()` guard also blocks any user whose `terms_accepted_version` is stale (never accepted, or a newer version was published since) — even an already-active user with a valid session, mid-session, once a new version goes active. Since that user's password is fine, they get a lighter re-consent path instead: `POST /api/auth/login` returns `terms_required: true` with a `consent_token` (same self-invalidating, 15-minute, single-purpose shape as `reset_token`), which `POST /api/auth/accept-terms` redeems — no password fields, just the checkbox. Both flows share one `record_consent()` implementation (`app/services/terms_service.py`) and are logged to the audit trail as `consent.accepted`.
+
 ### Permission Mapping
 
 | Feature | Permission code | Depot Supervisor | Manager | Revenue Assurance |
@@ -160,15 +164,15 @@ Every role can read its own alert inbox (`GET /api/alerts`) regardless of `manag
 
 One module (`app/services/alert_service.py`), two channels (`app/models/alert.py` for the in-app inbox, `app/core/email.py` for SMTP) — every alert is always written in-app and optionally emailed, never one or the other from separate code paths.
 
-**System-triggered:**
-- **Critical anomalies** — `POST /api/reconcile/metrics` alerts everyone holding `resolve_anomaly` when a fresh reconciliation run surfaces new critical anomalies (`status == "Critical"`): one in-app row per anomaly, one digest email per run. De-duplicated by dispatch id, so re-running reconciliation never re-alerts the same anomaly twice.
-- **E-billing failure rate** — after any sync (`POST /api/e-billing/sync` or the async variant), if the failure rate breaches `FAILURE_THRESHOLD`, everyone holding `manage_ebilling` gets an alert. Throttled to at most one per hour.
+**Registry-driven, not ad hoc:** `app/services/alert_types.py` is the single source of truth for every trigger — its tier (`immediate` / `digested` / `throttled` / `transactional`), severity, and audience. Audience is either `target_permissions` (resolves to whoever actually holds that route-access permission — e.g. `view_anomaly_table` naturally means Manager + Revenue Assurance) or `target_roles` (for pure platform-operational concerns like ETL failures or four-eyes admin visibility, where "system_admin" is the right audience because they operate the platform, not because of a feature permission). `create_alert()` takes an `AlertType` and pulls tier/audience from there, so routing policy lives in one file, not scattered per call site.
 
-**Manual:** `POST /api/alerts` (requires `manage_alerts`) broadcasts a one-off alert to everyone holding a given permission, or to one specific user.
+**System-triggered**, spanning reconciliation (new critical anomalies — digested; a single anomaly far exceeding materiality; an OMC escalating to High risk; a data-quality drop; a duplicate-record spike; a reopened anomaly; repeated resolve/reopen cycles; ETL failures), the fraud graph (a newly-detected high-risk cluster — digested), e-billing (an invoice entering the dead-letter queue; a failure-rate breach *and* its recovery — throttled hourly; a webhook failure), and auth/admin (a temp password expiring unused; four-eyes visibility to other admins on user create/delete/role-change; bulk exports; and a self-monitoring fallback alert when an alert's own email delivery genuinely fails). Several trigger types are deliberately unimplemented rather than faked — no job scheduler, login-lockout system, self-service password change, or quota-consumption logic exists yet to hook them into; each says why directly in the registry's `notes`.
+
+**Manual:** `POST /api/alerts` (requires `manage_alerts`) broadcasts a one-off alert to any combination of permissions, roles, or a single user.
 
 **Reading your inbox:** `GET /api/alerts` (own alerts, `unread_only` filter, paginated), `GET /api/alerts/unread-count` (badge count), `POST /api/alerts/{id}/read` / `POST /api/alerts/read-all`.
 
-**Email setup:** optional — see `SMTP_*` in `.env.example`. Without SMTP configured, alerts still work in-app; email sending is skipped and logged, not an error.
+**Email setup:** optional — see `SMTP_*` in `.env.example`. Without SMTP configured, alerts still work in-app; email sending is skipped and logged, not an error (and — deliberately — not itself reported as a delivery failure, since nothing was actually attempted).
 
 ## Quick Start
 
@@ -223,10 +227,11 @@ pip install -r requirements.txt
 python scripts/generate_kpc_data.py   # generate synthetic CSVs
 python scripts/etl_pipeline.py        # loads to SQLite always, and to Postgres too if DATABASE_URL is a postgresql:// URI
 
-alembic upgrade head                  # creates users/roles/permissions/user_roles/role_permissions
+alembic upgrade head                  # creates users/roles/permissions/user_roles/role_permissions/alerts/consent tables
 python scripts/seed_roles.py          # seeds the roles + permissions in the README's Permission Mapping table above
 python scripts/seed_admin.py          # bootstraps the first system_admin (admin@yopmail.com / Admin@1234) — required before /api/auth/register works, since that route is itself gated behind manage_users
 python scripts/seed_demo_users.py     # seeds the 4 demo logins above
+python scripts/seed_terms_documents.py  # seeds v1 Terms & Conditions / Privacy Policy — every user, including the demo logins above, must (re-)consent once this has run
 
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -248,8 +253,11 @@ Every row below except `/api/auth/login`, `/api/auth/register`, and `/api/e-bill
 
 | Method | Endpoint                          | Permission               | Description                                                  |
 | ------ | ---------------------------------- | ------------------------- | -------------------------------------------------------------- |
-| POST   | `/api/auth/login`                 | —                          | Log in with `{email, password}`, returns a JWT                |
-| POST   | `/api/auth/register`              | `manage_users`             | Create a user and assign a role                                |
+| POST   | `/api/auth/login`                 | —                          | Log in with `{email, password}` — returns a JWT, or a scoped `reset_token`/`consent_token` if a reset/re-consent is required |
+| POST   | `/api/auth/reset-password`        | —                           | Redeem a `reset_token`: set a new password + accept Terms/Privacy in one call |
+| GET    | `/api/auth/terms`                 | —                           | Current Terms & Conditions / Privacy Policy text + required version |
+| POST   | `/api/auth/accept-terms`          | —                           | Redeem a `consent_token` to re-accept a newer Terms/Privacy version (no password change) |
+| POST   | `/api/auth/register`              | `manage_users`             | Create a user and assign a role (takes a password directly — see `POST /api/admin/users` for the no-password flow) |
 | GET    | `/api/auth/me`                    | *(any authenticated)*      | Current user's profile, roles, permissions                     |
 | GET    | `/api/feed`                       | `view_live_feed`           | Live anomaly feed                                               |
 | POST   | `/api/reconcile/metrics`          | `view_metrics`             | Executive metrics (KPIs/summary, DB-backed)                     |
@@ -271,13 +279,20 @@ Every row below except `/api/auth/login`, `/api/auth/register`, and `/api/e-bill
 | POST   | `/api/e-billing/webhook`          | —                           | Simulate a KRA webhook callback (external, no user auth)        |
 | GET    | `/api/e-billing/reconcile`        | `manage_ebilling`           | E-Billing reconciliation dashboard                               |
 | GET    | `/api/e-billing/monitor`          | `manage_ebilling`           | Failure rate monitoring                                          |
-| GET    | `/api/admin/users`                | `manage_users`              | List all users                                                    |
+| GET    | `/api/admin/users`                | `manage_users`              | List all users, with `account_status` (Invited / Reset Required / Active) |
+| POST   | `/api/admin/users`                 | `manage_users`              | Provision a user with no password — generates + emails a temp password, forces reset on first login |
+| POST   | `/api/admin/users/{id}/resend-temp-password` | `manage_users`   | Regenerate + re-email a temp password (expired original, or failed delivery) |
 | PATCH  | `/api/admin/users/{user_id}`      | `manage_users`              | Edit a user's email/name/role/password/active status              |
 | DELETE | `/api/admin/users/{user_id}`      | `manage_users`              | Delete a user (blocked for self and the last `system_admin`)     |
 | GET    | `/api/audit/logs`                 | `view_audit`                | Paginated, filterable audit trail (actor/action/target/date range) |
 | GET    | `/api/audit/logs/{log_id}`        | `view_audit`                | Single audit log entry                                            |
 | GET    | `/api/audit/summary`              | `view_audit`                | Aggregate audit stats (by action/actor) for the last N days       |
 | GET    | `/api/audit/me`                   | `view_audit`                | Current user's own audit trail                                    |
+| GET    | `/api/alerts`                     | *(any authenticated)*       | Current user's alert inbox (`unread_only` filter, paginated)      |
+| GET    | `/api/alerts/unread-count`        | *(any authenticated)*       | Unread alert badge count                                           |
+| POST   | `/api/alerts/{alert_id}/read`     | *(any authenticated)*       | Mark one alert read                                                 |
+| POST   | `/api/alerts/read-all`            | *(any authenticated)*       | Mark every visible alert read                                       |
+| POST   | `/api/alerts`                     | `manage_alerts`             | Broadcast a manual alert to a permission, a role, or one user       |
 | GET    | `/health`                         | —                           | Service health check (DB + API status)                            |
 
 
@@ -410,7 +425,9 @@ Note: `MATERIALITY_THRESHOLD`, `CRITICAL_AGE_DAYS`, and the KRA endpoint/key are
 
 ## Project Status
 
-See [PROGRESS.md](./PROGRESS.md) for the current state of frontend/backend integration. In short: all 7 phases are complete — reconciliation dashboard, CSV upload, the E-Billing panel, Excel export, the fraud graph, and RBAC (backend enforcement + a role-based multi-dashboard frontend, replacing the single page that used to show every feature to every visitor) are all wired to live data and manually verified end-to-end as all 3 roles. CI (GitHub Actions) runs backend tests and frontend lint/typecheck/build on every push/PR to `main`.
+See [PROGRESS.md](./PROGRESS.md) for the current state of frontend/backend integration. In short: all 7 phases are complete — reconciliation dashboard, CSV upload, the E-Billing panel, Excel export, the fraud graph, and RBAC (backend enforcement + a role-based multi-dashboard frontend, replacing the single page that used to show every feature to every visitor) are all wired to live data and manually verified end-to-end as all 3 roles. Since then: admin-provisioned users with a forced, consent-gated password reset (see [Admin-provisioned users & forced password reset](#admin-provisioned-users--forced-password-reset)), and a registry-driven in-app + email alerts system (see [Alerts & Notifications](#alerts--notifications)) — both live-verified against the running stack, not just unit-tested. CI (GitHub Actions) runs backend tests and frontend lint/typecheck/build on every push/PR to `main`.
+
+**Note on the seeded Terms & Conditions / Privacy Policy text** (`scripts/seed_terms_documents.py`): it's a functional placeholder — real structure and the required confidentiality/acceptable-use clause, but not reviewed by legal counsel. Replace before any real user relies on it.
 
 ## License
 

@@ -12,7 +12,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.services.e_billing import (
+from app.services.ebilling.e_billing import (
     init_ebilling_tables,
     sync_invoices_to_ebilling,
     get_ebilling_status,
@@ -34,11 +34,11 @@ def test_db():
     # Point the service module's engine at a throwaway SQLite file instead of
     # the real kpc.db (DB_PATH no longer exists — services/e_billing.py talks
     # to the DB via get_engine() since the SQLAlchemy migration).
-    import app.services.e_billing
+    import app.services.ebilling.e_billing
     from sqlalchemy import create_engine
     test_engine = create_engine(f'sqlite:///{DB_PATH}')
-    original_get_engine = app.services.e_billing.get_engine
-    app.services.e_billing.get_engine = lambda: test_engine
+    original_get_engine = app.services.ebilling.e_billing.get_engine
+    app.services.ebilling.e_billing.get_engine = lambda: test_engine
 
     # Create test tables
     conn = sqlite3.connect(DB_PATH)
@@ -80,7 +80,7 @@ def test_db():
     yield DB_PATH
 
     # Cleanup
-    app.services.e_billing.get_engine = original_get_engine
+    app.services.ebilling.e_billing.get_engine = original_get_engine
     test_engine.dispose()
     if os.path.exists(DB_PATH):
         os.remove(DB_PATH)

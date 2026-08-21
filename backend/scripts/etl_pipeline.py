@@ -311,7 +311,7 @@ def _alert_etl_failure(error: str) -> None:
     the real ETL failure being reported, just supplement it when possible."""
     try:
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from app.services.alert_service import notify_etl_failed  # noqa: E402
+        from app.services.alerts.alert_service import notify_etl_failed  # noqa: E402
         from app.utils.db_connection import SessionLocal  # noqa: E402
 
         db = SessionLocal()

@@ -26,8 +26,8 @@ from jose import JWTError
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.security import decode_access_token
-from app.models.user import User
-from app.services.audit_service import log_action
+from app.models.auth.user import User
+from app.services.audit.audit_service import log_action
 from app.utils.db_connection import SessionLocal
 
 SKIP_PATH_PREFIXES = ("/health", "/docs", "/openapi.json", "/redoc", "/favicon.ico")

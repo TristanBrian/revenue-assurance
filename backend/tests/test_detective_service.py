@@ -17,7 +17,7 @@ from sqlalchemy import create_engine
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.services.detective_service import (
+from app.services.fraud.detective_service import (
     compute_omc_risk_features,
     get_all_omc_risk_features,
     get_omc_risk,
