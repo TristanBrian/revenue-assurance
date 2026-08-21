@@ -277,7 +277,10 @@ function ReportsContent() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto text-zinc-800 dark:text-zinc-100">
+    <div className="flex flex-col gap-6 w-full max-w-[1700px] mx-auto px-2 sm:px-4 text-zinc-800 dark:text-zinc-100">
+
+
+
       
       {/* Page Header */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -333,34 +336,31 @@ function ReportsContent() {
           {error}
         </div>
       )}
-
-
       {/* Main Reporting Workspace Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        
-        {/* LEFT COLUMN: Visual Funnel Chart Card (Spans 2 columns) */}
+               {/* LEFT COLUMN: Visual Funnel Chart Card (Spans 2 columns) */}
         <div className="lg:col-span-2 flex flex-col gap-6">
-          <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm flex flex-col gap-5">
-            <div className="flex items-center justify-between">
+          <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-7 shadow-md flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 dark:border-slate-800 pb-5">
               <div>
-                <h2 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider flex items-center space-x-2">
-                  <span>Revenue Lifecycle Funnel</span>
-                  <span className="text-[10px] px-2 py-0.5 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full normal-case font-normal">
-                    Interactive
+                <h2 className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider flex items-center space-x-3">
+                  <span>Revenue Lifecycle & Leakage State</span>
+                  <span className="text-xs px-3 py-1 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/30 rounded-full normal-case font-bold">
+                    Interactive Workspace
                   </span>
                 </h2>
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  Click any stage or leakage drop to automatically filter the audit preview table below.
+                <p className="text-sm font-medium text-zinc-600 dark:text-slate-400 mt-1.5">
+                  Click any stage or leakage card below to filter the audit preview table in real time.
                 </p>
               </div>
 
               {activeFunnelFilter !== "all" && (
                 <button
                   onClick={() => handleFunnelStageClick("all")}
-                  className="px-2.5 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition flex items-center space-x-1"
+                  className="px-4 py-2 text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 transition flex items-center space-x-2 shadow-sm cursor-pointer shrink-0"
                 >
                   <span>Reset Filter</span>
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -375,240 +375,162 @@ function ReportsContent() {
             ) : (
               <div className="flex flex-col gap-6">
                 
-                {/* Horizontal Step Funnel Interactive SVG Chart */}
-                <div className="w-full bg-zinc-950/60 border border-zinc-800 rounded-xl p-5 flex flex-col items-center shadow-inner relative overflow-hidden">
-                  
-                  {/* Subtle Grid Background */}
-                  <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293715_1px,transparent_1px),linear-gradient(to_bottom,#1f293715_1px,transparent_1px)] bg-[size:16px_16px] pointer-events-none" />
+                {/* 1. Segmented Pipeline Waterfall Bar */}
+                <div className="bg-zinc-50 dark:bg-slate-955/90 border border-zinc-200 dark:border-slate-800 p-6 rounded-2xl space-y-4 shadow-inner">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between text-sm font-bold text-zinc-800 dark:text-slate-200 gap-1">
+                    <span>Order-to-Cash Pipeline Conversion</span>
+                    <span className="font-mono text-emerald-700 dark:text-emerald-400 font-black">Total Metered Baseline: {formatKesCompact(funnelData.disp)}</span>
+                  </div>
 
-                  <svg viewBox="0 0 620 250" className="w-full max-w-[580px] h-auto relative z-10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    
-                    {/* SVG Definitions & Gradients */}
-                    <defs>
-                      <linearGradient id="funnel-grad-disp" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stopColor="#4f46e5" />
-                        <stop offset="100%" stopColor="#06b6d4" />
-                      </linearGradient>
-                      <linearGradient id="funnel-grad-inv" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stopColor="#7c3aed" />
-                        <stop offset="100%" stopColor="#c084fc" />
-                      </linearGradient>
-                      <linearGradient id="funnel-grad-pay" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stopColor="#059669" />
-                        <stop offset="100%" stopColor="#10b981" />
-                      </linearGradient>
-                      
-                      <filter id="glow-disp" x="-20%" y="-20%" width="140%" height="140%">
-                        <feGaussianBlur stdDeviation="4" result="blur" />
-                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                      </filter>
-                    </defs>
-
-                    {/* Funnel Stage 1: Dispatched (Clickable) */}
-                    <g
-                      onClick={() => handleFunnelStageClick("dispatched")}
-                      className={`cursor-pointer transition-all duration-300 ${
-                        activeFunnelFilter === "dispatched" ? "opacity-100 scale-[1.02]" : "hover:opacity-90"
-                      }`}
-                    >
-                      <polygon
-                        points="20,20 180,20 160,85 20,85"
-                        fill="url(#funnel-grad-disp)"
-                        className={`transition-all ${
-                          activeFunnelFilter === "dispatched" ? "stroke-cyan-400 stroke-[3]" : "stroke-indigo-400/40 stroke-1 hover:stroke-cyan-300"
-                        }`}
-                      />
-                      <text x="35" y="44" className="fill-white text-[9px] font-black uppercase tracking-wider">1. DISPATCHED</text>
-                      <text x="35" y="66" className="fill-white text-sm font-black font-mono">{formatKesCompact(funnelData.disp)}</text>
-                      <text x="132" y="45" className="fill-cyan-200 text-[10px] font-black font-mono">100%</text>
-                    </g>
-
-                    {/* Funnel Connector 1 -> 2 (Animated Pulse Line & Interactive Red Ghost Badge) */}
-                    <path
-                      d="M 180,30 L 215,30 L 215,125 L 230,125"
-                      stroke="#f43f5e"
-                      strokeWidth="2"
-                      strokeDasharray="4 4"
-                      className="animate-pulse opacity-70"
-                    />
-                    
-                    {/* Ghost Loads Clickable Badge */}
-                    <g
-                      onClick={() => handleFunnelStageClick("ghost")}
-                      className="cursor-pointer group"
-                    >
-                      <rect
-                        x="165"
-                        y="62"
-                        width="100"
-                        height="26"
-                        rx="6"
-                        className={`transition-all ${
-                          activeFunnelFilter === "ghost"
-                            ? "fill-rose-950 stroke-rose-500 stroke-2"
-                            : "fill-slate-900/90 stroke-rose-500/40 stroke-1 group-hover:stroke-rose-400 group-hover:fill-rose-950/80"
-                        }`}
-                      />
-                      <text x="215" y="75" className="fill-rose-400 text-[8px] font-black text-center" textAnchor="middle">
-                        -{funnelData.ghostPercent.toFixed(1)}% GHOST LOADS
-                      </text>
-                      <text x="215" y="84" className="fill-rose-200 text-[7px] font-mono text-center" textAnchor="middle">
-                        {formatKesCompact(funnelData.ghostLeak)}
-                      </text>
-                    </g>
-
-                    {/* Funnel Stage 2: Invoiced (Clickable) */}
-                    <g
-                      onClick={() => handleFunnelStageClick("invoiced")}
-                      className={`cursor-pointer transition-all duration-300 ${
-                        activeFunnelFilter === "invoiced" ? "opacity-100 scale-[1.02]" : "hover:opacity-90"
-                      }`}
-                    >
-                      <polygon
-                        points="235,105 395,105 375,170 235,170"
-                        fill="url(#funnel-grad-inv)"
-                        className={`transition-all ${
-                          activeFunnelFilter === "invoiced" ? "stroke-purple-300 stroke-[3]" : "stroke-purple-400/40 stroke-1 hover:stroke-purple-300"
-                        }`}
-                      />
-                      <text x="250" y="129" className="fill-white text-[9px] font-black uppercase tracking-wider">2. INVOICED</text>
-                      <text x="250" y="151" className="fill-white text-sm font-black font-mono">{formatKesCompact(funnelData.inv)}</text>
-                      <text x="348" y="130" className="fill-purple-200 text-[10px] font-black font-mono">{funnelData.invPercent.toFixed(1)}%</text>
-                    </g>
-
-                    {/* Funnel Connector 2 -> 3 (Animated Pulse Line & Interactive Amber Unpaid Badge) */}
-                    <path
-                      d="M 395,115 L 430,115 L 430,205 L 445,205"
-                      stroke="#f59e0b"
-                      strokeWidth="2"
-                      strokeDasharray="4 4"
-                      className="animate-pulse opacity-70"
-                    />
-
-                    {/* Unpaid Invoices Clickable Badge */}
-                    <g
-                      onClick={() => handleFunnelStageClick("unpaid")}
-                      className="cursor-pointer group"
-                    >
-                      <rect
-                        x="380"
-                        y="142"
-                        width="95"
-                        height="26"
-                        rx="6"
-                        className={`transition-all ${
-                          activeFunnelFilter === "unpaid"
-                            ? "fill-amber-950 stroke-amber-500 stroke-2"
-                            : "fill-slate-900/90 stroke-amber-500/40 stroke-1 group-hover:stroke-amber-400 group-hover:fill-amber-950/80"
-                        }`}
-                      />
-                      <text x="427.5" y="155" className="fill-amber-400 text-[8px] font-black text-center" textAnchor="middle">
-                        -{((funnelData.inv - funnelData.pay) / (funnelData.disp || 1) * 100).toFixed(1)}% UNPAID
-                      </text>
-                      <text x="427.5" y="164" className="fill-amber-200 text-[7px] font-mono text-center" textAnchor="middle">
-                        {formatKesCompact(funnelData.unpaidLeak)}
-                      </text>
-                    </g>
-
-                    {/* Funnel Stage 3: Settled Cash (Clickable) */}
-                    <g
+                  {/* Multi-color Segmented Bar */}
+                  <div className="h-5 w-full bg-zinc-200 dark:bg-slate-800 rounded-xl overflow-hidden flex p-0.5 gap-0.5">
+                    {/* Settled Cash Segment */}
+                    <div
                       onClick={() => handleFunnelStageClick("settled")}
-                      className={`cursor-pointer transition-all duration-300 ${
-                        activeFunnelFilter === "settled" ? "opacity-100 scale-[1.02]" : "hover:opacity-90"
-                      }`}
-                    >
-                      <polygon
-                        points="450,185 595,185 580,235 450,235"
-                        fill="url(#funnel-grad-pay)"
-                        className={`transition-all ${
-                          activeFunnelFilter === "settled" ? "stroke-emerald-300 stroke-[3]" : "stroke-emerald-400/40 stroke-1 hover:stroke-emerald-300"
-                        }`}
-                      />
-                      <text x="462" y="206" className="fill-white text-[8px] font-black uppercase tracking-wider">3. SETTLED CASH</text>
-                      <text x="462" y="224" className="fill-white text-xs font-black font-mono">{formatKesCompact(funnelData.pay)}</text>
-                      <text x="548" y="207" className="fill-emerald-200 text-[9px] font-black font-mono">{funnelData.payPercent.toFixed(1)}%</text>
-                    </g>
+                      style={{ width: `${funnelData.payPercent}%` }}
+                      className="h-full bg-gradient-to-r from-emerald-600 to-teal-400 rounded-l-lg cursor-pointer hover:brightness-110 transition-all"
+                      title={`Settled Cash: ${formatKesCompact(funnelData.pay)} (${funnelData.payPercent.toFixed(1)}%)`}
+                    />
+                    {/* Unpaid Segment */}
+                    <div
+                      onClick={() => handleFunnelStageClick("unpaid")}
+                      style={{ width: `${((funnelData.inv - funnelData.pay) / (funnelData.disp || 1) * 100)}%` }}
+                      className="h-full bg-gradient-to-r from-amber-500 to-amber-400 cursor-pointer hover:brightness-110 transition-all"
+                      title={`Unpaid Invoices Gap: ${formatKesCompact(funnelData.unpaidLeak)}`}
+                    />
+                    {/* Ghost Loads Segment */}
+                    <div
+                      onClick={() => handleFunnelStageClick("ghost")}
+                      style={{ width: `${funnelData.ghostPercent}%` }}
+                      className="h-full bg-gradient-to-r from-rose-600 to-rose-400 rounded-r-lg cursor-pointer hover:brightness-110 transition-all"
+                      title={`Ghost Loads Gap: ${formatKesCompact(funnelData.ghostLeak)} (${funnelData.ghostPercent.toFixed(1)}%)`}
+                    />
+                  </div>
 
-                  </svg>
+                  {/* Bar Legend */}
+                  <div className="flex flex-wrap items-center justify-between text-xs sm:text-sm font-bold text-zinc-700 dark:text-slate-300 pt-1 gap-2">
+                    <div
+                      onClick={() => handleFunnelStageClick("settled")}
+                      className="flex items-center space-x-2 cursor-pointer hover:text-emerald-700 dark:hover:text-emerald-300 transition"
+                    >
+                      <span className="w-3 h-3 rounded-full bg-emerald-500" />
+                      <span>Settled Remittances ({funnelData.payPercent.toFixed(1)}%)</span>
+                    </div>
+
+                    <div
+                      onClick={() => handleFunnelStageClick("unpaid")}
+                      className="flex items-center space-x-2 cursor-pointer hover:text-amber-700 dark:hover:text-amber-300 transition"
+                    >
+                      <span className="w-3 h-3 rounded-full bg-amber-500" />
+                      <span>Unpaid Invoices Gap ({formatKesCompact(funnelData.unpaidLeak)})</span>
+                    </div>
+
+                    <div
+                      onClick={() => handleFunnelStageClick("ghost")}
+                      className="flex items-center space-x-2 cursor-pointer hover:text-rose-700 dark:hover:text-rose-300 transition"
+                    >
+                      <span className="w-3 h-3 rounded-full bg-rose-500" />
+                      <span>Ghost Loads Gap ({formatKesCompact(funnelData.ghostLeak)})</span>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Explanatory Interactive KPI Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-zinc-150 dark:border-zinc-800/80 pt-4">
+                {/* 2. Three Interactive Hero Stage Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   
-                  {/* Card 1: Dispatched */}
+                  {/* Stage 1: Dispatched */}
                   <div
                     onClick={() => handleFunnelStageClick("dispatched")}
-                    className={`flex flex-col gap-2 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                    className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-5 shadow-sm ${
                       activeFunnelFilter === "dispatched"
-                        ? "bg-indigo-950/40 border-cyan-500/60 shadow-lg shadow-cyan-500/10"
-                        : "bg-zinc-900/30 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50"
+                        ? "bg-indigo-50/90 dark:bg-indigo-950/60 border-cyan-500/90 shadow-xl shadow-cyan-500/10 ring-2 ring-cyan-500/40"
+                        : "bg-white dark:bg-slate-950/80 border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 dark:hover:bg-slate-950"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-[#4f46e5] to-[#06b6d4]"></span>
-                        <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">1. Dispatched Volume</span>
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <span className="text-xs font-black uppercase tracking-wider text-cyan-700 dark:text-cyan-400">STAGE 1 BASELINE</span>
+                        <h3 className="text-base sm:text-lg font-extrabold text-zinc-900 dark:text-slate-100">Dispatched Volume</h3>
                       </div>
-                      <span className="text-[10px] font-mono font-bold text-cyan-400">100%</span>
-                    </div>
-                    <p className="text-[10px] text-zinc-550 dark:text-zinc-400 leading-relaxed">
-                      Physical inventory metered leaving KPC loading arms. Baseline volume.
-                    </p>
-                    <div className="mt-1 flex items-center justify-between text-[10px] pt-1 border-t border-zinc-800/60 text-indigo-400 font-medium">
-                      <span>Total: {formatKesCompact(funnelData.disp)}</span>
-                      <span>Click to view &rarr;</span>
-                    </div>
-                  </div>
-                  
-                  {/* Card 2: Commercial Billing */}
-                  <div
-                    onClick={() => handleFunnelStageClick("ghost")}
-                    className={`flex flex-col gap-2 p-3.5 rounded-xl border cursor-pointer transition-all ${
-                      activeFunnelFilter === "ghost" || activeFunnelFilter === "invoiced"
-                        ? "bg-purple-950/40 border-purple-500/60 shadow-lg shadow-purple-500/10"
-                        : "bg-zinc-900/30 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-[#7c3aed] to-[#a855f7]"></span>
-                        <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">2. Commercial Billing</span>
+                      <div className="w-12 h-12 rounded-full border-2 border-cyan-500/40 flex items-center justify-center text-sm font-black font-mono text-cyan-800 dark:text-cyan-300 bg-cyan-100 dark:bg-cyan-500/10 shrink-0">
+                        100%
                       </div>
-                      <span className="text-[10px] font-mono font-bold text-purple-400">{funnelData.invPercent.toFixed(1)}%</span>
                     </div>
-                    <div className="p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[10px] text-rose-300 flex items-center justify-between">
-                      <span>Ghost Loads Gap:</span>
-                      <span className="font-bold font-mono">{formatKesCompact(funnelData.ghostLeak)}</span>
+
+                    <div>
+                      <div className="text-3xl font-black font-mono text-zinc-900 dark:text-white tracking-tight">{formatKesCompact(funnelData.disp)}</div>
+                      <p className="text-sm font-medium text-zinc-600 dark:text-slate-400 mt-1.5 leading-relaxed">Physical fuel metered leaving loading arms.</p>
                     </div>
-                    <div className="flex items-center justify-between text-[10px] text-rose-400 font-medium pt-1">
-                      <span>Unbilled fuel dispatches</span>
-                      <span>Inspect Ghost Loads &rarr;</span>
+
+                    <div className="pt-4 border-t border-zinc-200 dark:border-slate-800 flex items-center justify-between text-sm font-bold text-cyan-700 dark:text-cyan-400">
+                      <span>Baseline Metering</span>
+                      <span>Filter Stage &rarr;</span>
                     </div>
                   </div>
 
-                  {/* Card 3: Cash Remittances */}
+                  {/* Stage 2: Commercial Invoicing */}
                   <div
-                    onClick={() => handleFunnelStageClick("unpaid")}
-                    className={`flex flex-col gap-2 p-3.5 rounded-xl border cursor-pointer transition-all ${
-                      activeFunnelFilter === "unpaid" || activeFunnelFilter === "settled"
-                        ? "bg-emerald-950/40 border-emerald-500/60 shadow-lg shadow-emerald-500/10"
-                        : "bg-zinc-900/30 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50"
+                    onClick={() => handleFunnelStageClick("ghost")}
+                    className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-5 shadow-sm ${
+                      activeFunnelFilter === "ghost" || activeFunnelFilter === "invoiced"
+                        ? "bg-purple-50/90 dark:bg-purple-950/60 border-purple-500/90 shadow-xl shadow-purple-500/10 ring-2 ring-purple-500/40"
+                        : "bg-white dark:bg-slate-950/80 border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 dark:hover:bg-slate-950"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-r from-[#059669] to-[#10b981]"></span>
-                        <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">3. Cash Remittances</span>
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <span className="text-xs font-black uppercase tracking-wider text-purple-700 dark:text-purple-400">STAGE 2 DECLARATION</span>
+                        <h3 className="text-base sm:text-lg font-extrabold text-zinc-900 dark:text-slate-100">Commercial Billing</h3>
                       </div>
-                      <span className="text-[10px] font-mono font-bold text-emerald-400">{funnelData.payPercent.toFixed(1)}%</span>
+                      <div className="w-12 h-12 rounded-full border-2 border-purple-500/40 flex items-center justify-center text-sm font-black font-mono text-purple-800 dark:text-purple-300 bg-purple-100 dark:bg-purple-500/10 shrink-0">
+                        {funnelData.invPercent.toFixed(0)}%
+                      </div>
                     </div>
-                    <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-300 flex items-center justify-between">
-                      <span>Unpaid Invoices Gap:</span>
-                      <span className="font-bold font-mono">{formatKesCompact(funnelData.unpaidLeak)}</span>
+
+                    <div>
+                      <div className="text-3xl font-black font-mono text-zinc-900 dark:text-white tracking-tight">{formatKesCompact(funnelData.inv)}</div>
+                      <div className="mt-3 p-3 rounded-xl bg-rose-50 dark:bg-rose-500/15 border border-rose-200 dark:border-rose-500/30 text-sm text-rose-800 dark:text-rose-300 flex flex-wrap items-center justify-between gap-1 font-bold">
+                        <span>Unbilled Ghost Loads:</span>
+                        <span className="font-extrabold font-mono text-rose-700 dark:text-rose-400">{formatKesCompact(funnelData.ghostLeak)}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-[10px] text-amber-400 font-medium pt-1">
-                      <span>Unmatched / partial payments</span>
-                      <span>Inspect Unpaid &rarr;</span>
+
+                    <div className="pt-4 border-t border-zinc-200 dark:border-slate-800 flex items-center justify-between text-sm font-bold text-rose-700 dark:text-rose-400">
+                      <span>Inspect Ghost Loads</span>
+                      <span>Filter &rarr;</span>
+                    </div>
+                  </div>
+
+                  {/* Stage 3: Settled Cash */}
+                  <div
+                    onClick={() => handleFunnelStageClick("unpaid")}
+                    className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-5 shadow-sm ${
+                      activeFunnelFilter === "unpaid" || activeFunnelFilter === "settled"
+                        ? "bg-emerald-50/90 dark:bg-emerald-950/60 border-emerald-500/90 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-500/40"
+                        : "bg-white dark:bg-slate-950/80 border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 dark:hover:bg-slate-950"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <span className="text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">STAGE 3 REMITTANCE</span>
+                        <h3 className="text-base sm:text-lg font-extrabold text-zinc-900 dark:text-slate-100">Settled Cash</h3>
+                      </div>
+                      <div className="w-12 h-12 rounded-full border-2 border-emerald-500/40 flex items-center justify-center text-sm font-black font-mono text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-500/10 shrink-0">
+                        {funnelData.payPercent.toFixed(0)}%
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-3xl font-black font-mono text-zinc-900 dark:text-white tracking-tight">{formatKesCompact(funnelData.pay)}</div>
+                      <div className="mt-3 p-3 rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 text-sm text-amber-900 dark:text-amber-300 flex flex-wrap items-center justify-between gap-1 font-bold">
+                        <span>Unpaid Invoice Gap:</span>
+                        <span className="font-extrabold font-mono text-amber-700 dark:text-amber-400">{formatKesCompact(funnelData.unpaidLeak)}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-zinc-200 dark:border-slate-800 flex items-center justify-between text-sm font-bold text-amber-700 dark:text-amber-400">
+                      <span>Inspect Unpaid Invoices</span>
+                      <span>Filter &rarr;</span>
                     </div>
                   </div>
 
@@ -624,27 +546,27 @@ function ReportsContent() {
         <div className="flex flex-col gap-6">
           
           {/* Card A: Report Filtering Options */}
-          <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm flex flex-col gap-4">
+          <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-6 sm:p-7 shadow-md flex flex-col gap-5">
             <div>
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Report Focus</h3>
-              <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Select the operational view to inspect and export.</p>
+              <h3 className="text-base font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">Report Focus</h3>
+              <p className="text-sm font-medium text-zinc-500 dark:text-slate-400 mt-1">Select the operational view to inspect and export.</p>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3">
               <button
                 type="button"
                 onClick={() => handleReportTypeChange("operational")}
-                className={`w-full text-left p-3 rounded-lg border text-xs transition-all flex flex-col gap-1 ${
+                className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
                   reportType === "operational"
-                    ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-bold"
-                    : "bg-white dark:bg-transparent border-zinc-200 dark:border-zinc-800 hover:bg-zinc-55 dark:hover:bg-zinc-900/40 text-zinc-650 dark:text-zinc-400"
+                    ? "bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-bold shadow-xs"
+                    : "bg-white dark:bg-slate-955/60 border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between font-bold text-sm sm:text-base">
                   <span>Operational Audit Report</span>
-                  {reportType === "operational" && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>}
+                  {reportType === "operational" && <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>}
                 </div>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-normal leading-tight">
+                <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
                   Audits dispatch volume matching (Ghost loads & transport gaps).
                 </span>
               </button>
@@ -652,17 +574,17 @@ function ReportsContent() {
               <button
                 type="button"
                 onClick={() => handleReportTypeChange("financial")}
-                className={`w-full text-left p-3 rounded-lg border text-xs transition-all flex flex-col gap-1 ${
+                className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
                   reportType === "financial"
-                    ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-bold"
-                    : "bg-white dark:bg-transparent border-zinc-200 dark:border-zinc-800 hover:bg-zinc-55 dark:hover:bg-zinc-900/40 text-zinc-650 dark:text-zinc-400"
+                    ? "bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-bold shadow-xs"
+                    : "bg-white dark:bg-slate-955/60 border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between font-bold text-sm sm:text-base">
                   <span>Financial Settlement Report</span>
-                  {reportType === "financial" && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>}
+                  {reportType === "financial" && <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>}
                 </div>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-normal leading-tight">
+                <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
                   Audits invoiced value vs banking cash deposits.
                 </span>
               </button>
@@ -670,55 +592,52 @@ function ReportsContent() {
               <button
                 type="button"
                 onClick={() => handleReportTypeChange("icms")}
-                className={`w-full text-left p-3 rounded-lg border text-xs transition-all flex flex-col gap-1 ${
+                className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
                   reportType === "icms"
-                    ? "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-500 text-indigo-700 dark:text-indigo-300 font-bold"
-                    : "bg-white dark:bg-transparent border-zinc-200 dark:border-zinc-800 hover:bg-zinc-55 dark:hover:bg-zinc-900/40 text-zinc-650 dark:text-zinc-400"
+                    ? "bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-bold shadow-xs"
+                    : "bg-white dark:bg-slate-955/60 border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between font-bold text-sm sm:text-base">
                   <span>iCMS Tax Sync Report</span>
-                  {reportType === "icms" && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>}
+                  {reportType === "icms" && <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>}
                 </div>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-normal leading-tight">
+                <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
                   Audits KRA e-billing status and failed sync queues.
                 </span>
               </button>
             </div>
           </div>
 
-          {/* Card B: Export Formats Card */}
-          <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm flex flex-col gap-4">
+          {/* Card B: Download & Export Trigger */}
+          <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-6 sm:p-7 shadow-md flex flex-col gap-5">
             <div>
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">Export Settings</h3>
-              <p className="text-[10px] text-zinc-500 dark:text-zinc-400">Download formatted files for external reporting.</p>
+              <h3 className="text-base font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">Export Settings</h3>
+              <p className="text-sm font-medium text-zinc-500 dark:text-slate-400 mt-1">Download formatted files for external reporting.</p>
             </div>
 
-            <div className="flex flex-col gap-3">
-              {/* Export Excel (Multi-sheet, full DB) */}
+            <div className="flex flex-col gap-3.5">
               <button
                 type="button"
                 onClick={handleExportExcel}
-                disabled={exporting || loading}
-                className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 py-3 text-xs font-bold text-white shadow-lg active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm sm:text-base rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center space-x-2.5 cursor-pointer"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <span>{exporting ? "Generating Excel..." : "Export Full Workbook (Excel)"}</span>
+                <span>Export Full Workbook (Excel)</span>
               </button>
 
-              {/* Export CSV (Client-side, filtered table data) */}
               <button
                 type="button"
                 onClick={handleExportCsv}
-                disabled={loading}
-                className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-55 dark:hover:bg-zinc-900 bg-white dark:bg-zinc-900 py-3 text-xs font-bold text-zinc-700 dark:text-zinc-200 shadow-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                disabled={exporting}
+                className="w-full py-3.5 px-5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-sm sm:text-base rounded-xl transition border border-slate-200 dark:border-slate-700 flex items-center justify-center space-x-2.5 cursor-pointer"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                <span>Export Active View (CSV)</span>
+                <span>{exporting ? "Exporting..." : "Export Active View (CSV)"}</span>
               </button>
             </div>
           </div>
@@ -727,18 +646,19 @@ function ReportsContent() {
 
       </div>
 
+
       {/* BOTTOM WORKSPACE SECTION: Report Data Preview Table Grid */}
-      <div className="bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm flex flex-col gap-4">
+      <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-6 shadow-md flex flex-col gap-5">
         
         {/* Toolbar Header for Table Preview */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-150 dark:border-zinc-800/80 pb-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-200 dark:border-slate-800 pb-4">
           <div>
-            <h3 className="text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">
               {reportType === "operational" ? "Operational Audit Log Preview" : 
                reportType === "financial" ? "Financial Settlement Match Preview" : 
                "iCMS Tax Declaration logs"}
             </h3>
-            <p className="text-[10px] text-zinc-500 dark:text-zinc-400">
+            <p className="text-xs text-zinc-500 dark:text-slate-400 mt-0.5">
               Showing active rows exceeding KES {materiality.toLocaleString()} materiality.
             </p>
           </div>
@@ -750,7 +670,7 @@ function ReportsContent() {
               placeholder="Search active table..."
               value={searchQuery}
               onChange={handleSearchChange}
-              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:bg-white rounded-lg px-3 py-1.5 text-xs text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none transition-all shadow-inner"
+              className="w-full bg-zinc-50 dark:bg-slate-955/80 border border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2 text-xs text-zinc-800 dark:text-slate-200 placeholder-zinc-400 focus:outline-none transition-all shadow-inner font-medium"
             />
           </div>
         </div>
@@ -764,7 +684,8 @@ function ReportsContent() {
           <div className="flex flex-col gap-4">
             
             {/* Table wrapper */}
-            <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950/40">
+            <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-955/90">
+
               {totalItems === 0 ? (
                 <div className="py-12 text-center text-xs text-zinc-500 italic">
                   No active logs match the search query or selected materiality.
@@ -773,7 +694,8 @@ function ReportsContent() {
                 <table className="w-full min-w-[700px] text-left text-xs">
                   
                   {/* Table Headers */}
-                  <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 text-zinc-550 dark:text-zinc-400 font-medium">
+                  <thead className="border-b border-zinc-200 dark:border-slate-800 bg-zinc-100 dark:bg-slate-900/90 text-zinc-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[11px]">
+
                     {reportType === "operational" ? (
                       <tr>
                         <th className="px-4 py-3">Dispatch ID</th>
