@@ -67,7 +67,16 @@ export interface Anomaly {
   flow_direction?: FlowDirection | null;
   officer_id?: string | null;
   beneficiary_id?: string | null;
+  // Fraud scoring layer (ML). Optional/nullable: null whenever the
+  // fraud-scoring model isn't trained yet (services/fraud/
+  // fraud_scoring_service.py's is_configured() gate) — reconciliation
+  // itself always succeeds either way, scoring is a best-effort
+  // enrichment on top of it, never a blocker.
+  fraud_score?: number | null;
+  fraud_tier?: FraudTier | null;
 }
+
+export type FraudTier = "Likely Fraud" | "Suspicious" | "Likely Benign";
 
 export interface DataQuality {
   total_rows: number;
@@ -274,6 +283,25 @@ export interface FraudGraphData {
     community_count: number;
     top_risk_entities: TopRiskEntity[];
   };
+}
+
+// Mirrors backend/app/schemas/fraud/scoring.py — the fraud scoring
+// layer's explainability endpoints (GET /api/fraud/explain/{id},
+// POST /api/fraud/chat).
+
+export interface ShapContributor {
+  feature: string;
+  value: number;
+  contribution: number;
+  direction: "toward_fraud" | "toward_benign";
+}
+
+export interface FraudExplainData {
+  anomaly_id: string;
+  fraud_score: number | null;
+  fraud_tier: FraudTier | null;
+  base_value: number;
+  contributors: ShapContributor[];
 }
 
 // Mirrors backend/app/schemas/user.py — the response shapes for /api/auth/*.
