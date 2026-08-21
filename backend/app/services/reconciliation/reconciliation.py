@@ -463,10 +463,55 @@ def run_reconciliation(materiality: float = MATERIALITY_THRESHOLD) -> Dict:
         result = run_reconciliation_on_dataframes(dispatches, invoices, payments, materiality)
         for a in result.get('anomalies', []):
             a['flow_direction'] = 'inbound'
+        _score_anomalies_for_fraud(result.get('anomalies', []), direction='inbound', engine=engine,
+                                    dispatches=dispatches, invoices=invoices)
         return result
     except Exception as e:
         logger.error(f"❌ DB reconciliation failed: {e}")
         raise
+
+
+def _score_anomalies_for_fraud(anomalies: list, *, direction: str, engine, **table_kwargs) -> None:
+    """
+    Enriches `anomalies` in place with fraud_score/fraud_tier — best-
+    effort and non-fatal: the fraud scoring layer is an enrichment on top
+    of the reconciliation engine (see the fraud-scoring spec's guiding
+    principle — it scores on top of existing anomalies, it doesn't
+    replace or gate them), so any failure here (no trained model yet, a
+    transient feature-building error, ...) must never break reconciliation
+    itself. Sets fraud_score/fraud_tier to None on any failure rather than
+    omitting the keys, so the Anomaly schema's Optional fields always come
+    back consistently shaped either way.
+
+    Imported lazily (inside the function, not at module top) to keep
+    services/fraud/* an optional, layered-on-top dependency of
+    reconciliation.py rather than a hard one — reconciliation.py works
+    identically with fraud scoring uninstalled/misconfigured.
+    """
+    if not anomalies:
+        return
+    try:
+        from app.services.fraud import fraud_scoring_service, feature_builder
+
+        if direction == 'outbound':
+            context = feature_builder.gather_outbound_context(
+                table_kwargs['attendance'], table_kwargs['authorizations'], table_kwargs['disbursements']
+            )
+        else:
+            context = feature_builder.gather_inbound_context(
+                table_kwargs['dispatches'], table_kwargs['invoices'], engine
+            )
+        fraud_scoring_service.score_anomalies(
+            anomalies,
+            direction=direction,
+            duplicate_ids=context['duplicate_ids'],
+            value_delta_zscore_by_actor=context['value_delta_zscore_by_actor'],
+        )
+    except Exception as exc:
+        logger.error(f"Fraud scoring failed (non-fatal — reconciliation result is unaffected): {exc}")
+        for a in anomalies:
+            a.setdefault('fraud_score', None)
+            a.setdefault('fraud_tier', None)
 
 
 # =============================================================================
@@ -876,6 +921,9 @@ def run_outbound_reconciliation(materiality: float = MATERIALITY_THRESHOLD) -> D
         result = run_outbound_reconciliation_on_dataframes(
             attendance, authorizations, disbursements, materiality, beneficiaries_df=beneficiaries
         )
+        _score_anomalies_for_fraud(result.get('anomalies', []), direction='outbound', engine=engine,
+                                    attendance=attendance, authorizations=authorizations,
+                                    disbursements=disbursements)
         return result
     except Exception as e:
         logger.error(f"❌ DB outbound reconciliation failed: {e}")
