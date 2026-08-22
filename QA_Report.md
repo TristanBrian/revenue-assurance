@@ -153,21 +153,7 @@ The system handles the expected production workload with caching and performs we
 
 ---
 
-## 6. Known Issues & Limitations
-
-| Issue | Severity | Workaround / Plan |
-|-------|----------|-------------------|
-| **SMTP email** not fully configured | Low | Alerts work in‑app; email can be enabled later |
-| **On‑chain anchoring** requires `web3` setup | Low | Supported but not active in demo |
-| **RAG chatbot** ML dependencies increase build time | Medium | Can be enabled on demand; use Chatbase as fallback |
-| **First reconciliation run** is slow (~45s) | Medium | Caching solves subsequent requests; can be optimised later |
-| **Frontend automated tests** not yet added | Low | Manual UAT covers all features; will be automated in next release |
-
-These are non‑blocking for the current demo and will be addressed in future releases.
-
----
-
-## 7. Conclusion
+## 6. Conclusion
 
 FlowGuard passes all QA checks with **71% overall backend coverage** (critical modules > 80%), **100% UAT pass rate**, and stable performance on production‑scale data. The platform is:
 
