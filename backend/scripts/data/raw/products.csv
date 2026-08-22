@@ -1,0 +1,8 @@
+product_id,product_name,unit_price_kes,is_active
+PMS,Premium Motor Spirit (Petrol),182.0,True
+AGO,Automotive Gas Oil (Diesel),168.0,True
+DPK,Dual Purpose Kerosene (Kerosene),145.0,True
+JETA1,Jet A-1,,True
+HFO,Heavy Fuel Oil,,True
+LPG,Liquefied Petroleum Gas,,True
+LUB,Lubricants,,True
