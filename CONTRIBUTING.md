@@ -87,21 +87,21 @@ Before submitting your PR, please confirm:
 We use Conventional Commits to automate versioning and changelog generation.
 Common types:
 
-feat: – a new feature
+- feat: – a new feature
 
-fix: – a bug fix
+- fix: – a bug fix
 
-docs: – documentation changes
+- docs: – documentation changes
 
-style: – code style (whitespace, formatting, etc.)
+- style: – code style (whitespace, formatting, etc.)
 
-refactor: – code changes that neither fix nor add a feature
+- refactor: – code changes that neither fix nor add a feature
 
-perf: – performance improvements
+- perf: – performance improvements
 
-test: – adding or updating tests
+- test: – adding or updating tests
 
-chore: – build process, tooling, or dependencies
+- chore: – build process, tooling, or dependencies
 
 🧪 Testing
 
