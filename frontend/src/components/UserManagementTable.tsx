@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ApiError, createUser, deleteUser, getAdminSecurityEvents, getUsers, resendTempPassword, updateUser } from "@/lib/api";
-import type { AdminSecurityEvent, AdminUser, RoleName } from "@/lib/types";
+import { ApiError, createUser, deleteUser, getAdminSecurityEvents, getPasswordPolicy, getUsers, resendTempPassword, updateUser } from "@/lib/api";
+import type { AdminSecurityEvent, AdminUser, PasswordPolicy, RoleName } from "@/lib/types";
 import { ROLE_NAMES } from "@/lib/types";
 
 function roleLabel(role: string): string {
@@ -94,6 +94,7 @@ export default function UserManagementTable() {
   const [securityEvents, setSecurityEvents] = useState<AdminSecurityEvent[]>([]);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [passwordPolicy, setPasswordPolicy] = useState<PasswordPolicy | null>(null);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -120,6 +121,7 @@ export default function UserManagementTable() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
+    getPasswordPolicy().then(setPasswordPolicy).catch(() => setPasswordPolicy(null));
     return () => {
       cancelled = true;
     };
@@ -316,6 +318,19 @@ export default function UserManagementTable() {
           </select>
         </div>
         {(() => { const detail = ROLE_DESCRIPTIONS[previewRole]; return <div className="mt-3 grid gap-3 text-xs sm:grid-cols-3"><div><p className="text-muted-foreground">Domain</p><p className="mt-1 font-semibold text-foreground">{detail.domain}</p></div><div><p className="text-muted-foreground">Can access</p><p className="mt-1 font-semibold text-foreground">{detail.access}</p></div><div><p className="text-muted-foreground">Can act</p><p className="mt-1 font-semibold text-foreground">{detail.action}</p></div></div>; })()}
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Authentication baseline</p><h2 className="mt-1 text-sm font-bold text-foreground">Password enforcement</h2><p className="mt-1 text-xs text-muted-foreground">Read-only policy published by the backend. It is not user-selectable so an admin cannot weaken the platform baseline.</p></div>
+          <span className="rounded-full bg-status-low-bg px-2 py-1 text-[10px] font-semibold text-status-low">Backend enforced</span>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <span className="rounded-full bg-muted px-2.5 py-1">{passwordPolicy?.min_length ?? 12}+ characters</span>
+          <span className="rounded-full bg-muted px-2.5 py-1">Upper + lower case</span>
+          <span className="rounded-full bg-muted px-2.5 py-1">Number + symbol</span>
+          <span className="rounded-full bg-muted px-2.5 py-1">Blocks email fragments</span>
+        </div>
       </div>
 
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">

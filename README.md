@@ -242,11 +242,11 @@ Auth is real (JWT + RBAC, enforced on every route) — you need to log in. Both 
 
 | Role | Email | Password |
 |---|---|---|
-| Depot Supervisor | `depot_supervisor@kpc-demo.co.ke` | `demo-pass-123` |
-| Manager | `manager@kpc-demo.co.ke` | `demo-pass-123` |
-| Revenue Assurance | `revenue_assurance@kpc-demo.co.ke` | `demo-pass-123` |
-| Inuka Manager | `inuka_manager@kpc-demo.co.ke` | `demo-pass-123` |
-| System Admin | `system_admin@kpc-demo.co.ke` | `demo-pass-123` |
+| Depot Supervisor | `depot_supervisor@kpc-demo.co.ke` | `Demo-Access-123!` |
+| Manager | `manager@kpc-demo.co.ke` | `Demo-Access-123!` |
+| Revenue Assurance | `revenue_assurance@kpc-demo.co.ke` | `Demo-Access-123!` |
+| Inuka Manager | `inuka_manager@kpc-demo.co.ke` | `Demo-Access-123!` |
+| System Admin | `system_admin@kpc-demo.co.ke` | `Demo-Access-123!` |
 
 These are throwaway local-dev accounts seeded by `backend/scripts/seed_demo_users.py` — never point that script at a real deployment.
 
@@ -281,7 +281,7 @@ python scripts/etl_pipeline.py        # loads to SQLite always, and to Postgres 
 
 alembic upgrade head                  # creates users/roles/permissions/user_roles/role_permissions/alerts/consent tables
 python scripts/seed_roles.py          # seeds the roles + permissions in the README's Permission Mapping table above, including inuka_manager
-python scripts/seed_admin.py          # bootstraps the first system_admin (admin@yopmail.com / Admin@1234) — required before /api/auth/register works, since that route is itself gated behind manage_users
+python scripts/seed_admin.py          # bootstraps the first system_admin (admin@yopmail.com / Admin-Access-123!) — required before /api/auth/register works, since that route is itself gated behind manage_users
 python scripts/seed_demo_users.py     # seeds the 5 demo logins above
 python scripts/seed_terms_documents.py  # seeds v1 Terms & Conditions / Privacy Policy — every user, including the demo logins above, must (re-)consent once this has run
 

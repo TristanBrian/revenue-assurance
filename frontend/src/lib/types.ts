@@ -425,6 +425,15 @@ export interface AdminSecurityEvent {
   metadata: Record<string, unknown> | null;
 }
 
+export interface PasswordPolicy {
+  min_length: number;
+  requires_uppercase: boolean;
+  requires_lowercase: boolean;
+  requires_number: boolean;
+  requires_symbol: boolean;
+  rejects_identity_fragment: boolean;
+}
+
 // POST /api/admin/users — admin-provisioned, no password field: the
 // backend generates a random temp password and emails it.
 export interface CreateUserPayload {

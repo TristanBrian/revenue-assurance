@@ -27,7 +27,7 @@ from app.models.auth.user import User
 from app.services.auth.user_service import EmailAlreadyRegisteredError, register_user
 from app.utils.db_connection import SessionLocal
 
-DEMO_PASSWORD = "demo-pass-123"
+DEMO_PASSWORD = "Demo-Access-123!"
 
 # Fourth element is the depot assigned to the demo depot_supervisor — the
 # one real value this scoping needs, since it drives every alert they see

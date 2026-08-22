@@ -23,7 +23,7 @@ from app.models.auth.user import User
 from app.utils.db_connection import SessionLocal
 
 ADMIN_EMAIL = "admin@yopmail.com"
-ADMIN_PASSWORD = "Admin@1234"
+ADMIN_PASSWORD = "Admin-Access-123!"
 ADMIN_FULL_NAME = "Admin"
 
 

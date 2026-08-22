@@ -2,6 +2,7 @@ import type {
   AcceptTermsResponse,
   AdminUser,
   AdminSecurityEvent,
+  PasswordPolicy,
   AnomalyTableResult,
   AuthUser,
   CreateUserPayload,
@@ -157,6 +158,10 @@ export async function login(email: string, password: string): Promise<LoginRespo
     body: JSON.stringify({ email, password }),
   });
   return unwrap<LoginResponse>(res);
+}
+
+export async function getPasswordPolicy(): Promise<PasswordPolicy> {
+  return unwrap<PasswordPolicy>(await fetch(new URL("/api/auth/password-policy", API_URL)));
 }
 
 /** Fetches the current Terms & Conditions / Privacy Policy text + required

@@ -3,6 +3,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_permission
+from app.core.password_policy import PasswordPolicyError
 from app.core.email import send_email
 from app.models.auth.user import User
 from app.models.audit.audit import AuditLog
@@ -173,6 +174,8 @@ def edit_user(
     except EmailAlreadyRegisteredError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
     except RoleNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except PasswordPolicyError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 

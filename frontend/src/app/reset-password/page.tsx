@@ -9,6 +9,7 @@ import {
   clearConsentToken,
   clearResetToken,
   getConsentToken,
+  getPasswordPolicy,
   getResetToken,
   getTermsBundle,
   resetPassword,
@@ -44,6 +45,7 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [minimumPasswordLength, setMinimumPasswordLength] = useState(12);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,10 +65,18 @@ export default function ResetPasswordPage() {
     };
   }, []);
 
+  useEffect(() => {
+    getPasswordPolicy().then((policy) => setMinimumPasswordLength(policy.min_length)).catch(() => undefined);
+  }, []);
+
   // Client-side gating is a UX nicety only — the backend validates all of
   // this again server-side regardless (see routes/auth.py's
   // reset_password()/accept_terms()).
-  const passwordOk = mode !== "reset" || (newPassword.length >= 8 && newPassword === confirmPassword);
+  const passwordOk = mode !== "reset" || (
+    newPassword.length >= minimumPasswordLength &&
+    /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) && /\d/.test(newPassword) && /[^A-Za-z0-9]/.test(newPassword) &&
+    newPassword === confirmPassword
+  );
   const canSubmit = checkboxAccepted && passwordOk && !termsLoading && !termsError && mode !== "invalid";
 
   async function handleSubmit(e: React.FormEvent) {
@@ -147,12 +157,13 @@ export default function ResetPasswordPage() {
                       id="new-password"
                       type="password"
                       required
-                      minLength={8}
+                      minLength={minimumPasswordLength}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       className="rounded-lg border border-border bg-background px-4 py-3.5 text-base text-foreground placeholder-muted-foreground shadow-inner transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      placeholder="At least 8 characters"
+                      placeholder={`At least ${minimumPasswordLength} characters`}
                     />
+                    <p className="text-xs text-muted-foreground">Use uppercase and lowercase letters, a number, and a symbol.</p>
                   </div>
 
                   <div className="flex flex-col gap-2">
@@ -166,7 +177,7 @@ export default function ResetPasswordPage() {
                       id="confirm-password"
                       type="password"
                       required
-                      minLength={8}
+                      minLength={minimumPasswordLength}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="rounded-lg border border-border bg-background px-4 py-3.5 text-base text-foreground placeholder-muted-foreground shadow-inner transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
