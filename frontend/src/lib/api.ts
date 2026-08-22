@@ -306,6 +306,28 @@ export async function getInukaCases(params: {
   return unwrap<InukaCasesResult>(res);
 }
 
+export interface InukaCaseAction {
+  id: string;
+  action: string;
+  note: string;
+  created_at: string;
+  actor_user_id?: string | null;
+}
+
+export async function getInukaCaseActions(caseId: string): Promise<InukaCaseAction[]> {
+  const res = await authFetch(new URL(`/api/inuka/cases/${encodeURIComponent(caseId)}/actions`, API_URL));
+  return (await unwrap<{ actions: InukaCaseAction[] }>(res)).actions;
+}
+
+export async function createInukaCaseAction(caseId: string, action: string, note = ""): Promise<InukaCaseAction> {
+  const res = await authFetch(new URL(`/api/inuka/cases/${encodeURIComponent(caseId)}/actions`, API_URL), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, note }),
+  });
+  return unwrap<InukaCaseAction>(res);
+}
+
 export async function getInukaPillars(): Promise<InukaDimensionSummary[]> {
   const res = await authFetch(new URL("/api/inuka/pillars", API_URL));
   return (await unwrap<{ items: InukaDimensionSummary[] }>(res)).items;

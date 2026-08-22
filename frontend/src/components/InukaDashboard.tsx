@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ApiError, getAnomalies, getInukaCases, getMetrics } from "@/lib/api";
-import type { Anomaly, InukaCaseSummary, Metrics } from "@/lib/types";
+import { ApiError, getInukaCases, getMetrics } from "@/lib/api";
+import type { InukaCaseSummary, InukaRiskCase, Metrics } from "@/lib/types";
 import StatCard from "@/components/StatCard";
+import InukaCaseModal from "@/components/InukaCaseModal";
 
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", {
@@ -29,8 +30,9 @@ const BREAK_TYPES: { key: keyof Metrics; label: string; color: string }[] = [
 
 export default function InukaDashboard() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
+  const [priorityCases, setPriorityCases] = useState<InukaRiskCase[]>([]);
   const [caseSummary, setCaseSummary] = useState<InukaCaseSummary | null>(null);
+  const [selectedCase, setSelectedCase] = useState<InukaRiskCase | null>(null);
   const [qualityScore, setQualityScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,14 +48,14 @@ export default function InukaDashboard() {
 
     Promise.all([
       getMetrics(100000, "outbound"),
-      getAnomalies(100000, 1, 8, {}, "outbound"),
+      getInukaCases({ page: 1, pageSize: 5, status: "Critical" }),
       getInukaCases({ page: 1, pageSize: 1 }),
     ])
-      .then(([metricsResult, anomalyResult, casesResult]) => {
+      .then(([metricsResult, priorityResult, casesResult]) => {
         if (cancelled) return;
         setMetrics(metricsResult.metrics);
         setQualityScore(metricsResult.data_quality.quality_score);
-        setAnomalies(anomalyResult.anomalies);
+        setPriorityCases(priorityResult.cases);
         setCaseSummary(casesResult.summary);
       })
       .catch((err: unknown) => {
@@ -91,35 +93,35 @@ export default function InukaDashboard() {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Eligible program funds" value={formatKesCompact(metrics.total_dispatched_kes)} note="Attendance-linked amount" />
-            <StatCard label="Open assurance cases" value={(caseSummary?.case_count ?? metrics.anomaly_count).toLocaleString()} note="Explainable cases to review" tone={(caseSummary?.critical_count ?? metrics.critical_count) ? "critical" : "low"} href="/dashboard/inuka/anomalies" />
+            <StatCard label="Open assurance cases" value={(caseSummary?.case_count ?? metrics.anomaly_count).toLocaleString()} note="Review by pillar" tone={(caseSummary?.critical_count ?? metrics.critical_count) ? "critical" : "low"} href="/dashboard/inuka/programs" />
             <StatCard label="Reconciliation rate" value={`${metrics.reconciliation_rate.toFixed(1)}%`} progress={metrics.reconciliation_rate} tone={metrics.reconciliation_rate >= 90 ? "low" : "medium"} />
-            <StatCard label="Funds at risk" value={formatKesCompact(caseSummary?.amount_at_risk ?? metrics.total_leakage_kes)} note={`${caseSummary?.critical_count ?? metrics.critical_count} critical cases`} tone="info" href="/dashboard/inuka/anomalies" />
+            <StatCard label="Funds at risk" value={formatKesCompact(caseSummary?.amount_at_risk ?? metrics.total_leakage_kes)} note="Compare pillar exposure" tone="info" href="/dashboard/inuka/programs" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             <section className="lg:col-span-2 bg-card border border-border rounded-xl p-5 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-sm font-bold text-foreground">Priority payout anomalies</h2>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Sorted by exposed program funds</p>
+                  <h2 className="text-sm font-bold text-foreground">Priority review queue</h2>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Critical cases requiring evidence review</p>
                 </div>
-                <Link href="/dashboard/inuka/anomalies" className="text-xs font-medium text-muted-foreground hover:text-foreground">View all</Link>
+                <Link href="/dashboard/inuka/programs" className="text-xs font-medium text-muted-foreground hover:text-foreground">View by pillar</Link>
               </div>
-              {anomalies.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic py-8 text-center">No payout anomalies match the current threshold.</p>
+              {priorityCases.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic py-8 text-center">No critical cases require review.</p>
               ) : (
                 <div className="divide-y divide-border">
-                  {anomalies.map((anomaly) => (
-                    <div key={`${anomaly.dispatch_id}-${anomaly.break_type}`} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                  {priorityCases.map((item) => (
+                    <button type="button" key={item.case_id} onClick={() => setSelectedCase(item)} className="flex w-full items-center justify-between gap-4 py-3 text-left first:pt-0 last:pb-0 hover:bg-muted/20">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{anomaly.beneficiary_id || "Unknown beneficiary"}</p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">{anomaly.break_type} · Officer {anomaly.officer_id || "unassigned"}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">{item.title}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">{item.pillar_id || "Unassigned pillar"} · {item.beneficiary_id || "Unknown beneficiary"}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-sm font-mono font-semibold text-status-critical">{formatKes(anomaly.leakage_kes)}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">{anomaly.status}</p>
+                        <p className="text-sm font-mono font-semibold text-status-critical">{formatKes(item.amount_at_risk)}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Open case</p>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -143,6 +145,7 @@ export default function InukaDashboard() {
           </div>
         </>
       )}
+      {selectedCase && <InukaCaseModal item={selectedCase} onClose={() => setSelectedCase(null)} />}
     </div>
   );
 }

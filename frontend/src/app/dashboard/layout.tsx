@@ -123,17 +123,6 @@ const INUKA_NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    href: "/dashboard/inuka/anomalies",
-    label: "Payout Anomalies",
-    anyOf: ["view_anomaly_table"],
-    badgeKey: "anomalies",
-    icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-      </svg>
-    ),
-  },
-  {
     href: "/dashboard/inuka/programs",
     label: "Pillar Risk",
     anyOf: ["view_metrics"],
@@ -274,7 +263,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   // Decorative search over anomalies/OMCs/invoices only makes sense on pages
   // that actually show that content — not the Explorer, uploads, reports,
   // e-billing, or fraud graph, and never for admin (their page is users).
-  const SEARCH_RELEVANT_PATHS = isInukaManager ? ["/dashboard", "/dashboard/inuka/anomalies"] : ["/dashboard", "/dashboard/anomalies", "/dashboard/omc-risk"];
+  const SEARCH_RELEVANT_PATHS = isInukaManager ? ["/dashboard/inuka/anomalies", "/dashboard/inuka/programs", "/dashboard/inuka/officers"] : ["/dashboard", "/dashboard/anomalies", "/dashboard/omc-risk"];
   const showSearch = !isAdmin && SEARCH_RELEVANT_PATHS.includes(pathname);
 
   return (
@@ -407,8 +396,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-1.5 shrink-0">
             {canSeeAllAlerts && (
               <Link
-                href={isInukaManager ? "/dashboard/inuka/anomalies" : "/dashboard/anomalies"}
-                title={isInukaManager ? "Critical payout anomalies" : "Critical anomalies"}
+                href={isInukaManager ? "/dashboard/inuka/programs" : "/dashboard/anomalies"}
+                title={isInukaManager ? "Critical pillar exposure" : "Critical anomalies"}
                 className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 <BellIcon />
