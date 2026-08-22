@@ -228,7 +228,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     // its nav item — a role without it would otherwise 403 on every
     // dashboard load for a badge it can't even see, on every page.
     if (user.permissions.includes("view_metrics")) {
-      getMetrics(isInukaManager ? 0 : materiality, isInukaManager ? "outbound" : "all")
+      getMetrics(isInukaManager ? 100000 : materiality, isInukaManager ? "outbound" : "all")
         .then((data) => {
           setAnomalyCount(data.metrics.anomaly_count);
           setCriticalCount(data.metrics.critical_count);

@@ -45,8 +45,8 @@ export default function InukaDashboard() {
     });
 
     Promise.all([
-      getMetrics(0, "outbound"),
-      getAnomalies(0, 1, 8, {}, "outbound"),
+      getMetrics(100000, "outbound"),
+      getAnomalies(100000, 1, 8, {}, "outbound"),
       getInukaCases({ page: 1, pageSize: 1 }),
     ])
       .then(([metricsResult, anomalyResult, casesResult]) => {
