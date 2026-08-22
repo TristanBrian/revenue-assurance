@@ -19,6 +19,18 @@ import pandas as pd
 from app.services.reconciliation.reconciliation import run_outbound_reconciliation
 from app.utils.db_connection import get_engine
 
+PILLAR_LABELS = {
+    "Scholarship": "Inuka Scholarship",
+    "Plus": "Inuka Plus",
+    "Vocational": "Vocational Training",
+    "Tech": "Inuka Tech Fellowship",
+}
+
+
+def pillar_label(value: Any) -> Optional[str]:
+    raw = _text(value)
+    return PILLAR_LABELS.get(raw or "", raw)
+
 
 def _records(table: str) -> pd.DataFrame:
     try:
@@ -41,7 +53,7 @@ def _money(value: Any) -> int:
 
 
 def _case(case_id: str, risk_type: str, title: str, reason: str, *, beneficiary_id: str | None = None,
-          officer_id: str | None = None, program_id: str | None = None, period: str | None = None,
+          officer_id: str | None = None, pillar_id: str | None = None, period: str | None = None,
           amount_at_risk: int = 0, risk_score: int = 50, severity: str = "Review Required",
           source_records: list[str] | None = None, confidence: str = "medium") -> dict[str, Any]:
     return {
@@ -51,7 +63,8 @@ def _case(case_id: str, risk_type: str, title: str, reason: str, *, beneficiary_
         "reason": reason,
         "beneficiary_id": beneficiary_id,
         "officer_id": officer_id,
-        "program_id": program_id,
+        "pillar_id": pillar_label(pillar_id),
+        "program_id": None,
         "period": period,
         "amount_at_risk": amount_at_risk,
         "risk_score": risk_score,
@@ -99,7 +112,7 @@ def build_inuka_cases(materiality: float = 0) -> dict[str, Any]:
             case_id, risk_type, title, reason,
             beneficiary_id=_text(anomaly.get("beneficiary_id")),
             officer_id=_text(anomaly.get("officer_id")),
-            program_id=_text(anomaly.get("product")) or _text(anomaly.get("customer")),
+            pillar_id=_text(anomaly.get("product")) or _text(anomaly.get("customer")),
             period=None,
             amount_at_risk=_money(anomaly.get("leakage_kes")),
             risk_score=95 if break_type in {"Ghost Payment", "Duplicate Disbursement", "Overpayment"} else 80,
@@ -115,11 +128,11 @@ def build_inuka_cases(materiality: float = 0) -> dict[str, Any]:
             beneficiary_id = _text(getattr(row, "beneficiary_id", None))
             if beneficiary_id and beneficiary_id not in beneficiary_ids:
                 case_id = f"IDENTITY-GHOST-{getattr(row, 'disbursement_id', beneficiary_id)}"
-                cases.append(_case(case_id, "ghost_beneficiary", "Ghost beneficiary", "Payment references a beneficiary absent from the verified beneficiary registry.", beneficiary_id=beneficiary_id, program_id=_text(getattr(row, "pillar_id", None)), period=_text(getattr(row, "period", None)), amount_at_risk=_money(getattr(row, "amount_paid", 0)), risk_score=98, severity="Critical", source_records=[_text(getattr(row, "disbursement_id", None))] if getattr(row, "disbursement_id", None) else [], confidence="high"))
+                cases.append(_case(case_id, "ghost_beneficiary", "Ghost beneficiary", "Payment references a beneficiary absent from the verified beneficiary registry.", beneficiary_id=beneficiary_id, pillar_id=_text(getattr(row, "pillar_id", None)), period=_text(getattr(row, "period", None)), amount_at_risk=_money(getattr(row, "amount_paid", 0)), risk_score=98, severity="Critical", source_records=[_text(getattr(row, "disbursement_id", None))] if getattr(row, "disbursement_id", None) else [], confidence="high"))
 
             if beneficiary_id and active_by_beneficiary.get(beneficiary_id) is False:
                 case_id = f"ELIGIBILITY-INACTIVE-{getattr(row, 'disbursement_id', beneficiary_id)}"
-                cases.append(_case(case_id, "inactive_beneficiary", "Inactive beneficiary paid", "A payment was made after the beneficiary was marked inactive.", beneficiary_id=beneficiary_id, program_id=_text(getattr(row, "pillar_id", None)), period=_text(getattr(row, "period", None)), amount_at_risk=_money(getattr(row, "amount_paid", 0)), risk_score=90, severity="Critical", source_records=[_text(getattr(row, "disbursement_id", None))] if getattr(row, "disbursement_id", None) else [], confidence="high"))
+                cases.append(_case(case_id, "inactive_beneficiary", "Inactive beneficiary paid", "A payment was made after the beneficiary was marked inactive.", beneficiary_id=beneficiary_id, pillar_id=_text(getattr(row, "pillar_id", None)), period=_text(getattr(row, "period", None)), amount_at_risk=_money(getattr(row, "amount_paid", 0)), risk_score=90, severity="Critical", source_records=[_text(getattr(row, "disbursement_id", None))] if getattr(row, "disbursement_id", None) else [], confidence="high"))
 
     # Shared payment accounts are retained as a supporting signal, not a
     # verdict. Legitimate guardians or household arrangements need review.
@@ -132,7 +145,7 @@ def build_inuka_cases(materiality: float = 0) -> dict[str, Any]:
             total = _money(group["amount_paid"].sum()) if "amount_paid" in group else 0
             for beneficiary_id in ids:
                 case_id = f"ACCOUNT-SHARED-{account}-{beneficiary_id}"
-                cases.append(_case(case_id, "shared_payment_account", "Shared payment account", f"{len(ids)} beneficiary records route payments to the same account; confirm household or program justification.", beneficiary_id=beneficiary_id, program_id=_text(group.iloc[0].get("pillar_id")), amount_at_risk=total, risk_score=72, severity="Review Required", source_records=group.get("disbursement_id", pd.Series(dtype=str)).astype(str).tolist(), confidence="medium"))
+                cases.append(_case(case_id, "shared_payment_account", "Shared payment account", f"{len(ids)} beneficiary records route payments to the same account; confirm household or program justification.", beneficiary_id=beneficiary_id, pillar_id=_text(group.iloc[0].get("pillar_id")), amount_at_risk=total, risk_score=72, severity="Review Required", source_records=group.get("disbursement_id", pd.Series(dtype=str)).astype(str).tolist(), confidence="medium"))
 
     # Weak or late participation evidence is surfaced separately from cash
     # leakage so managers can improve source controls without overclaiming fraud.
@@ -141,7 +154,7 @@ def build_inuka_cases(materiality: float = 0) -> dict[str, Any]:
             status = _text(getattr(row, "status", None))
             if status and status.lower() not in {"verified", "approved", "confirmed"}:
                 attendance_id = _text(getattr(row, "attendance_id", None)) or "unknown"
-                cases.append(_case(f"EVIDENCE-STATUS-{attendance_id}", "weak_participation_evidence", "Participation evidence not verified", f"Attendance status is {status}; an independent verification is required before payout.", beneficiary_id=_text(getattr(row, "beneficiary_id", None)), officer_id=_text(getattr(row, "officer_id", None)), program_id=_text(getattr(row, "pillar_id", None)), period=_text(getattr(row, "period", None)), risk_score=65, severity="Review Required", source_records=[attendance_id], confidence="low"))
+                cases.append(_case(f"EVIDENCE-STATUS-{attendance_id}", "weak_participation_evidence", "Participation evidence not verified", f"Attendance status is {status}; an independent verification is required before payout.", beneficiary_id=_text(getattr(row, "beneficiary_id", None)), officer_id=_text(getattr(row, "officer_id", None)), pillar_id=_text(getattr(row, "pillar_id", None)), period=_text(getattr(row, "period", None)), risk_score=65, severity="Review Required", source_records=[attendance_id], confidence="low"))
 
     # Deduplicate generated cases by id while preserving highest exposure.
     unique: dict[str, dict[str, Any]] = {}
@@ -188,7 +201,7 @@ def beneficiary_detail(beneficiary_id: str) -> dict[str, Any] | None:
 
 def dimension_summary(dimension: str) -> list[dict[str, Any]]:
     cases = build_inuka_cases(materiality=0)["cases"]
-    key = "program_id" if dimension == "programs" else "officer_id"
+    key = "pillar_id" if dimension == "pillars" else "officer_id"
     grouped: dict[str, dict[str, Any]] = {}
     for item in cases:
         value = item.get(key) or "Unassigned"

@@ -39,7 +39,32 @@ Inuka program assurance: program/enrollment → participation evidence → autho
 
 The Inuka manager receives an Inuka shell, terminology, routes, filters, and outbound-only server scope. Revenue screens and concepts must not be used as placeholders for Inuka data.
 
-## 4. Target eligibility and payment chain
+## 4. Inuka hierarchy
+
+The official Inuka categories are pillars, not individual programs. The four pillars are:
+
+- Inuka Scholarship
+- Inuka Plus
+- Vocational Training
+- Inuka Tech Fellowship
+
+Each pillar can contain multiple concrete programs. Each program can have multiple cohorts and training sites. The system must not present the four pillars as if they were the final program names.
+
+```text
+Inuka Foundation
+  → Pillar
+    → Program / intervention
+      → Cohort / intake
+        → Training site
+          → Beneficiary enrollment
+            → Participation evidence
+              → Authorization
+                → Disbursement
+```
+
+The current synthetic source data contains `pillar_id` values (`Scholarship`, `Plus`, `Vocational`, and `Tech`) but does not contain a trustworthy program or cohort registry. The application therefore reports current risk at pillar level and marks program/cohort fields as unavailable until source data supplies them. It must not invent program names beneath a pillar.
+
+## 5. Target eligibility and payment chain
 
 ```text
 Program → Cohort → Enrollment/KYC → Eligibility rules
@@ -50,11 +75,11 @@ Program → Cohort → Enrollment/KYC → Eligibility rules
 
 Attendance is one evidence source. It is not sufficient by itself to establish that a person is a legitimate student or that a payment is valid.
 
-## 5. Target information model
+## 6. Target information model
 
 The current tables remain compatible with the first implementation. The target model adds:
 
-- `programs`: program code, name, sponsor, active dates, stipend rules.
+- `programs`: pillar, program code, name, sponsor, active dates, stipend rules.
 - `cohorts`: program, site, start/end dates, capacity, status.
 - `beneficiary_enrollments`: beneficiary, cohort, enrollment status, approval evidence, effective dates.
 - `identity_verifications`: verification method, provider/reference, verified timestamp, confidence, reviewer.
@@ -62,9 +87,9 @@ The current tables remain compatible with the first implementation. The target m
 - `risk_cases`: explainable case, risk type, score, amount at risk, status, assignment, timestamps.
 - `risk_evidence`: one-to-many evidence items supporting a case.
 
-Existing `pillar_id` values may temporarily act as program groups, but they must not be treated as a complete program registry. New ingestion contracts should carry `program_id`, `cohort_id`, `site_id`, `transaction_reference`, `account_verification_status`, and participation evidence metadata.
+Existing `pillar_id` values are the current reporting dimension. They must not be treated as a complete program registry. New ingestion contracts should carry `pillar_id`, `program_id`, `cohort_id`, `site_id`, `transaction_reference`, `account_verification_status`, and participation evidence metadata.
 
-## 6. Control and risk requirements
+## 7. Control and risk requirements
 
 The system shall calculate independent, explainable signals including:
 
@@ -80,21 +105,21 @@ The system shall calculate independent, explainable signals including:
 
 Each case shall expose reason codes, source records, amount at risk, confidence, and a recommended review action. A risk score is triage support, not proof of fraud.
 
-## 7. User experience requirements
+## 8. User experience requirements
 
 The Inuka portal shall provide:
 
 - Control Center: eligible population, verified population, authorized/paid amounts, cases by severity, and exposure.
 - Exceptions Queue: server-side pagination, filters, sorting, evidence summaries, and a detail drawer.
 - Beneficiary 360: identity, enrollment, participation, authorizations, payments, and related cases.
-- Program/Cohort Risk: case and exposure rates by program, cohort, site, and period.
+- Pillar Risk: case and exposure rates for the four official pillars, with program, cohort, site, and period drill-downs when those records are available.
 - Officer Assurance: approval volume, anomaly rate, late-entry rate, and concentration signals.
 - Payment Controls: unmatched, duplicate, over/under, and account-concentration cases.
 - Relationship Explorer: optional secondary investigation view; not the primary dashboard.
 
 Default page size is 25, with 25/50/100 options. Filtering and pagination must happen server-side.
 
-## 8. Security and governance
+## 9. Security and governance
 
 - Inuka users are restricted server-side to outbound data.
 - Identity and payment identifiers must be masked in normal list views.
@@ -102,7 +127,7 @@ Default page size is 25, with 25/50/100 options. Filtering and pagination must h
 - Every case review, export, assignment, and status change is auditable.
 - The portal must not automatically deny benefits solely from a risk score.
 
-## 9. Delivery strategy
+## 10. Delivery strategy
 
 Phase 1 (implemented in this branch): a backward-compatible explainable risk-case service over the existing outbound tables, paginated APIs, and Inuka investigation pages.
 
@@ -112,11 +137,12 @@ Phase 3: add approved identity/payment-provider adapters and investigator feedba
 
 Phase 4: train and evaluate statistical/ML models only after sufficient labelled outcomes exist; retain rule evidence and human review.
 
-## 10. Acceptance criteria
+## 11. Acceptance criteria
 
 - An Inuka manager never sees inbound/oil concepts or data.
 - A case can be traced to source records and a human-readable reason.
 - A beneficiary can be investigated across enrollment, participation, authorization, and payment history.
+- The interface distinguishes official pillars from concrete programs and cohorts.
 - Large case sets remain responsive through server-side pagination.
 - The system distinguishes data-quality weakness from confirmed payment leakage.
 - The same shared auth, audit, alerts, and deployment platform continues to serve both domains.

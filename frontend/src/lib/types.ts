@@ -448,6 +448,7 @@ export interface InukaRiskCase {
   reason: string;
   beneficiary_id: string | null;
   officer_id: string | null;
+  pillar_id: string | null;
   program_id: string | null;
   period: string | null;
   amount_at_risk: number;

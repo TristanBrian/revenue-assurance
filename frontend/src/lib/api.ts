@@ -304,8 +304,8 @@ export async function getInukaCases(params: {
   return unwrap<InukaCasesResult>(res);
 }
 
-export async function getInukaPrograms(): Promise<InukaDimensionSummary[]> {
-  const res = await authFetch(new URL("/api/inuka/programs", API_URL));
+export async function getInukaPillars(): Promise<InukaDimensionSummary[]> {
+  const res = await authFetch(new URL("/api/inuka/pillars", API_URL));
   return (await unwrap<{ items: InukaDimensionSummary[] }>(res)).items;
 }
 

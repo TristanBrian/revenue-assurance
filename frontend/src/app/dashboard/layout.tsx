@@ -135,7 +135,7 @@ const INUKA_NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/dashboard/inuka/programs",
-    label: "Program Risk",
+    label: "Pillar Risk",
     anyOf: ["view_metrics"],
     icon: (
       <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

@@ -60,10 +60,10 @@ def inuka_beneficiary(beneficiary_id: str, user: User = Depends(require_permissi
     return detail
 
 
-@router.get("/programs")
-def inuka_programs(user: User = Depends(require_permission("view_metrics"))):
+@router.get("/pillars")
+def inuka_pillars(user: User = Depends(require_permission("view_metrics"))):
     _user(user)
-    return {"items": dimension_summary("programs")}
+    return {"items": dimension_summary("pillars"), "dimension": "pillar"}
 
 
 @router.get("/officers")
