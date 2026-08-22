@@ -21,7 +21,7 @@ We actively maintain the latest major release. Security patches are backported t
 
 If you discover a security vulnerability, **please do not open a public issue**. Instead, send a detailed report to:
 
-**Email:** `nullterminators@yopmail.com`*
+**Email:** `nullterminators@yopmail.com`
 
 We aim to respond within **48 hours** and will work with you to confirm the issue, plan a fix, and coordinate a disclosure timeline.
 
@@ -89,7 +89,7 @@ We use Dependabot (GitHub) to monitor and automatically update vulnerable depend
 
 For general security questions or to report a vulnerability:
 
-📧 **security@nullterminators.com** *(replace with your actual email)*
+📧 **nullterminators@yopmail.com** *
 
 ---
 
