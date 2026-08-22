@@ -42,13 +42,13 @@ else
 fi
 
 # ------------------------------------------------------------------
-# 3. Medallion lakehouse (always run)
+# 3. Medallion lakehouse (always run, but never break startup)
 # ------------------------------------------------------------------
 echo "🔄 Setting up medallion schema (bronze/silver/gold)..."
-python scripts/setup_medallion.py
+python scripts/setup_medallion.py || true
 
 echo "🔄 Loading master data (master schema)..."
-python scripts/load_master_data.py
+python scripts/load_master_data.py || true
 
 # ------------------------------------------------------------------
 # 4. Always run migrations and seeding
