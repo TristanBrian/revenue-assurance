@@ -21,7 +21,7 @@ We actively maintain the latest major release. Security patches are backported t
 
 If you discover a security vulnerability, **please do not open a public issue**. Instead, send a detailed report to:
 
-**Email:** `security@nullterminators.com` *(replace with your actual email)*
+**Email:** `nullterminators@yopmail.com`*
 
 We aim to respond within **48 hours** and will work with you to confirm the issue, plan a fix, and coordinate a disclosure timeline.
 
