@@ -210,6 +210,15 @@ body {
 .kpc-reports [class*="border-emerald-"],
 .kpc-reports [class*="border-cyan-"],
 .kpc-reports [class*="border-purple-"] { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)) !important; }
+.kpc-reports [class*="bg-indigo-"] { background-color: var(--status-info-bg) !important; }
+.kpc-reports [class*="text-indigo-"] { color: var(--status-info) !important; }
+.kpc-reports [class*="border-indigo-"] { border-color: color-mix(in srgb, var(--status-info) 45%, var(--border)) !important; }
+.kpc-reports [class*="bg-rose-"] { background-color: var(--status-critical-bg) !important; }
+.kpc-reports [class*="text-rose-"] { color: var(--status-critical) !important; }
+.kpc-reports [class*="border-rose-"] { border-color: color-mix(in srgb, var(--status-critical) 35%, var(--border)) !important; }
+.kpc-reports [class*="bg-amber-"] { background-color: var(--status-medium-bg) !important; }
+.kpc-reports [class*="text-amber-"] { color: var(--status-medium) !important; }
+.kpc-reports [class*="border-amber-"] { border-color: color-mix(in srgb, var(--status-medium) 35%, var(--border)) !important; }
 
 table {
   border-collapse: separate;

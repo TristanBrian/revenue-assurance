@@ -32,7 +32,7 @@ function formatKesCompact(value: number): string {
 }
 
 function ReportsContent() {
-  const { materiality, setMateriality } = useMateriality();
+  const { materiality } = useMateriality();
   const { direction } = useDirection();
   const [reportType, setReportType] = useState<ReportType>("operational");
   
@@ -83,6 +83,11 @@ function ReportsContent() {
   // Reset page when search or report type changes
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
+    setCurrentPage(1);
+  }, []);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery("");
     setCurrentPage(1);
   }, []);
 
@@ -288,34 +293,52 @@ function ReportsContent() {
       {/* Page Header */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500 uppercase tracking-widest leading-none">
-            Audit Reporting Center
+          <span className="text-[10px] font-bold uppercase tracking-widest leading-none text-primary">
+            Revenue assurance workspace
           </span>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white mt-1">
-            Revenue Assurance Reports
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+            Reports and evidence
           </h1>
-          <p className="text-xs text-zinc-550 dark:text-zinc-400 mt-0.5">
-            Audit operational drops, financial settlements, and tax declarations.
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Prepare decision-ready Oil revenue reports from reconciled records, inspect the supporting exceptions, and export an auditable file.
           </p>
         </div>
       </header>
 
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Current report</p>
+          <p className="mt-2 text-base font-bold text-foreground">{reportType === "operational" ? "Operational audit" : reportType === "financial" ? "Financial settlement" : "iCMS tax sync"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Choose a focus below to change the evidence set.</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Evidence rows</p>
+          <p className="mt-2 text-base font-bold text-foreground">{loading ? "Loading…" : totalItems.toLocaleString("en-KE")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Rows matching the active report and search.</p>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Exposure in scope</p>
+          <p className="mt-2 text-base font-bold text-status-critical">{formatKesCompact((funnelData.ghostLeak + funnelData.unpaidLeak) || 0)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Unbilled and unpaid leakage from the live reconciliation.</p>
+        </div>
+      </div>
+
 
       {/* Compliance & Governance Banner */}
-      <div className="bg-emerald-50/90 dark:bg-emerald-950/25 border border-emerald-300/80 dark:border-emerald-500/30 rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm my-2">
+      <div className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex items-center space-x-4">
-          <div className="p-3.5 bg-emerald-100 dark:bg-emerald-500/15 rounded-xl text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20 shrink-0">
+          <div className="shrink-0 rounded-xl border border-status-low/20 bg-status-low-bg p-3.5 text-status-low">
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm sm:text-base font-black text-emerald-950 dark:text-emerald-400 uppercase tracking-wide">Governance Health Metric:</span>
-              <span className="text-sm sm:text-base font-extrabold text-emerald-800 dark:text-emerald-300">98.4% Verified Active Consent & KRA PIN Coverage</span>
+              <span className="text-sm font-black uppercase tracking-wide text-foreground">Report integrity:</span>
+              <span className="text-sm font-extrabold text-status-low">Traceable export and audit history</span>
             </div>
-            <p className="text-xs sm:text-sm font-medium text-emerald-900/90 dark:text-zinc-400 mt-1.5 leading-relaxed">
-              Order-to-Cash exports are cryptographically signed with SHA-256 digests and audited under KDPA standards.
+            <p className="mt-1.5 text-xs font-medium leading-relaxed text-muted-foreground sm:text-sm">
+              Exported reports can be verified against their SHA-256 signature and linked audit provenance before they are shared.
             </p>
           </div>
         </div>
@@ -323,7 +346,7 @@ function ReportsContent() {
         <button
           type="button"
           onClick={() => setIsVerifierOpen(true)}
-          className="px-5 py-3 bg-cyan-100 hover:bg-cyan-200 text-cyan-950 border border-cyan-300 dark:bg-cyan-600/20 dark:hover:bg-cyan-600/30 dark:text-cyan-300 dark:border-cyan-500/30 rounded-xl text-sm font-bold transition flex items-center space-x-2 shrink-0 shadow-sm cursor-pointer"
+          className="flex shrink-0 items-center space-x-2 rounded-lg bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-sm transition hover:bg-primary/90"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -684,19 +707,26 @@ function ReportsContent() {
                "iCMS Tax Declaration logs"}
             </h3>
             <p className="text-xs text-zinc-500 dark:text-slate-400 mt-0.5">
-              Showing active rows exceeding KES {materiality.toLocaleString()} materiality.
+              {reportType === "icms"
+                ? "Showing e-Billing synchronization records returned by the live integration log."
+                : `Showing reconciliation exceptions at or above KES ${materiality.toLocaleString("en-KE")} materiality.`}
             </p>
           </div>
 
           {/* Search bar inside preview header */}
-          <div className="w-full md:w-64 relative">
+          <div className="relative flex w-full gap-2 md:w-80">
             <input
               type="text"
               placeholder="Search active table..."
               value={searchQuery}
               onChange={handleSearchChange}
-              className="w-full bg-zinc-50 dark:bg-slate-955/80 border border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2 text-xs text-zinc-800 dark:text-slate-200 placeholder-zinc-400 focus:outline-none transition-all shadow-inner font-medium"
+              className="w-full rounded-lg border border-border bg-background px-3.5 py-2 text-xs font-medium text-foreground shadow-inner outline-none transition-all placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15"
             />
+            {searchQuery && (
+              <button type="button" onClick={handleClearSearch} className="rounded-lg border border-border px-3 text-xs font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground">
+                Clear
+              </button>
+            )}
           </div>
         </div>
 
