@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ApiError, getAnomalies, getMetrics } from "@/lib/api";
-import type { Anomaly, Metrics } from "@/lib/types";
+import { ApiError, getAnomalies, getInukaCases, getMetrics } from "@/lib/api";
+import type { Anomaly, InukaCaseSummary, Metrics } from "@/lib/types";
 import { useMateriality } from "@/context/MaterialityContext";
 import StatCard from "@/components/StatCard";
 
@@ -32,6 +32,7 @@ export default function InukaDashboard() {
   const { materiality, setMateriality } = useMateriality();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
+  const [caseSummary, setCaseSummary] = useState<InukaCaseSummary | null>(null);
   const [qualityScore, setQualityScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,12 +49,14 @@ export default function InukaDashboard() {
     Promise.all([
       getMetrics(materiality, "outbound"),
       getAnomalies(materiality, 1, 8, {}, "outbound"),
+      getInukaCases({ page: 1, pageSize: 1 }),
     ])
-      .then(([metricsResult, anomalyResult]) => {
+      .then(([metricsResult, anomalyResult, casesResult]) => {
         if (cancelled) return;
         setMetrics(metricsResult.metrics);
         setQualityScore(metricsResult.data_quality.quality_score);
         setAnomalies(anomalyResult.anomalies);
+        setCaseSummary(casesResult.summary);
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -103,9 +106,9 @@ export default function InukaDashboard() {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Eligible program funds" value={formatKesCompact(metrics.total_dispatched_kes)} note="Attendance-linked amount" />
-            <StatCard label="Critical payout anomalies" value={metrics.critical_count.toLocaleString()} note="Needs immediate review" tone={metrics.critical_count ? "critical" : "low"} href="/dashboard/inuka/anomalies" />
+            <StatCard label="Open assurance cases" value={(caseSummary?.case_count ?? metrics.anomaly_count).toLocaleString()} note="Explainable cases to review" tone={(caseSummary?.critical_count ?? metrics.critical_count) ? "critical" : "low"} href="/dashboard/inuka/anomalies" />
             <StatCard label="Reconciliation rate" value={`${metrics.reconciliation_rate.toFixed(1)}%`} progress={metrics.reconciliation_rate} tone={metrics.reconciliation_rate >= 90 ? "low" : "medium"} />
-            <StatCard label="Disbursed funds" value={formatKesCompact(metrics.total_paid_kes)} note="Verified payout records" tone="info" />
+            <StatCard label="Funds at risk" value={formatKesCompact(caseSummary?.amount_at_risk ?? metrics.total_leakage_kes)} note={`${caseSummary?.critical_count ?? metrics.critical_count} critical cases`} tone="info" href="/dashboard/inuka/anomalies" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">

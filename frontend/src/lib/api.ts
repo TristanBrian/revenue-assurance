@@ -17,6 +17,10 @@ import type {
   HeatmapData,
   LoginResponse,
   MetricsResult,
+  InukaCasesResult,
+  InukaCaseSummary,
+  InukaDimensionSummary,
+  InukaBeneficiaryDetail,
   OmcRiskProfile,
   OmcRiskProfileResult,
   ReconcileResult,
@@ -270,6 +274,49 @@ export async function getAnomalies(
   if (filters.search) url.searchParams.set("search", filters.search);
   const res = await authFetch(url);
   return unwrap<AnomalyTableResult>(res);
+}
+
+export async function getInukaSummary(): Promise<InukaCaseSummary> {
+  const res = await authFetch(new URL("/api/inuka/summary", API_URL));
+  return unwrap<InukaCaseSummary>(res);
+}
+
+export async function getInukaCases(params: {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  riskType?: string;
+  programId?: string;
+  officerId?: string;
+  period?: string;
+  search?: string;
+} = {}): Promise<InukaCasesResult> {
+  const url = new URL("/api/inuka/cases", API_URL);
+  url.searchParams.set("page", String(params.page ?? 1));
+  url.searchParams.set("page_size", String(params.pageSize ?? 25));
+  if (params.status) url.searchParams.set("status", params.status);
+  if (params.riskType) url.searchParams.set("risk_type", params.riskType);
+  if (params.programId) url.searchParams.set("program_id", params.programId);
+  if (params.officerId) url.searchParams.set("officer_id", params.officerId);
+  if (params.period) url.searchParams.set("period", params.period);
+  if (params.search) url.searchParams.set("search", params.search);
+  const res = await authFetch(url);
+  return unwrap<InukaCasesResult>(res);
+}
+
+export async function getInukaPrograms(): Promise<InukaDimensionSummary[]> {
+  const res = await authFetch(new URL("/api/inuka/programs", API_URL));
+  return (await unwrap<{ items: InukaDimensionSummary[] }>(res)).items;
+}
+
+export async function getInukaOfficers(): Promise<InukaDimensionSummary[]> {
+  const res = await authFetch(new URL("/api/inuka/officers", API_URL));
+  return (await unwrap<{ items: InukaDimensionSummary[] }>(res)).items;
+}
+
+export async function getInukaBeneficiary(beneficiaryId: string): Promise<InukaBeneficiaryDetail> {
+  const res = await authFetch(new URL(`/api/inuka/beneficiaries/${encodeURIComponent(beneficiaryId)}`, API_URL));
+  return unwrap<InukaBeneficiaryDetail>(res);
 }
 
 export async function getOmcRiskProfile(materiality = 100000, direction: Direction = "all"): Promise<OmcRiskProfile[]> {
@@ -613,5 +660,3 @@ export async function getRecordHistory(targetType: string, targetId: string): Pr
   const res = await authFetch(new URL(`/api/audit/history/${targetType}/${targetId}`, API_URL));
   return unwrap(res);
 }
-
-

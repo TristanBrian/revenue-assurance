@@ -9,6 +9,7 @@ from app.routes.auth import auth, admin
 from app.routes.fraud import detective, graph, scoring
 from app.routes.audit import audit
 from app.routes.alerts import alerts
+from app.routes import inuka
 from app.routes import report_verify
 from app.routes import alerts
 # from app.routes import chatbot
@@ -92,6 +93,7 @@ app.include_router(scoring.router, prefix="/api/fraud", tags=["Fraud Scoring"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
 app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])  # <-- NEW
+app.include_router(inuka.router, prefix="/api/inuka", tags=["Inuka Assurance"])
 app.include_router(report_verify.router, prefix="/api/reports", tags=["Report Verification"])
 # app.include_router(chatbot.router, prefix="/api", tags=["Chatbot"])
 

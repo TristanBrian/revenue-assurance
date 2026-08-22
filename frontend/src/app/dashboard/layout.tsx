@@ -134,6 +134,26 @@ const INUKA_NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    href: "/dashboard/inuka/programs",
+    label: "Program Risk",
+    anyOf: ["view_metrics"],
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 5h16M4 12h16M4 19h16M8 5v14" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/inuka/officers",
+    label: "Officer Assurance",
+    anyOf: ["view_metrics"],
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m7-10a4 4 0 100-8 4 4 0 000 8zm7-3a4 4 0 010 8m4 5v-2a4 4 0 00-3-3.87" />
+      </svg>
+    ),
+  },
+  {
     href: "/dashboard/fraud",
     label: "Beneficiary Network",
     anyOf: ["view_fraud_graph"],

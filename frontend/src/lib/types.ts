@@ -441,6 +441,50 @@ export const ROLE_NAMES = [
 ] as const;
 export type RoleName = (typeof ROLE_NAMES)[number];
 
+export interface InukaRiskCase {
+  case_id: string;
+  risk_type: string;
+  title: string;
+  reason: string;
+  beneficiary_id: string | null;
+  officer_id: string | null;
+  program_id: string | null;
+  period: string | null;
+  amount_at_risk: number;
+  risk_score: number;
+  severity: string;
+  status: string;
+  confidence: string;
+  source_records: string[];
+}
+
+export interface InukaCaseSummary {
+  case_count: number;
+  critical_count: number;
+  review_count: number;
+  amount_at_risk: number;
+  by_type: Record<string, number>;
+  generated_at: string;
+}
+
+export interface InukaCasesResult {
+  cases: InukaRiskCase[];
+  pagination: Pagination;
+  summary: InukaCaseSummary;
+}
+
+export interface InukaDimensionSummary {
+  id: string;
+  case_count: number;
+  critical_count: number;
+  amount_at_risk: number;
+}
+
+export interface InukaBeneficiaryDetail {
+  beneficiary_id: string;
+  [key: string]: unknown;
+}
+
 // Mirrors backend/app/schemas/feed.py.
 export interface FeedData {
   anomalies: Anomaly[];
