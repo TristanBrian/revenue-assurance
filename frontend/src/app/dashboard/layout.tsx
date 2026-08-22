@@ -112,6 +112,39 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+const INUKA_NAV_ITEMS: NavItem[] = [
+  {
+    href: "/dashboard",
+    label: "Control Center",
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 13h6V4H4v9zm0 7h6v-3H4v3zm10 0h6v-9h-6v9zm0-16v3h6V4h-6z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/inuka/anomalies",
+    label: "Payout Anomalies",
+    anyOf: ["view_anomaly_table"],
+    badgeKey: "anomalies",
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/fraud",
+    label: "Beneficiary Network",
+    anyOf: ["view_fraud_graph"],
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="12" cy="18" r="2.5" /><path strokeLinecap="round" d="M8.2 7.2L10 15M15.8 7.2L14 15M8.5 6h7" />
+      </svg>
+    ),
+  },
+];
+
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", {
     style: "currency",
@@ -152,6 +185,22 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const isInukaManager = user?.roles.includes("inuka_manager") ?? false;
+
+  useEffect(() => {
+    if (!isInukaManager) return;
+    const revenueOnlyPaths = [
+      "/dashboard/upload",
+      "/dashboard/anomalies",
+      "/dashboard/heatmap",
+      "/dashboard/omc-risk",
+      "/dashboard/ebilling",
+      "/dashboard/reports",
+    ];
+    if (revenueOnlyPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
+      router.replace("/dashboard");
+    }
+  }, [isInukaManager, pathname, router]);
 
   const [anomalyCount, setAnomalyCount] = useState<number>(0);
   const [criticalCount, setCriticalCount] = useState<number>(0);
@@ -168,7 +217,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     // its nav item — a role without it would otherwise 403 on every
     // dashboard load for a badge it can't even see, on every page.
     if (user.permissions.includes("view_metrics")) {
-      getMetrics(materiality)
+      getMetrics(materiality, isInukaManager ? "outbound" : "all")
         .then((data) => {
           setAnomalyCount(data.metrics.anomaly_count);
           setCriticalCount(data.metrics.critical_count);
@@ -176,7 +225,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         .catch(() => {});
     }
 
-    if (user.permissions.includes("view_omc_risk_profile")) {
+    if (!isInukaManager && user.permissions.includes("view_omc_risk_profile")) {
       getOmcRiskProfile(materiality)
         .then((profiles) => {
           setHighRiskCount(profiles.filter((p) => p.risk_level === "High").length);
@@ -184,7 +233,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         .catch(() => {});
     }
 
-    if (user.permissions.includes("manage_ebilling")) {
+    if (!isInukaManager && user.permissions.includes("manage_ebilling")) {
       getEbillingStatus()
         .then((status) => setFailedSyncCount(status.failed_count))
         .catch(() => {});
@@ -193,19 +242,19 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     // Depot Supervisor's alert bell: their own depot only, from a server
     // endpoint that ignores any client-supplied depot — not the global
     // view_metrics critical_count above, which is unscoped across every depot.
-    if (user.permissions.includes("view_depot_alerts")) {
+    if (!isInukaManager && user.permissions.includes("view_depot_alerts")) {
       getDepotAlerts()
         .then((data) => setDepotAlerts({ depotId: data.depot_id, criticalCount: data.critical_count, items: data.items }))
         .catch(() => {});
     }
-  }, [user, materiality]);
+  }, [user, materiality, isInukaManager]);
 
   function handleLogout() {
     logout();
     router.push("/login");
   }
 
-  const visibleItems = NAV_ITEMS.filter(
+  const visibleItems = (isInukaManager ? INUKA_NAV_ITEMS : NAV_ITEMS).filter(
     (item) => !item.anyOf || item.anyOf.some((code) => user?.permissions.includes(code)),
   );
   const canSeeAllAlerts = user?.permissions.includes("view_anomaly_table") ?? false;
@@ -214,7 +263,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   // Decorative search over anomalies/OMCs/invoices only makes sense on pages
   // that actually show that content — not the Explorer, uploads, reports,
   // e-billing, or fraud graph, and never for admin (their page is users).
-  const SEARCH_RELEVANT_PATHS = ["/dashboard", "/dashboard/anomalies", "/dashboard/omc-risk"];
+  const SEARCH_RELEVANT_PATHS = isInukaManager ? ["/dashboard", "/dashboard/inuka/anomalies"] : ["/dashboard", "/dashboard/anomalies", "/dashboard/omc-risk"];
   const showSearch = !isAdmin && SEARCH_RELEVANT_PATHS.includes(pathname);
 
   return (
@@ -248,7 +297,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               {BRAND_CONFIG.companyName}
             </p>
             <p className="text-[10px] text-sidebar-muted-foreground leading-none mt-1 truncate">
-              {BRAND_CONFIG.systemName}
+              {isInukaManager ? "Inuka Program Assurance" : BRAND_CONFIG.systemName}
             </p>
           </div>
         </div>
@@ -337,7 +386,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z" />
                 </svg>
-                <span className="truncate">Search anomalies, OMCs, invoices…</span>
+                <span className="truncate">{isInukaManager ? "Search beneficiaries, officers, payouts…" : "Search anomalies, OMCs, invoices…"}</span>
               </div>
             </div>
           ) : (
@@ -347,8 +396,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-1.5 shrink-0">
             {canSeeAllAlerts && (
               <Link
-                href="/dashboard/anomalies"
-                title="Critical anomalies"
+                href={isInukaManager ? "/dashboard/inuka/anomalies" : "/dashboard/anomalies"}
+                title={isInukaManager ? "Critical payout anomalies" : "Critical anomalies"}
                 className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 <BellIcon />
