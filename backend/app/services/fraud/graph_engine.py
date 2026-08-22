@@ -80,11 +80,21 @@ def build_fraud_graph_from_dataframes(anomalies_df: pd.DataFrame, dispatches_df:
     if not required_disp_cols.issubset(dispatches_df.columns):
         return _empty_graph_result()
 
+    # Reconciliation anomaly rows may already carry depot metadata. Use an
+    # explicit suffix for the dispatch-side copy so the two sources do not
+    # become depot_x/depot_y and leave the graph builder without the plain
+    # depot column it expects below.
     merged = anomalies_df.merge(
         dispatches_df[['dispatch_id', 'omc_id', 'depot']],
         on='dispatch_id',
-        how='left'
+        how='left',
+        suffixes=('', '_dispatch'),
     )
+    if 'depot_dispatch' in merged.columns:
+        if 'depot' in merged.columns:
+            merged['depot'] = merged['depot'].combine_first(merged['depot_dispatch'])
+        else:
+            merged = merged.rename(columns={'depot_dispatch': 'depot'})
     merged = merged.dropna(subset=['omc_id', 'depot'])
 
     if merged.empty:
