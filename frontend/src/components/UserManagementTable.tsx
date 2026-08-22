@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ApiError, createUser, deleteUser, getUsers, updateUser } from "@/lib/api";
-import type { AdminUser, RoleName } from "@/lib/types";
+import { ApiError, createUser, deleteUser, getAdminSecurityEvents, getUsers, resendTempPassword, updateUser } from "@/lib/api";
+import type { AdminSecurityEvent, AdminUser, RoleName } from "@/lib/types";
 import { ROLE_NAMES } from "@/lib/types";
 
 function roleLabel(role: string): string {
@@ -32,6 +32,14 @@ const ROLE_TONE: Record<string, { avatar: string; badge: string }> = {
   depot_supervisor: { avatar: "bg-status-medium-bg text-status-medium", badge: "bg-status-medium-bg text-status-medium" },
 };
 const FALLBACK_TONE = { avatar: "bg-muted text-muted-foreground", badge: "bg-muted text-muted-foreground" };
+
+const ROLE_DESCRIPTIONS: Record<string, { domain: string; access: string; action: string }> = {
+  system_admin: { domain: "Platform administration", access: "Users, roles, security events", action: "Provision, disable, reset, and manage access" },
+  manager: { domain: "Oil Revenue + Inuka Programs", access: "Executive metrics, cases, reports, alerts", action: "Oversight and escalation" },
+  revenue_assurance: { domain: "Oil Revenue + Inuka Programs", access: "Cases, fraud intelligence, reports, e-billing", action: "Investigate and resolve Oil cases" },
+  depot_supervisor: { domain: "Oil Revenue", access: "Live feed and assigned depot metrics", action: "Monitor assigned depot" },
+  inuka_manager: { domain: "Inuka Programs", access: "Pillars, beneficiaries, payments, cases", action: "Review, request evidence, and escalate" },
+};
 
 interface UserFormState {
   email: string;
@@ -70,6 +78,7 @@ export default function UserManagementTable() {
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"All" | RoleName>("All");
+  const [previewRole, setPreviewRole] = useState<RoleName>("system_admin");
   const [statusFilter, setStatusFilter] = useState<"All" | "Active" | "Disabled">("All");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -82,6 +91,9 @@ export default function UserManagementTable() {
   const [editForm, setEditForm] = useState<{ role_name: RoleName; is_active: boolean; password: string } | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [rowError, setRowError] = useState<Record<string, string>>({});
+  const [securityEvents, setSecurityEvents] = useState<AdminSecurityEvent[]>([]);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -91,12 +103,19 @@ export default function UserManagementTable() {
     setLoading(true);
     setError(null);
     getUsers()
-      .then((data) => {
-        if (!cancelled) setUsers(data);
+      .then((userData) => {
+        if (!cancelled) setUsers(userData);
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(err instanceof ApiError ? err.message : "Could not load users.");
+        if (!cancelled) setError(err instanceof ApiError ? err.message : "Could not load users.");
+      });
+    getAdminSecurityEvents(1, 8)
+      .then((securityData) => {
+        if (!cancelled) setSecurityEvents(securityData.items);
+      })
+      .catch(() => {
+        // Security monitoring is additive; a missing/older endpoint must not hide user management.
+        if (!cancelled) setSecurityEvents([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -195,6 +214,19 @@ export default function UserManagementTable() {
     }
   }
 
+  async function handleResendTempPassword(user: AdminUser) {
+    setResendingId(user.id);
+    setRowError((current) => ({ ...current, [user.id]: "" }));
+    try {
+      await resendTempPassword(user.id);
+      refresh();
+    } catch (err) {
+      setRowError((current) => ({ ...current, [user.id]: err instanceof ApiError ? err.message : "Could not initiate password reset." }));
+    } finally {
+      setResendingId(null);
+    }
+  }
+
   async function handleDelete(userId: string) {
     setDeletingId(userId);
     setRowError((r) => ({ ...r, [userId]: "" }));
@@ -209,6 +241,11 @@ export default function UserManagementTable() {
       setDeletingId(null);
     }
   }
+
+  const activeCount = users.filter((u) => u.is_active).length;
+  const pendingCount = users.filter((u) => u.account_status === "Invited / Pending first login").length;
+  const resetCount = users.filter((u) => u.account_status === "Reset Required").length;
+  const roleCount = new Set(users.flatMap((u) => u.roles)).size;
 
   return (
     <div className="flex flex-col gap-5">
@@ -255,6 +292,30 @@ export default function UserManagementTable() {
             Add User
           </button>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          ["Active accounts", activeCount.toString(), "text-status-low"],
+          ["Pending first login", pendingCount.toString(), "text-status-medium"],
+          ["Reset required", resetCount.toString(), "text-status-critical"],
+          ["Roles in use", roleCount.toString(), "text-status-info"],
+        ].map(([label, value, tone]) => (
+          <div key={label} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+            <p className={`mt-1 text-2xl font-bold ${tone}`}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Access governance</p><h2 className="mt-1 text-sm font-bold text-foreground">Role permissions preview</h2><p className="mt-1 text-xs text-muted-foreground">Select a role to see its operational boundary before assigning it.</p></div>
+          <select value={previewRole} onChange={(e) => setPreviewRole(e.target.value as RoleName)} className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground">
+            {ROLE_NAMES.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}
+          </select>
+        </div>
+        {(() => { const detail = ROLE_DESCRIPTIONS[previewRole]; return <div className="mt-3 grid gap-3 text-xs sm:grid-cols-3"><div><p className="text-muted-foreground">Domain</p><p className="mt-1 font-semibold text-foreground">{detail.domain}</p></div><div><p className="text-muted-foreground">Can access</p><p className="mt-1 font-semibold text-foreground">{detail.access}</p></div><div><p className="text-muted-foreground">Can act</p><p className="mt-1 font-semibold text-foreground">{detail.action}</p></div></div>; })()}
       </div>
 
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
@@ -333,7 +394,7 @@ export default function UserManagementTable() {
                         />
                       </td>
                       <td className="px-2 py-3.5">
-                        <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setSelectedUser(u)} className="flex items-center gap-3 text-left">
                           <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${tone.avatar}`}>
                             {initials(u)}
                           </div>
@@ -341,7 +402,7 @@ export default function UserManagementTable() {
                             <p className="truncate font-semibold text-foreground">{u.full_name || u.email}</p>
                             <p className="truncate text-[11px] text-muted-foreground">{u.email}</p>
                           </div>
-                        </div>
+                        </button>
                       </td>
                       <td className="px-4 py-3.5">
                         {isEditing ? (
@@ -414,6 +475,14 @@ export default function UserManagementTable() {
                         ) : (
                           <div className="flex justify-end gap-2">
                             <button
+                              type="button"
+                              onClick={() => handleResendTempPassword(u)}
+                              disabled={resendingId === u.id}
+                              className="rounded-md border border-status-medium/30 px-2.5 py-1 text-[11px] font-semibold text-status-medium transition-colors hover:bg-status-medium-bg disabled:opacity-40"
+                            >
+                              {resendingId === u.id ? "Sending…" : "Force reset"}
+                            </button>
+                            <button
                               onClick={() => startEdit(u)}
                               className="rounded-md border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground/90 transition-colors hover:bg-accent"
                             >
@@ -461,6 +530,18 @@ export default function UserManagementTable() {
           </div>
         </div>
       )}
+
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Security monitoring</p><h2 className="mt-1 text-sm font-bold text-foreground">Recent account events</h2><p className="mt-1 text-xs text-muted-foreground">Provisioning, password, role, and login events only. Operational Oil and Inuka records remain outside the admin view.</p></div>
+          <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-semibold text-muted-foreground">{securityEvents.length} recent</span>
+        </div>
+        <div className="mt-4 divide-y divide-border">
+          {securityEvents.length === 0 ? <p className="py-5 text-sm text-muted-foreground">No security events recorded yet.</p> : securityEvents.map((event) => <div key={event.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-xs"><div><span className="font-semibold text-foreground">{event.action.replaceAll(".", " ")}</span><span className="ml-2 text-muted-foreground">{event.target_type || "system"}{event.target_id ? ` · ${event.target_id}` : ""}</span></div><span className="text-muted-foreground">{formatDate(event.created_at)}</span></div>)}
+        </div>
+      </section>
+
+      {selectedUser && (() => { const role = selectedUser.roles[0] ?? ""; const detail = ROLE_DESCRIPTIONS[role] ?? ROLE_DESCRIPTIONS.system_admin; return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" onClick={() => setSelectedUser(null)}><div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Account details</p><h2 className="mt-1 text-xl font-bold text-foreground">{selectedUser.full_name || selectedUser.email}</h2><p className="mt-1 text-sm text-muted-foreground">{selectedUser.email}</p></div><button type="button" onClick={() => setSelectedUser(null)} className="text-xl text-muted-foreground">×</button></div><div className="mt-5 grid grid-cols-2 gap-3 text-sm"><div><p className="text-[10px] uppercase text-muted-foreground">Status</p><p className="mt-1 font-semibold text-foreground">{selectedUser.account_status}</p></div><div><p className="text-[10px] uppercase text-muted-foreground">Joined</p><p className="mt-1 font-semibold text-foreground">{formatDate(selectedUser.created_at)}</p></div><div><p className="text-[10px] uppercase text-muted-foreground">Domain</p><p className="mt-1 font-semibold text-foreground">{detail.domain}</p></div><div><p className="text-[10px] uppercase text-muted-foreground">Role</p><p className="mt-1 font-semibold capitalize text-foreground">{roleLabel(role)}</p></div></div><div className="mt-5 border-t border-border pt-4"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Permissions</p><div className="mt-2 flex flex-wrap gap-2">{selectedUser.permissions.map((permission) => <span key={permission} className="rounded-full bg-muted px-2 py-1 font-mono text-[10px] text-muted-foreground">{permission}</span>)}</div></div><div className="mt-5 flex justify-end"><button type="button" onClick={() => setSelectedUser(null)} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Close</button></div></div></div>; })()}
 
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">

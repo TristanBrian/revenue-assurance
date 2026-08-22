@@ -415,6 +415,16 @@ export interface AdminUser {
   account_status: "Invited / Pending first login" | "Reset Required" | "Active";
 }
 
+export interface AdminSecurityEvent {
+  id: string;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  actor_user_id: string | null;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+}
+
 // POST /api/admin/users — admin-provisioned, no password field: the
 // backend generates a random temp password and emails it.
 export interface CreateUserPayload {

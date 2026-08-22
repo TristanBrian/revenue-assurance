@@ -1,6 +1,7 @@
 import type {
   AcceptTermsResponse,
   AdminUser,
+  AdminSecurityEvent,
   AnomalyTableResult,
   AuthUser,
   CreateUserPayload,
@@ -603,6 +604,13 @@ export async function sendEbillingWebhook(payload: {
 export async function getUsers(): Promise<AdminUser[]> {
   const res = await authFetch(new URL("/api/admin/users", API_URL));
   return unwrap<AdminUser[]>(res);
+}
+
+export async function getAdminSecurityEvents(page = 1, pageSize = 25): Promise<{ items: AdminSecurityEvent[]; total: number }> {
+  const url = new URL("/api/admin/security-events", API_URL);
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("page_size", String(pageSize));
+  return unwrap<{ items: AdminSecurityEvent[]; total: number }>(await authFetch(url));
 }
 
 /** Admin-provisioned user — no password field. The backend generates a
