@@ -5,19 +5,16 @@ echo "🚀 KPC Revenue Assurance - Startup Script"
 echo "🔍 Environment: $ENVIRONMENT"
 echo "📁 Current directory: $(pwd)"
 
-# Move to backend root
 cd "$(dirname "$0")/.." || exit 1
 echo "📁 Changed to backend root: $(pwd)"
 
-# Ensure data directories exist
 mkdir -p data/raw data/clean logs
 
 # ------------------------------------------------------------------
 # 1. Check if PostgreSQL data already exists
 # ------------------------------------------------------------------
-RUN_ETL=1  # default: run ETL
+RUN_ETL=1
 
-# Accept postgres://, postgresql://, and dialect URLs like postgresql+psycopg2://
 is_postgres_url() {
     case "$1" in
         postgres://*|postgresql://*|postgresql+*) return 0 ;;
@@ -27,13 +24,9 @@ is_postgres_url() {
 
 if [ -n "$DATABASE_URL" ] && is_postgres_url "$DATABASE_URL"; then
     echo "✅ PostgreSQL detected (DATABASE_URL set)"
-
-    # Check if 'dispatches' table has any rows
     DATA_EXISTS=$(python3 -c "
-import os
-import sys
+import os, sys
 from sqlalchemy import create_engine, text
-
 try:
     engine = create_engine(os.environ['DATABASE_URL'])
     with engine.connect() as conn:
@@ -63,12 +56,14 @@ fi
 # 2. Run data generation & ETL only if needed
 # ------------------------------------------------------------------
 if [ "$RUN_ETL" -eq 1 ]; then
-    # Generate CSVs if missing
     if [ -f "data/raw/dispatches.csv" ] && [ -f "data/raw/invoices.csv" ] && [ -f "data/raw/payments.csv" ]; then
         echo "✅ CSVs already exist – skipping generation."
     else
         echo "📊 Generating fresh synthetic data..."
         python scripts/generate_kpc_data.py
+        # Copy generated CSVs to ETL expected location
+        mkdir -p data/raw
+        cp scripts/data/raw/* data/raw/ 2>/dev/null || true
     fi
 
     echo "🔄 Running ETL pipeline..."
@@ -78,14 +73,7 @@ else
 fi
 
 # ------------------------------------------------------------------
-# 2b. Medallion lakehouse foundation (bronze/silver/gold) — always run.
-# Parallel to the main app's data path above, not a replacement for it:
-# the running API still reads the plain public-schema tables ETL just
-# loaded. This only creates the bronze/silver/gold schemas and loads
-# static/historical CSVs into a separate 'master' schema; nothing reads
-# from either yet. Both scripts no-op cleanly if DATABASE_URL isn't
-# Postgres. live_kpc_stream.py (continuous bronze->silver->gold feed) is
-# deliberately NOT run here — still a manual/separate step for now.
+# 2b. Medallion lakehouse
 # ------------------------------------------------------------------
 echo "🔄 Setting up medallion schema (bronze/silver/gold)..."
 python scripts/setup_medallion.py
@@ -94,7 +82,7 @@ echo "🔄 Loading master data (master schema)..."
 python scripts/load_master_data.py
 
 # ------------------------------------------------------------------
-# 3. Always run migrations and seeding (idempotent)
+# 3. Always run migrations and seeding
 # ------------------------------------------------------------------
 echo "🔄 Running Alembic migrations..."
 alembic upgrade head
