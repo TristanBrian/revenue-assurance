@@ -32,6 +32,8 @@ jobs:
       - name: Generate synthetic data + run ETL
         run: |
           python scripts/generate_kpc_data.py
+          mkdir -p data/raw
+          cp scripts/data/raw/* data/raw/ || true
           python scripts/etl_pipeline.py
 
       - name: Run tests
