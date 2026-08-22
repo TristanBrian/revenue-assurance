@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.dependencies import get_db, require_permission
-from app.models.user import User
-from app.models.audit import AuditLog
+from app.models.auth.user import User
+from app.models.audit.audit import AuditLog
 from app.services.report_crypto import verify_report_bytes, sign_report_bytes
-from app.services.audit_service import log_action
+from app.services.audit.audit_service import log_action
 
 router = APIRouter()
 
