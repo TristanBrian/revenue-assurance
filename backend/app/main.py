@@ -9,7 +9,8 @@ from app.routes.auth import auth, admin
 from app.routes.fraud import detective, graph
 from app.routes.audit import audit
 from app.routes import report_verify
-
+from app.routes import alerts
+from app.routes import chatbot
 
 # import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
@@ -74,17 +75,18 @@ app.add_middleware(
 # root()'s "endpoints" list below: Auth first (everything else needs a
 # token), then Live Feed, Reconciliation, Heatmap, E-Billing, Graph,
 # Detective (risk analytics), Admin, Audit.
-app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])  # <-- ADDED auth router
-app.include_router(feed.router, prefix="/api", tags=["Live Feed"])      # <-- NEW
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
 app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
-app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
+app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])
 app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
-app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])  # <-- NEW
-app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
-app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
-app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])  # <-- NEW
+app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
+app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
+app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])  # Now defined
 app.include_router(report_verify.router, prefix="/api/reports", tags=["Report Verification"])
+app.include_router(chatbot.router, prefix="/api", tags=["Chatbot"])
 
 # Envelope and audit middlewares
 app.add_middleware(ResponseEnvelopeMiddleware)
