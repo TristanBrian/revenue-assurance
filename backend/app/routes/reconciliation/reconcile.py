@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from app.core.dependencies import get_db, require_permission
+from app.core.dependencies import get_db, require_permission, enforce_reconciliation_scope
 from app.models.auth.user import User
 from app.services.reconciliation.reconciliation import (
     run_reconciliation,
@@ -153,8 +153,9 @@ def reconcile_metrics(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     direction: str = Query("all", description="inbound | outbound | all — defaults to all"),
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("view_metrics")),
+    user: User = Depends(require_permission("view_metrics")),
 ):
+    enforce_reconciliation_scope(user, direction)
     try:
         cache_key = f"metrics_{materiality}_{direction}"
         cached = get_cached_result(cache_key)
@@ -229,12 +230,13 @@ def reconcile_anomalies(
     break_type: Optional[str] = Query(None, description="Filter by break type (e.g. Overpayment, Underpayment, Missing Invoice, Missing Payment)"),
     status: Optional[str] = Query(None, description="Filter by status (e.g. Critical, Pending, Review Required, Reconciled)"),
     search: Optional[str] = Query(None, description="Search across OMC, dispatch ID, product, invoice ID"),
-    _: User = Depends(require_permission("view_anomaly_table")),
+    user: User = Depends(require_permission("view_anomaly_table")),
 ):
     """
     Anomaly Table feature: paginated raw anomaly rows with filtering.
     Uses cached reconciliation data to avoid re-running full reconciliation.
     """
+    enforce_reconciliation_scope(user, direction)
     try:
         cache_key = f"metrics_{materiality}_{direction}"
         cached = get_cached_result(cache_key)
@@ -311,8 +313,9 @@ def reconcile_anomalies(
 def reconcile_omc_risk_profile(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     direction: str = Query("all", description="inbound | outbound | all — defaults to all"),
-    _: User = Depends(require_permission("view_omc_risk_profile")),
+    user: User = Depends(require_permission("view_omc_risk_profile")),
 ):
+    enforce_reconciliation_scope(user, direction)
     try:
         cache_key = f"metrics_{materiality}_{direction}"
         cached = get_cached_result(cache_key)
@@ -577,6 +580,7 @@ def export_report(
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("export_reports")),
 ):
+    enforce_reconciliation_scope(user, direction)
     try:
         result = run_combined_reconciliation(direction=direction, materiality=materiality)
 

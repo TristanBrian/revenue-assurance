@@ -415,6 +415,25 @@ export interface AdminUser {
   account_status: "Invited / Pending first login" | "Reset Required" | "Active";
 }
 
+export interface AdminSecurityEvent {
+  id: string;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  actor_user_id: string | null;
+  created_at: string;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface PasswordPolicy {
+  min_length: number;
+  requires_uppercase: boolean;
+  requires_lowercase: boolean;
+  requires_number: boolean;
+  requires_symbol: boolean;
+  rejects_identity_fragment: boolean;
+}
+
 // POST /api/admin/users — admin-provisioned, no password field: the
 // backend generates a random temp password and emails it.
 export interface CreateUserPayload {
@@ -440,6 +459,51 @@ export const ROLE_NAMES = [
   "system_admin",
 ] as const;
 export type RoleName = (typeof ROLE_NAMES)[number];
+
+export interface InukaRiskCase {
+  case_id: string;
+  risk_type: string;
+  title: string;
+  reason: string;
+  beneficiary_id: string | null;
+  officer_id: string | null;
+  pillar_id: string | null;
+  program_id: string | null;
+  period: string | null;
+  amount_at_risk: number;
+  risk_score: number;
+  severity: string;
+  status: string;
+  confidence: string;
+  source_records: string[];
+}
+
+export interface InukaCaseSummary {
+  case_count: number;
+  critical_count: number;
+  review_count: number;
+  amount_at_risk: number;
+  by_type: Record<string, number>;
+  generated_at: string;
+}
+
+export interface InukaCasesResult {
+  cases: InukaRiskCase[];
+  pagination: Pagination;
+  summary: InukaCaseSummary;
+}
+
+export interface InukaDimensionSummary {
+  id: string;
+  case_count: number;
+  critical_count: number;
+  amount_at_risk: number;
+}
+
+export interface InukaBeneficiaryDetail {
+  beneficiary_id: string;
+  [key: string]: unknown;
+}
 
 // Mirrors backend/app/schemas/feed.py.
 export interface FeedData {

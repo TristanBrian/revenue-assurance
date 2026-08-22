@@ -1,6 +1,8 @@
 import type {
   AcceptTermsResponse,
   AdminUser,
+  AdminSecurityEvent,
+  PasswordPolicy,
   AnomalyTableResult,
   AuthUser,
   CreateUserPayload,
@@ -17,6 +19,10 @@ import type {
   HeatmapData,
   LoginResponse,
   MetricsResult,
+  InukaCasesResult,
+  InukaCaseSummary,
+  InukaDimensionSummary,
+  InukaBeneficiaryDetail,
   OmcRiskProfile,
   OmcRiskProfileResult,
   ReconcileResult,
@@ -154,6 +160,10 @@ export async function login(email: string, password: string): Promise<LoginRespo
   return unwrap<LoginResponse>(res);
 }
 
+export async function getPasswordPolicy(): Promise<PasswordPolicy> {
+  return unwrap<PasswordPolicy>(await fetch(new URL("/api/auth/password-policy", API_URL)));
+}
+
 /** Fetches the current Terms & Conditions / Privacy Policy text + required
  * version for the reset-password / accept-terms screen to render. No auth
  * — a user in either flow doesn't have a normal session token yet. */
@@ -270,6 +280,73 @@ export async function getAnomalies(
   if (filters.search) url.searchParams.set("search", filters.search);
   const res = await authFetch(url);
   return unwrap<AnomalyTableResult>(res);
+}
+
+export async function getInukaSummary(): Promise<InukaCaseSummary> {
+  const res = await authFetch(new URL("/api/inuka/summary", API_URL));
+  return unwrap<InukaCaseSummary>(res);
+}
+
+export async function getInukaCases(params: {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  riskType?: string;
+  pillarId?: string;
+  programId?: string;
+  officerId?: string;
+  period?: string;
+  search?: string;
+} = {}): Promise<InukaCasesResult> {
+  const url = new URL("/api/inuka/cases", API_URL);
+  url.searchParams.set("page", String(params.page ?? 1));
+  url.searchParams.set("page_size", String(params.pageSize ?? 25));
+  if (params.status) url.searchParams.set("status", params.status);
+  if (params.riskType) url.searchParams.set("risk_type", params.riskType);
+  if (params.pillarId) url.searchParams.set("pillar_id", params.pillarId);
+  if (params.programId) url.searchParams.set("program_id", params.programId);
+  if (params.officerId) url.searchParams.set("officer_id", params.officerId);
+  if (params.period) url.searchParams.set("period", params.period);
+  if (params.search) url.searchParams.set("search", params.search);
+  const res = await authFetch(url);
+  return unwrap<InukaCasesResult>(res);
+}
+
+export interface InukaCaseAction {
+  id: string;
+  action: string;
+  note: string;
+  created_at: string;
+  actor_user_id?: string | null;
+}
+
+export async function getInukaCaseActions(caseId: string): Promise<InukaCaseAction[]> {
+  const res = await authFetch(new URL(`/api/inuka/cases/${encodeURIComponent(caseId)}/actions`, API_URL));
+  return (await unwrap<{ actions: InukaCaseAction[] }>(res)).actions;
+}
+
+export async function createInukaCaseAction(caseId: string, action: string, note = ""): Promise<InukaCaseAction> {
+  const res = await authFetch(new URL(`/api/inuka/cases/${encodeURIComponent(caseId)}/actions`, API_URL), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, note }),
+  });
+  return unwrap<InukaCaseAction>(res);
+}
+
+export async function getInukaPillars(): Promise<InukaDimensionSummary[]> {
+  const res = await authFetch(new URL("/api/inuka/pillars", API_URL));
+  return (await unwrap<{ items: InukaDimensionSummary[] }>(res)).items;
+}
+
+export async function getInukaOfficers(): Promise<InukaDimensionSummary[]> {
+  const res = await authFetch(new URL("/api/inuka/officers", API_URL));
+  return (await unwrap<{ items: InukaDimensionSummary[] }>(res)).items;
+}
+
+export async function getInukaBeneficiary(beneficiaryId: string): Promise<InukaBeneficiaryDetail> {
+  const res = await authFetch(new URL(`/api/inuka/beneficiaries/${encodeURIComponent(beneficiaryId)}`, API_URL));
+  return unwrap<InukaBeneficiaryDetail>(res);
 }
 
 export async function getOmcRiskProfile(materiality = 100000, direction: Direction = "all"): Promise<OmcRiskProfile[]> {
@@ -534,6 +611,13 @@ export async function getUsers(): Promise<AdminUser[]> {
   return unwrap<AdminUser[]>(res);
 }
 
+export async function getAdminSecurityEvents(page = 1, pageSize = 25): Promise<{ items: AdminSecurityEvent[]; total: number }> {
+  const url = new URL("/api/admin/security-events", API_URL);
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("page_size", String(pageSize));
+  return unwrap<{ items: AdminSecurityEvent[]; total: number }>(await authFetch(url));
+}
+
 /** Admin-provisioned user — no password field. The backend generates a
  * random temp password and emails it; must_reset_password forces the new
  * user through /reset-password on their first login. */
@@ -613,5 +697,3 @@ export async function getRecordHistory(targetType: string, targetId: string): Pr
   const res = await authFetch(new URL(`/api/audit/history/${targetType}/${targetId}`, API_URL));
   return unwrap(res);
 }
-
-

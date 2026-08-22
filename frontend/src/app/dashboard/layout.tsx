@@ -24,6 +24,8 @@ interface NavItem {
   anyOf?: string[];
 }
 
+type Workspace = "oil" | "inuka";
+
 const NAV_ITEMS: NavItem[] = [
   {
     href: "/dashboard",
@@ -78,7 +80,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/dashboard/fraud",
-    label: "Fraud Graph",
+    label: "Risk Intelligence",
     anyOf: ["view_fraud_graph"],
     icon: (
       <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -107,6 +109,49 @@ const NAV_ITEMS: NavItem[] = [
     icon: (
       <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2a4 4 0 014-4h4m0 0l-3-3m3 3l-3 3M4 7h16M4 7a2 2 0 002 2h12a2 2 0 002-2M4 7a2 2 0 012-2h12a2 2 0 012 2" />
+      </svg>
+    ),
+  },
+];
+
+const REVIEW_QUEUE_ITEM: NavItem = {
+  href: "/dashboard/review-queue",
+  label: "My Review Queue",
+  anyOf: ["view_anomaly_table"],
+  icon: (
+    <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5h10M9 12h10M9 19h10M4 5h.01M4 12h.01M4 19h.01" />
+    </svg>
+  ),
+};
+
+const INUKA_NAV_ITEMS: NavItem[] = [
+  {
+    href: "/dashboard/inuka",
+    label: "Assurance Overview",
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 13h6V4H4v9zm0 7h6v-3H4v3zm10 0h6v-9h-6v9zm0-16v3h6V4h-6z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/inuka/programs",
+    label: "Pillar Risk",
+    anyOf: ["view_metrics"],
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 5h16M4 12h16M4 19h16M8 5v14" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/inuka/officers",
+    label: "Officer Assurance",
+    anyOf: ["view_metrics"],
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m7-10a4 4 0 100-8 4 4 0 000 8zm7-3a4 4 0 010 8m4 5v-2a4 4 0 00-3-3.87" />
       </svg>
     ),
   },
@@ -152,6 +197,42 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const isInukaManager = user?.roles.includes("inuka_manager") ?? false;
+  const canUseDualWorkspace = !isInukaManager && (user?.permissions.includes("view_outgoing_data") ?? false);
+  const [workspace, setWorkspace] = useState<Workspace>("oil");
+  const routeWorkspace: Workspace | null = pathname.startsWith("/dashboard/inuka")
+    ? "inuka"
+    : pathname.startsWith("/dashboard/review-queue")
+      ? null
+      : "oil";
+  const isInukaWorkspace = isInukaManager || (canUseDualWorkspace && (routeWorkspace ?? workspace) === "inuka");
+
+  useEffect(() => {
+    if (routeWorkspace) setWorkspace(routeWorkspace);
+  }, [routeWorkspace]);
+
+  useEffect(() => {
+    if (!canUseDualWorkspace || typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("kpc_assurance_workspace");
+    if (stored === "oil" || stored === "inuka") setWorkspace(stored);
+  }, [canUseDualWorkspace]);
+
+  useEffect(() => {
+    if (!isInukaManager) return;
+    const revenueOnlyPaths = [
+      "/dashboard/upload",
+      "/dashboard/anomalies",
+      "/dashboard/heatmap",
+      "/dashboard/omc-risk",
+      "/dashboard/ebilling",
+      "/dashboard/reports",
+      "/dashboard/fraud",
+      "/dashboard/review-queue",
+    ];
+    if (revenueOnlyPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
+      router.replace("/dashboard");
+    }
+  }, [isInukaManager, pathname, router]);
 
   const [anomalyCount, setAnomalyCount] = useState<number>(0);
   const [criticalCount, setCriticalCount] = useState<number>(0);
@@ -168,7 +249,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     // its nav item — a role without it would otherwise 403 on every
     // dashboard load for a badge it can't even see, on every page.
     if (user.permissions.includes("view_metrics")) {
-      getMetrics(materiality)
+      getMetrics(isInukaWorkspace ? 100000 : materiality, isInukaWorkspace ? "outbound" : "all")
         .then((data) => {
           setAnomalyCount(data.metrics.anomaly_count);
           setCriticalCount(data.metrics.critical_count);
@@ -176,7 +257,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         .catch(() => {});
     }
 
-    if (user.permissions.includes("view_omc_risk_profile")) {
+    if (!isInukaManager && user.permissions.includes("view_omc_risk_profile")) {
       getOmcRiskProfile(materiality)
         .then((profiles) => {
           setHighRiskCount(profiles.filter((p) => p.risk_level === "High").length);
@@ -184,7 +265,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         .catch(() => {});
     }
 
-    if (user.permissions.includes("manage_ebilling")) {
+    if (!isInukaManager && user.permissions.includes("manage_ebilling")) {
       getEbillingStatus()
         .then((status) => setFailedSyncCount(status.failed_count))
         .catch(() => {});
@@ -193,19 +274,24 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     // Depot Supervisor's alert bell: their own depot only, from a server
     // endpoint that ignores any client-supplied depot — not the global
     // view_metrics critical_count above, which is unscoped across every depot.
-    if (user.permissions.includes("view_depot_alerts")) {
+    if (!isInukaManager && user.permissions.includes("view_depot_alerts")) {
       getDepotAlerts()
         .then((data) => setDepotAlerts({ depotId: data.depot_id, criticalCount: data.critical_count, items: data.items }))
         .catch(() => {});
     }
-  }, [user, materiality]);
+  }, [user, materiality, isInukaWorkspace]);
 
   function handleLogout() {
     logout();
     router.push("/login");
   }
 
-  const visibleItems = NAV_ITEMS.filter(
+  const baseItems = isInukaManager
+    ? INUKA_NAV_ITEMS
+    : canUseDualWorkspace && isInukaWorkspace
+      ? INUKA_NAV_ITEMS
+      : NAV_ITEMS;
+  const visibleItems = (canUseDualWorkspace ? [REVIEW_QUEUE_ITEM, ...baseItems] : baseItems).filter(
     (item) => !item.anyOf || item.anyOf.some((code) => user?.permissions.includes(code)),
   );
   const canSeeAllAlerts = user?.permissions.includes("view_anomaly_table") ?? false;
@@ -214,8 +300,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   // Decorative search over anomalies/OMCs/invoices only makes sense on pages
   // that actually show that content — not the Explorer, uploads, reports,
   // e-billing, or fraud graph, and never for admin (their page is users).
-  const SEARCH_RELEVANT_PATHS = ["/dashboard", "/dashboard/anomalies", "/dashboard/omc-risk"];
+  const SEARCH_RELEVANT_PATHS = isInukaWorkspace ? ["/dashboard/inuka/anomalies", "/dashboard/inuka/programs", "/dashboard/inuka/officers"] : ["/dashboard", "/dashboard/anomalies", "/dashboard/omc-risk"];
   const showSearch = !isAdmin && SEARCH_RELEVANT_PATHS.includes(pathname);
+
+  function switchWorkspace(next: Workspace) {
+    setWorkspace(next);
+    if (typeof window !== "undefined") window.localStorage.setItem("kpc_assurance_workspace", next);
+    router.push(next === "inuka" ? "/dashboard/inuka" : "/dashboard");
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
@@ -248,7 +340,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               {BRAND_CONFIG.companyName}
             </p>
             <p className="text-[10px] text-sidebar-muted-foreground leading-none mt-1 truncate">
-              {BRAND_CONFIG.systemName}
+              {isInukaWorkspace ? "Inuka Program Assurance" : BRAND_CONFIG.systemName}
             </p>
           </div>
         </div>
@@ -256,6 +348,24 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         <p className="px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
           Workspace
         </p>
+        {canUseDualWorkspace && (
+          <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-sidebar-accent/50 p-1">
+            {(["oil", "inuka"] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => switchWorkspace(item)}
+                className={`rounded-md px-2 py-2 text-[10px] font-semibold transition-colors ${
+                  (routeWorkspace ?? workspace) === item
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                    : "text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                }`}
+              >
+                {item === "oil" ? "Oil Revenue" : "Inuka Programs"}
+              </button>
+            ))}
+          </div>
+        )}
         <nav className="flex flex-col gap-0.5">
           {visibleItems.map((item) => {
             const active = pathname === item.href;
@@ -289,15 +399,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">
-          <div className="rounded-lg bg-sidebar-accent/50 px-3 py-2.5">
-            <p className="text-[9px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
-              Materiality Threshold
-            </p>
-            <p className="text-sm font-bold text-sidebar-foreground font-mono mt-0.5">
-              {formatKes(materiality)}
-            </p>
-          </div>
-
           <div className="border-t border-sidebar-border pt-3 flex items-center gap-2.5 px-1">
             <div className="w-7 h-7 shrink-0 rounded-full bg-sidebar-primary/20 text-sidebar-primary flex items-center justify-center text-[11px] font-bold">
               {user?.email?.[0]?.toUpperCase() ?? "?"}
@@ -337,7 +438,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z" />
                 </svg>
-                <span className="truncate">Search anomalies, OMCs, invoices…</span>
+                <span className="truncate">{isInukaWorkspace ? "Search beneficiaries, officers, payouts…" : "Search anomalies, OMCs, invoices…"}</span>
               </div>
             </div>
           ) : (
@@ -347,8 +448,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-1.5 shrink-0">
             {canSeeAllAlerts && (
               <Link
-                href="/dashboard/anomalies"
-                title="Critical anomalies"
+                href={isInukaWorkspace ? "/dashboard/inuka/programs" : "/dashboard/anomalies"}
+                title={isInukaWorkspace ? "Critical pillar exposure" : "Critical anomalies"}
                 className="relative p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 <BellIcon />

@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from app.core.password_policy import normalize_email, validate_password
 from app.core.security import generate_temp_password, hash_password
 from app.models.auth.role import Role
 from app.models.auth.user import User
@@ -84,6 +85,8 @@ def register_user(
     role_name: str,
     actor_user_id=None,
 ) -> User:
+    email = normalize_email(email)
+    validate_password(password, email)
     if db.query(User).filter(User.email == email).first():
         raise EmailAlreadyRegisteredError(email)
 
@@ -141,6 +144,7 @@ def provision_user_with_temp_password(
     deterministic password) rather than replacing it — see PROGRESS.md/
     scripts/seed_demo_users.py's dependency on register_user's signature.
     """
+    email = normalize_email(email)
     if db.query(User).filter(User.email == email).first():
         raise EmailAlreadyRegisteredError(email)
 
@@ -229,6 +233,11 @@ def update_user(
     actor_user_id=None,
 ) -> User:
     user = _get_user_or_raise(db, user_id)
+
+    if email is not None:
+        email = normalize_email(email)
+    if password is not None:
+        validate_password(password, email or user.email)
 
     before = {}
     after = {}

@@ -46,6 +46,14 @@ export default function LoginPage() {
               "radial-gradient(120% 90% at 15% 10%, color-mix(in oklch, var(--sidebar-primary) 35%, transparent), transparent 55%), radial-gradient(110% 80% at 85% 90%, color-mix(in oklch, var(--sidebar-primary) 40%, black), transparent 60%), linear-gradient(160deg, #1c1010 0%, #2a1414 45%, #170c0c 100%)",
           }}
         />
+        <Image
+          src={BRAND_CONFIG.landing.bgImage}
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover opacity-[0.34] mix-blend-screen"
+        />
         <FlowGuardHeroIllustration className="absolute inset-0 h-full w-full object-cover opacity-[0.14] mix-blend-screen" />
         <div
           className="absolute inset-0 opacity-[0.06]"
