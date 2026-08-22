@@ -399,15 +399,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">
-          {!isInukaWorkspace && <div className="rounded-lg bg-sidebar-accent/50 px-3 py-2.5">
-            <p className="text-[9px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
-              Materiality Threshold
-            </p>
-            <p className="text-sm font-bold text-sidebar-foreground font-mono mt-0.5">
-              {formatKes(materiality)}
-            </p>
-          </div>}
-
           <div className="border-t border-sidebar-border pt-3 flex items-center gap-2.5 px-1">
             <div className="w-7 h-7 shrink-0 rounded-full bg-sidebar-primary/20 text-sidebar-primary flex items-center justify-center text-[11px] font-bold">
               {user?.email?.[0]?.toUpperCase() ?? "?"}

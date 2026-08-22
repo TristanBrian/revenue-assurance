@@ -106,7 +106,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-between overflow-hidden bg-background p-6 font-sans text-foreground relative">
+    <div className="relative flex min-h-screen flex-col items-center overflow-y-auto bg-background p-4 font-sans text-foreground sm:p-6">
       <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
         <FlowGuardHeroIllustration className="h-full w-full object-cover opacity-[0.08] mix-blend-multiply" />
       </div>
@@ -121,16 +121,16 @@ export default function ResetPasswordPage() {
         </div>
       </header>
 
-      <div className="relative z-10 w-full max-w-2xl mx-auto my-6 px-4 flex items-center justify-center">
-        <div className="w-full rounded-2xl border border-border bg-card p-8 shadow-xl md:p-10">
+      <div className="relative z-10 my-6 flex w-full max-w-5xl flex-1 items-start justify-center px-1 sm:px-4">
+        <div className="w-full rounded-2xl border border-border bg-card p-6 shadow-xl sm:p-8 md:p-10">
           <div className="mb-6 text-center">
-            <h2 className="text-3xl font-extrabold tracking-tight text-foreground">
-              {mode === "consent" ? "Updated Terms & Privacy Policy" : "Set a new password"}
+            <h2 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+              {mode === "consent" ? "Review updated Terms & Privacy Policy" : "Set your new password"}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
               {mode === "consent"
-                ? "Our Terms & Conditions / Privacy Policy have been updated. Please review and re-accept to continue."
-                : "You signed in with a temporary password. Choose a new one and accept the Terms & Conditions / Privacy Policy to continue."}
+                ? "Your password is already active. Review and accept the updated documents to continue."
+                : "Your temporary password was accepted. Choose a new password, then review and accept the Terms & Conditions / Privacy Policy."}
             </p>
           </div>
 
@@ -143,9 +143,13 @@ export default function ResetPasswordPage() {
               to continue.
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-6">
               {mode === "reset" && (
                 <>
+                  <div className="rounded-lg border border-status-info/30 bg-status-info-bg px-4 py-3 text-sm text-foreground">
+                    <p className="font-semibold">Password reset required</p>
+                    <p className="mt-1 text-muted-foreground">This is a mandatory first-login security step. Your temporary password cannot be used as a normal session password.</p>
+                  </div>
                   <div className="flex flex-col gap-2">
                     <label
                       htmlFor="new-password"
@@ -194,7 +198,7 @@ export default function ResetPasswordPage() {
                 <span className="text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Terms &amp; Conditions and Privacy Policy
                 </span>
-                <div className="max-h-56 overflow-y-auto rounded-lg border border-border bg-muted/40 p-4 text-xs leading-relaxed text-foreground shadow-inner whitespace-pre-wrap">
+                <div className="min-h-[320px] max-h-[55vh] overflow-y-auto rounded-lg border border-border bg-muted/40 p-5 text-sm leading-7 text-foreground shadow-inner whitespace-pre-wrap sm:p-6">
                   {termsLoading && "Loading…"}
                   {termsError && <span className="text-red-600">{termsError}</span>}
                   {terms && (
