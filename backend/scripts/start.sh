@@ -24,7 +24,9 @@ is_postgres_url() {
 
 if [ -n "$DATABASE_URL" ] && is_postgres_url "$DATABASE_URL"; then
     echo "✅ PostgreSQL detected (DATABASE_URL set)"
-    DATA_EXISTS=$(python3 -c "
+    # Run a Python script to check if the 'dispatches' table has data.
+    # We capture the exit code and ignore the output to avoid parsing errors.
+    python3 -c "
 import os, sys
 from sqlalchemy import create_engine, text
 try:
@@ -32,19 +34,19 @@ try:
     with engine.connect() as conn:
         result = conn.execute(text(\"SELECT EXISTS (SELECT 1 FROM dispatches LIMIT 1)\")).scalar()
         sys.exit(0 if result else 1)
-except Exception as e:
-    print(f'ERROR: {e}', file=sys.stderr)
+except Exception:
     sys.exit(2)
-" 2>&1 || echo "error")
+" 2>/dev/null
 
-    if [[ "$DATA_EXISTS" == "error" ]] || [[ "$DATA_EXISTS" == "2" ]]; then
-        echo "⚠️ Could not check database – running ETL to be safe."
-        RUN_ETL=1
-    elif [[ "$DATA_EXISTS" -eq 0 ]]; then
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -eq 0 ]; then
         echo "✅ Data found in PostgreSQL – skipping ETL and data generation."
         RUN_ETL=0
-    else
+    elif [ $EXIT_CODE -eq 1 ]; then
         echo "📊 No data found in PostgreSQL – will run ETL."
+        RUN_ETL=1
+    else
+        echo "⚠️ Could not check database – running ETL to be safe."
         RUN_ETL=1
     fi
 else
@@ -94,4 +96,4 @@ python scripts/seed_demo_users.py
 python scripts/seed_terms_documents.py
 
 echo "🚀 Starting Uvicorn server..."
-exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}
+exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
