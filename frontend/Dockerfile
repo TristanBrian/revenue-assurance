@@ -1,4 +1,3 @@
-# frontend/Dockerfile
 FROM node:20-slim AS builder
 
 WORKDIR /app
@@ -25,5 +24,4 @@ COPY --from=builder /app/public ./public
 
 EXPOSE 3000
 
-# ✅ Use node server.js for standalone mode
 CMD ["node", "server.js"]

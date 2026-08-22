@@ -10,9 +10,9 @@ from app.routes.fraud import detective, graph, scoring
 from app.routes.audit import audit
 from app.routes.alerts import alerts
 from app.routes import report_verify
+from app.routes import alerts
+# from app.routes import chatbot
 
-
-# import sqlite3  # replaced by SQLAlchemy engine (see app.utils.db_connection)
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
 from app.services.audit.anchor_service import run_periodic_anchor_check
@@ -41,12 +41,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Database connection failed ({safe_url}): {e}")
 
-    # Periodic on-chain anchor check (immutable audit trail) — always
-    # started; it's cheap to poll and no-ops immediately if anchoring
-    # isn't configured (no AUDIT_ANCHOR_CONTRACT_ADDRESS / CDP
-    # credentials yet), same as everything else in this app that
-    # degrades gracefully when a third-party integration isn't set up.
-    # See services/audit/anchor_service.py's module docstring.
     anchor_task = asyncio.create_task(run_periodic_anchor_check())
 
     # Fraud scoring layer: graph snapshot refresh (Louvain community
@@ -77,24 +71,20 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# ✅ CORS – must be the FIRST middleware (outermost)
+# ✅ CORS – Allow all origins (no credentials needed for JWT)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],                 # Allow all origins during debugging
-    allow_credentials=False,             # Must be False when using "*"
+    allow_origins=["*"],           # Allow any origin (safe for public API with JWT)
+    allow_credentials=False,       # Must be False when using "*"
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include Routers — order here also drives the grouping/order Swagger UI
-# displays tags in, so it's kept in sync with the strategic ordering in
-# root()'s "endpoints" list below: Auth first (everything else needs a
-# token), then Live Feed, Reconciliation, Heatmap, E-Billing, Graph,
-# Detective (risk analytics), Admin, Audit.
-app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])  # <-- ADDED auth router
-app.include_router(feed.router, prefix="/api", tags=["Live Feed"])      # <-- NEW
+# Include Routers
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
 app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
-app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])    # <-- NEW
+app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])
 app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
 app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])  # <-- NEW
 app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
@@ -103,28 +93,14 @@ app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
 app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])  # <-- NEW
 app.include_router(report_verify.router, prefix="/api/reports", tags=["Report Verification"])
+# app.include_router(chatbot.router, prefix="/api", tags=["Chatbot"])
 
 # Envelope and audit middlewares
 app.add_middleware(ResponseEnvelopeMiddleware)
 app.add_middleware(AuditMiddleware)
 
 # ============================================================================
-# MANUAL OPTIONS HANDLER FOR LOGIN (fallback)
-# ============================================================================
-@app.options("/api/auth/login")
-async def options_login():
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Max-Age": "86400",
-        }
-    )
-
-# ============================================================================
-# ROOT AND HEALTH ENDPOINTS (with HEAD support)
+# ROOT AND HEALTH ENDPOINTS
 # ============================================================================
 
 @app.get("/")
@@ -134,61 +110,54 @@ async def root():
         "status": "running",
         "version": "2.0.0",
         "endpoints": [
-            # -- Auth: everything else needs a token from here first --
-            "POST /api/auth/login - Log in, returns a JWT (or a scoped reset_token if must_reset_password)",
-            "POST /api/auth/reset-password - Redeem a reset_token + set a new password + accept Terms/Privacy (forced-reset flow)",
-            "GET /api/auth/terms - Current Terms & Conditions / Privacy Policy text + required version",
-            "POST /api/auth/accept-terms - Redeem a consent_token to re-accept a newer Terms/Privacy version",
-            "POST /api/auth/register - Create a user and assign a role (manage_users)",
-            "GET /api/auth/me - Current user's profile, roles, permissions",
-            "GET /api/feed - Live anomaly feed",
-            "POST /api/reconcile/metrics - Executive metrics (DB)",
-            "GET /api/reconcile/anomalies - Paginated anomaly table (DB)",
-            "GET /api/reconcile/omc-risk-profile - OMC risk profile (DB)",
-            "POST /api/reconcile/upload - Run reconciliation (CSV Upload)",
-            "GET /api/reconcile/template/{type} - Download CSV template",
-            "POST /api/reconcile/update - Update anomaly status",
-            "GET /api/reconcile/export - Download Excel report",
-            "POST /api/reconcile/sync - Sync anomalies to E-Billing",
-            "GET /api/heatmap - Leakage heatmap (OMC × Product)",
-            "GET /api/e-billing/status - E-Billing integration status",
-            "POST /api/e-billing/sync - Sync invoices to KRA iCMS",
-            "POST /api/e-billing/sync/async - Async sync (returns task_id)",
-            "GET /api/e-billing/task/{task_id} - Check async task status",
-            "POST /api/e-billing/retry/{invoice_id} - Retry failed sync",
-            "GET /api/e-billing/logs - View sync logs",
-            "GET /api/e-billing/pending - List pending invoices",
-            "POST /api/e-billing/webhook - KRA webhook callback",
-            "GET /api/e-billing/reconcile - E-Billing reconciliation dashboard",
-            "GET /api/e-billing/monitor - Failure rate monitoring",
-            "GET /api/graph - Anomaly-based fraud graph (OMC<->Depot leakage, Louvain communities)",
-            "GET /api/graph/network - OMC/depot structural network graph",
-            "GET /api/graph/communities - Detected risk communities (structural graph)",
-            "GET /api/graph/omc/{omc_id} - Risk features + community info for one OMC",
-            "GET /api/detective/risk-features - OMC risk features (all OMCs)",
-            "GET /api/detective/risk-features/{omc_id} - OMC risk features (single OMC)",
-            "GET /api/detective/risk-features/export - Download risk features as CSV",
-
-            # -- Admin: user/permission management, not a revenue-assurance feature --
-            "GET /api/admin/users - List all users (with account_status)",
-            "POST /api/admin/users - Provision a user with an emailed temp password, forced reset on first login",
-            "POST /api/admin/users/{user_id}/resend-temp-password - Regenerate + re-email a temp password",
-            "PATCH /api/admin/users/{user_id} - Edit a user (email/name/role/password/is_active)",
-            "DELETE /api/admin/users/{user_id} - Delete a user",
-            "GET /api/audit/logs - Paginated, filterable audit trail",
-            "GET /api/audit/logs/{log_id} - Single audit log entry",
-            "GET /api/audit/summary - Aggregate audit stats for the last N days",
-            "GET /api/audit/me - Current user's own audit trail",
-
-            # -- Alerts: in-app + email notifications (system-triggered and manual) --
-            "GET /api/alerts - Current user's alert inbox",
-            "GET /api/alerts/unread-count - Unread alert badge count",
-            "POST /api/alerts/{alert_id}/read - Mark one alert read",
-            "POST /api/alerts/read-all - Mark every visible alert read",
-            "POST /api/alerts - Broadcast a manual alert (manage_alerts)",
-
-            # -- Infra --
-            "GET /health - Health check"
+            "POST /api/auth/login",
+            "POST /api/auth/reset-password",
+            "GET /api/auth/terms",
+            "POST /api/auth/accept-terms",
+            "POST /api/auth/register",
+            "GET /api/auth/me",
+            "GET /api/feed",
+            "POST /api/reconcile/metrics",
+            "GET /api/reconcile/anomalies",
+            "GET /api/reconcile/omc-risk-profile",
+            "POST /api/reconcile/upload",
+            "GET /api/reconcile/template/{type}",
+            "POST /api/reconcile/update",
+            "GET /api/reconcile/export",
+            "POST /api/reconcile/sync",
+            "GET /api/heatmap",
+            "GET /api/e-billing/status",
+            "POST /api/e-billing/sync",
+            "POST /api/e-billing/sync/async",
+            "GET /api/e-billing/task/{task_id}",
+            "POST /api/e-billing/retry/{invoice_id}",
+            "GET /api/e-billing/logs",
+            "GET /api/e-billing/pending",
+            "POST /api/e-billing/webhook",
+            "GET /api/e-billing/reconcile",
+            "GET /api/e-billing/monitor",
+            "GET /api/graph",
+            "GET /api/graph/network",
+            "GET /api/graph/communities",
+            "GET /api/graph/omc/{omc_id}",
+            "GET /api/detective/risk-features",
+            "GET /api/detective/risk-features/{omc_id}",
+            "GET /api/detective/risk-features/export",
+            "GET /api/admin/users",
+            "POST /api/admin/users",
+            "POST /api/admin/users/{user_id}/resend-temp-password",
+            "PATCH /api/admin/users/{user_id}",
+            "DELETE /api/admin/users/{user_id}",
+            "GET /api/audit/logs",
+            "GET /api/audit/logs/{log_id}",
+            "GET /api/audit/summary",
+            "GET /api/audit/me",
+            "GET /api/alerts",
+            "GET /api/alerts/unread-count",
+            "POST /api/alerts/{alert_id}/read",
+            "POST /api/alerts/read-all",
+            "POST /api/alerts",
+            "GET /health"
         ]
     }
 
