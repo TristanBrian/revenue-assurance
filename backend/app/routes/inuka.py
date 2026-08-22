@@ -24,6 +24,7 @@ def inuka_cases(
     page_size: int = Query(25, ge=1, le=100),
     status: str | None = Query(None),
     risk_type: str | None = Query(None),
+    pillar_id: str | None = Query(None),
     program_id: str | None = Query(None),
     officer_id: str | None = Query(None),
     period: str | None = Query(None),
@@ -39,6 +40,8 @@ def inuka_cases(
         cases = [x for x in cases if x["risk_type"] == risk_type]
     if program_id:
         cases = [x for x in cases if x.get("program_id") == program_id]
+    if pillar_id:
+        cases = [x for x in cases if x.get("pillar_id") == pillar_id]
     if officer_id:
         cases = [x for x in cases if x.get("officer_id") == officer_id]
     if period:

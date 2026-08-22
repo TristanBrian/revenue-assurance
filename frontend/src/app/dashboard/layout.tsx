@@ -115,7 +115,7 @@ const NAV_ITEMS: NavItem[] = [
 const INUKA_NAV_ITEMS: NavItem[] = [
   {
     href: "/dashboard",
-    label: "Control Center",
+    label: "Assurance Overview",
     icon: (
       <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 13h6V4H4v9zm0 7h6v-3H4v3zm10 0h6v-9h-6v9zm0-16v3h6V4h-6z" />
@@ -150,16 +150,6 @@ const INUKA_NAV_ITEMS: NavItem[] = [
     icon: (
       <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m7-10a4 4 0 100-8 4 4 0 000 8zm7-3a4 4 0 010 8m4 5v-2a4 4 0 00-3-3.87" />
-      </svg>
-    ),
-  },
-  {
-    href: "/dashboard/fraud",
-    label: "Beneficiary Network",
-    anyOf: ["view_fraud_graph"],
-    icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="12" cy="18" r="2.5" /><path strokeLinecap="round" d="M8.2 7.2L10 15M15.8 7.2L14 15M8.5 6h7" />
       </svg>
     ),
   },
@@ -216,6 +206,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       "/dashboard/omc-risk",
       "/dashboard/ebilling",
       "/dashboard/reports",
+      "/dashboard/fraud",
     ];
     if (revenueOnlyPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
       router.replace("/dashboard");
@@ -237,7 +228,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     // its nav item — a role without it would otherwise 403 on every
     // dashboard load for a badge it can't even see, on every page.
     if (user.permissions.includes("view_metrics")) {
-      getMetrics(materiality, isInukaManager ? "outbound" : "all")
+      getMetrics(isInukaManager ? 0 : materiality, isInukaManager ? "outbound" : "all")
         .then((data) => {
           setAnomalyCount(data.metrics.anomaly_count);
           setCriticalCount(data.metrics.critical_count);
@@ -358,14 +349,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">
-          <div className="rounded-lg bg-sidebar-accent/50 px-3 py-2.5">
+          {!isInukaManager && <div className="rounded-lg bg-sidebar-accent/50 px-3 py-2.5">
             <p className="text-[9px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
               Materiality Threshold
             </p>
             <p className="text-sm font-bold text-sidebar-foreground font-mono mt-0.5">
               {formatKes(materiality)}
             </p>
-          </div>
+          </div>}
 
           <div className="border-t border-sidebar-border pt-3 flex items-center gap-2.5 px-1">
             <div className="w-7 h-7 shrink-0 rounded-full bg-sidebar-primary/20 text-sidebar-primary flex items-center justify-center text-[11px] font-bold">

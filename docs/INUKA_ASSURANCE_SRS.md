@@ -28,7 +28,20 @@ The objective is not to label beneficiaries as fraudulent from a single attendan
 
 External identity and payment systems are integration points. Until connected, the portal must show the evidence source and confidence level rather than pretend that a record is independently verified.
 
-## 3. Domain separation
+## 3. KPC Foundation portfolio context
+
+Inuka is important, but it is not the whole KPC Foundation portfolio. KPC’s official Corporate Social Investment information describes work across education, health, water and sanitation, sports for development, environmental conservation, emergency response, and empowerment of youth, women, and people with disabilities. KPC also describes Inuka Scholarship and Inuka Plus as education-focused initiatives: Inuka Scholarship supports students with disabilities, while Inuka Plus extends support into university, college, and TVET education.
+
+The assurance portal therefore uses two levels of scope:
+
+- **Foundation portfolio** — the wider KPC Foundation investment/CSI portfolio.
+- **Inuka assurance domain** — beneficiary-centered education and empowerment programs with enrollment, participation, authorization, and disbursement records.
+
+The system must not infer that every KPC Foundation program is an Inuka stipend program. Infrastructure projects, medical camps, water projects, sports support, environmental work, emergency response, and group empowerment require different assurance workflows and should be added as separate domains or grant/project control types.
+
+Reference sources: [KPC Corporate Social Investment](https://www.kpc.co.ke/corporate-social-investment/), [KPC Foundation Inuka Program](https://foundation.kpc.co.ke/?page_id=1146), and [KPC Inuka Plus announcement](https://kpc.co.ke/kpc-foundation-invests-kes-41-million-annually-in-tertiary-education-sponsorship-program/).
+
+## 4. Domain separation
 
 FlowGuard remains one platform with shared security and audit infrastructure, but it has two bounded assurance domains:
 
@@ -39,7 +52,7 @@ Inuka program assurance: program/enrollment → participation evidence → autho
 
 The Inuka manager receives an Inuka shell, terminology, routes, filters, and outbound-only server scope. Revenue screens and concepts must not be used as placeholders for Inuka data.
 
-## 4. Inuka hierarchy
+## 5. Inuka hierarchy
 
 The official Inuka categories are pillars, not individual programs. The four pillars are:
 
@@ -64,7 +77,7 @@ Inuka Foundation
 
 The current synthetic source data contains `pillar_id` values (`Scholarship`, `Plus`, `Vocational`, and `Tech`) but does not contain a trustworthy program or cohort registry. The application therefore reports current risk at pillar level and marks program/cohort fields as unavailable until source data supplies them. It must not invent program names beneath a pillar.
 
-## 5. Target eligibility and payment chain
+## 6. Target eligibility and payment chain
 
 ```text
 Program → Cohort → Enrollment/KYC → Eligibility rules
@@ -75,7 +88,7 @@ Program → Cohort → Enrollment/KYC → Eligibility rules
 
 Attendance is one evidence source. It is not sufficient by itself to establish that a person is a legitimate student or that a payment is valid.
 
-## 6. Target information model
+## 7. Target information model
 
 The current tables remain compatible with the first implementation. The target model adds:
 
@@ -89,7 +102,7 @@ The current tables remain compatible with the first implementation. The target m
 
 Existing `pillar_id` values are the current reporting dimension. They must not be treated as a complete program registry. New ingestion contracts should carry `pillar_id`, `program_id`, `cohort_id`, `site_id`, `transaction_reference`, `account_verification_status`, and participation evidence metadata.
 
-## 7. Control and risk requirements
+## 8. Control and risk requirements
 
 The system shall calculate independent, explainable signals including:
 
@@ -105,21 +118,24 @@ The system shall calculate independent, explainable signals including:
 
 Each case shall expose reason codes, source records, amount at risk, confidence, and a recommended review action. A risk score is triage support, not proof of fraud.
 
-## 8. User experience requirements
+## 9. User experience requirements
 
 The Inuka portal shall provide:
 
 - Control Center: eligible population, verified population, authorized/paid amounts, cases by severity, and exposure.
 - Exceptions Queue: server-side pagination, filters, sorting, evidence summaries, and a detail drawer.
+- Selecting a case opens a detail modal showing why it was flagged, pillar, beneficiary, officer, period, confidence, amount at risk, and source records.
 - Beneficiary 360: identity, enrollment, participation, authorizations, payments, and related cases.
 - Pillar Risk: case and exposure rates for the four official pillars, with program, cohort, site, and period drill-downs when those records are available.
-- Officer Assurance: approval volume, anomaly rate, late-entry rate, and concentration signals.
+- Officer Assurance: approval volume, anomaly rate, late-entry rate, concentration signals, and a selectable officer detail modal.
 - Payment Controls: unmatched, duplicate, over/under, and account-concentration cases.
-- Relationship Explorer: optional secondary investigation view; not the primary dashboard.
+- Relationship Explorer: not part of the primary Inuka navigation until identity, enrollment, and relationship evidence support a defensible investigation view.
 
 Default page size is 25, with 25/50/100 options. Filtering and pagination must happen server-side.
 
-## 9. Security and governance
+The Inuka portal does not expose the revenue portal’s materiality slider. Inuka control rules are evaluated against the full outbound population; severity and review prioritization come from the case rules and evidence confidence.
+
+## 10. Security and governance
 
 - Inuka users are restricted server-side to outbound data.
 - Identity and payment identifiers must be masked in normal list views.
@@ -127,7 +143,7 @@ Default page size is 25, with 25/50/100 options. Filtering and pagination must h
 - Every case review, export, assignment, and status change is auditable.
 - The portal must not automatically deny benefits solely from a risk score.
 
-## 10. Delivery strategy
+## 11. Delivery strategy
 
 Phase 1 (implemented in this branch): a backward-compatible explainable risk-case service over the existing outbound tables, paginated APIs, and Inuka investigation pages.
 
@@ -137,7 +153,7 @@ Phase 3: add approved identity/payment-provider adapters and investigator feedba
 
 Phase 4: train and evaluate statistical/ML models only after sufficient labelled outcomes exist; retain rule evidence and human review.
 
-## 11. Acceptance criteria
+## 12. Acceptance criteria
 
 - An Inuka manager never sees inbound/oil concepts or data.
 - A case can be traced to source records and a human-readable reason.

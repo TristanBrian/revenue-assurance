@@ -286,6 +286,7 @@ export async function getInukaCases(params: {
   pageSize?: number;
   status?: string;
   riskType?: string;
+  pillarId?: string;
   programId?: string;
   officerId?: string;
   period?: string;
@@ -296,6 +297,7 @@ export async function getInukaCases(params: {
   url.searchParams.set("page_size", String(params.pageSize ?? 25));
   if (params.status) url.searchParams.set("status", params.status);
   if (params.riskType) url.searchParams.set("risk_type", params.riskType);
+  if (params.pillarId) url.searchParams.set("pillar_id", params.pillarId);
   if (params.programId) url.searchParams.set("program_id", params.programId);
   if (params.officerId) url.searchParams.set("officer_id", params.officerId);
   if (params.period) url.searchParams.set("period", params.period);

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ApiError, getAnomalies, getInukaCases, getMetrics } from "@/lib/api";
 import type { Anomaly, InukaCaseSummary, Metrics } from "@/lib/types";
-import { useMateriality } from "@/context/MaterialityContext";
 import StatCard from "@/components/StatCard";
 
 function formatKes(value: number): string {
@@ -29,7 +28,6 @@ const BREAK_TYPES: { key: keyof Metrics; label: string; color: string }[] = [
 ];
 
 export default function InukaDashboard() {
-  const { materiality, setMateriality } = useMateriality();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [caseSummary, setCaseSummary] = useState<InukaCaseSummary | null>(null);
@@ -47,8 +45,8 @@ export default function InukaDashboard() {
     });
 
     Promise.all([
-      getMetrics(materiality, "outbound"),
-      getAnomalies(materiality, 1, 8, {}, "outbound"),
+      getMetrics(0, "outbound"),
+      getAnomalies(0, 1, 8, {}, "outbound"),
       getInukaCases({ page: 1, pageSize: 1 }),
     ])
       .then(([metricsResult, anomalyResult, casesResult]) => {
@@ -70,7 +68,7 @@ export default function InukaDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [materiality]);
+  }, []);
 
   const maxBreakLeak = metrics
     ? Math.max(...BREAK_TYPES.map(({ key }) => Number(metrics[key] ?? 0)), 1)
@@ -81,21 +79,8 @@ export default function InukaDashboard() {
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Inuka Program Assurance</p>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground mt-1">Disbursement Control Center</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground mt-1">Inuka Disbursement Assurance</h1>
           <p className="text-sm text-muted-foreground mt-1">Find errors and anomalies in training-program payouts.</p>
-        </div>
-        <div className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3 py-1.5">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Materiality</span>
-          <input
-            type="range"
-            min="0"
-            max="1000000"
-            step="25000"
-            value={materiality}
-            onChange={(event) => setMateriality(Number(event.target.value))}
-            className="w-24 h-1 accent-primary cursor-pointer"
-          />
-          <span className="text-xs font-mono font-semibold text-foreground w-20 text-right">{formatKesCompact(materiality)}</span>
         </div>
       </header>
 
