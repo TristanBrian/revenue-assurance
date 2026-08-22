@@ -39,12 +39,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Database connection failed ({safe_url}): {e}")
 
-    # Periodic on-chain anchor check (immutable audit trail) — always
-    # started; it's cheap to poll and no-ops immediately if anchoring
-    # isn't configured (no AUDIT_ANCHOR_CONTRACT_ADDRESS / CDP
-    # credentials yet), same as everything else in this app that
-    # degrades gracefully when a third-party integration isn't set up.
-    # See services/audit/anchor_service.py's module docstring.
+    # Periodic on-chain anchor check
     anchor_task = asyncio.create_task(run_periodic_anchor_check())
     yield
     anchor_task.cancel()
@@ -64,17 +59,13 @@ app = FastAPI(
 # ✅ CORS – must be the FIRST middleware (outermost)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],                 # Allow all origins during debugging
-    allow_credentials=False,             # Must be False when using "*"
+    allow_origins=["https://flowgardd.vercel.app"],   # only your frontend
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include Routers — order here also drives the grouping/order Swagger UI
-# displays tags in, so it's kept in sync with the strategic ordering in
-# root()'s "endpoints" list below: Auth first (everything else needs a
-# token), then Live Feed, Reconciliation, Heatmap, E-Billing, Graph,
-# Detective (risk analytics), Admin, Audit.
+# Include Routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
 app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
@@ -84,31 +75,16 @@ app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
 app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
-app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])  # Now defined
+app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(report_verify.router, prefix="/api/reports", tags=["Report Verification"])
-#app.include_router(chatbot.router, prefix="/api", tags=["Chatbot"])
+# app.include_router(chatbot.router, prefix="/api", tags=["Chatbot"])
 
 # Envelope and audit middlewares
 app.add_middleware(ResponseEnvelopeMiddleware)
 app.add_middleware(AuditMiddleware)
 
 # ============================================================================
-# MANUAL OPTIONS HANDLER FOR LOGIN (fallback)
-# ============================================================================
-@app.options("/api/auth/login")
-async def options_login():
-    return Response(
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Max-Age": "86400",
-        }
-    )
-
-# ============================================================================
-# ROOT AND HEALTH ENDPOINTS (with HEAD support)
+# ROOT AND HEALTH ENDPOINTS
 # ============================================================================
 
 @app.get("/")
@@ -118,9 +94,8 @@ async def root():
         "status": "running",
         "version": "2.0.0",
         "endpoints": [
-            # -- Auth: everything else needs a token from here first --
             "POST /api/auth/login - Log in, returns a JWT (or a scoped reset_token if must_reset_password)",
-            "POST /api/auth/reset-password - Redeem a reset_token + set a new password + accept Terms/Privacy (forced-reset flow)",
+            "POST /api/auth/reset-password - Redeem a reset_token + set a new password + accept Terms/Privacy",
             "GET /api/auth/terms - Current Terms & Conditions / Privacy Policy text + required version",
             "POST /api/auth/accept-terms - Redeem a consent_token to re-accept a newer Terms/Privacy version",
             "POST /api/auth/register - Create a user and assign a role (manage_users)",
@@ -152,8 +127,6 @@ async def root():
             "GET /api/detective/risk-features - OMC risk features (all OMCs)",
             "GET /api/detective/risk-features/{omc_id} - OMC risk features (single OMC)",
             "GET /api/detective/risk-features/export - Download risk features as CSV",
-
-            # -- Admin: user/permission management, not a revenue-assurance feature --
             "GET /api/admin/users - List all users (with account_status)",
             "POST /api/admin/users - Provision a user with an emailed temp password, forced reset on first login",
             "POST /api/admin/users/{user_id}/resend-temp-password - Regenerate + re-email a temp password",
@@ -163,15 +136,11 @@ async def root():
             "GET /api/audit/logs/{log_id} - Single audit log entry",
             "GET /api/audit/summary - Aggregate audit stats for the last N days",
             "GET /api/audit/me - Current user's own audit trail",
-
-            # -- Alerts: in-app + email notifications (system-triggered and manual) --
             "GET /api/alerts - Current user's alert inbox",
             "GET /api/alerts/unread-count - Unread alert badge count",
             "POST /api/alerts/{alert_id}/read - Mark one alert read",
             "POST /api/alerts/read-all - Mark every visible alert read",
             "POST /api/alerts - Broadcast a manual alert (manage_alerts)",
-
-            # -- Infra --
             "GET /health - Health check"
         ]
     }
