@@ -280,7 +280,7 @@ function ReportsContent() {
   }
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-[1700px] mx-auto px-2 sm:px-4 text-zinc-800 dark:text-zinc-100">
+    <div className="kpc-reports flex w-full max-w-[1700px] flex-col gap-6 mx-auto px-2 text-foreground sm:px-4">
 
 
 

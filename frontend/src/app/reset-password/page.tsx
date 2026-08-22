@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   acceptTerms,
   ApiError,
@@ -95,30 +96,28 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen text-zinc-100 font-sans p-6 relative overflow-hidden justify-between items-center bg-[#071225]">
+    <div className="flex min-h-screen flex-col items-center justify-between overflow-hidden bg-background p-6 font-sans text-foreground relative">
       <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
-        <FlowGuardHeroIllustration className="w-full h-full object-cover opacity-[0.32]" />
+        <FlowGuardHeroIllustration className="h-full w-full object-cover opacity-[0.08] mix-blend-multiply" />
       </div>
 
-      <header className="relative z-10 w-full text-center flex flex-col items-center gap-2 pt-4">
-        <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight leading-none filter drop-shadow-sm select-none text-white">
-          {BRAND_CONFIG.companyName}
-        </h1>
-        <h2
-          className="text-xl md:text-2xl font-extrabold tracking-tight mt-1 select-none"
-          style={{ color: BRAND_CONFIG.accentColor }}
-        >
-          {BRAND_CONFIG.systemName}
-        </h2>
+      <header className="relative z-10 flex w-full flex-col items-center gap-3 pt-4 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-md ring-1 ring-border">
+          <Image src={BRAND_CONFIG.logoUrl || "/svg/kpc-logo-transparent.svg"} alt={`${BRAND_CONFIG.companyName} logo`} width={40} height={40} className="object-contain" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">{BRAND_CONFIG.companyName}</h1>
+          <h2 className="mt-0.5 text-sm font-medium text-muted-foreground">{BRAND_CONFIG.systemName}</h2>
+        </div>
       </header>
 
       <div className="relative z-10 w-full max-w-2xl mx-auto my-6 px-4 flex items-center justify-center">
-        <div className="w-full bg-white border border-zinc-200 p-8 md:p-10 rounded-xl shadow-2xl">
+        <div className="w-full rounded-2xl border border-border bg-card p-8 shadow-xl md:p-10">
           <div className="mb-6 text-center">
-            <h2 className="text-3xl font-extrabold tracking-tight text-zinc-900">
+            <h2 className="text-3xl font-extrabold tracking-tight text-foreground">
               {mode === "consent" ? "Updated Terms & Privacy Policy" : "Set a new password"}
             </h2>
-            <p className="text-sm text-zinc-500 mt-2">
+            <p className="mt-2 text-sm text-muted-foreground">
               {mode === "consent"
                 ? "Our Terms & Conditions / Privacy Policy have been updated. Please review and re-accept to continue."
                 : "You signed in with a temporary password. Choose a new one and accept the Terms & Conditions / Privacy Policy to continue."}
@@ -126,7 +125,7 @@ export default function ResetPasswordPage() {
           </div>
 
           {mode === "invalid" ? (
-            <div className="rounded border border-red-200 bg-red-50 px-4 py-3.5 text-sm text-red-600 text-center">
+            <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg px-4 py-3.5 text-center text-sm text-status-critical">
               This link has expired or wasn&apos;t reached from login.{" "}
               <a href="/login" className="font-bold underline">
                 Log in again
@@ -140,7 +139,7 @@ export default function ResetPasswordPage() {
                   <div className="flex flex-col gap-2">
                     <label
                       htmlFor="new-password"
-                      className="text-xs font-black uppercase tracking-wider text-left text-zinc-700"
+                      className="text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                     >
                       New Password
                     </label>
@@ -151,7 +150,7 @@ export default function ResetPasswordPage() {
                       minLength={8}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      className="rounded-lg bg-zinc-50/50 border border-zinc-250 hover:border-zinc-350 focus:border-[#0A2E5C] focus:bg-white px-4 py-3.5 text-base text-zinc-900 placeholder-zinc-400 focus:outline-none transition-all shadow-inner"
+                      className="rounded-lg border border-border bg-background px-4 py-3.5 text-base text-foreground placeholder-muted-foreground shadow-inner transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                       placeholder="At least 8 characters"
                     />
                   </div>
@@ -159,7 +158,7 @@ export default function ResetPasswordPage() {
                   <div className="flex flex-col gap-2">
                     <label
                       htmlFor="confirm-password"
-                      className="text-xs font-black uppercase tracking-wider text-left text-zinc-700"
+                      className="text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                     >
                       Confirm New Password
                     </label>
@@ -170,28 +169,28 @@ export default function ResetPasswordPage() {
                       minLength={8}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="rounded-lg bg-zinc-50/50 border border-zinc-250 hover:border-zinc-350 focus:border-[#0A2E5C] focus:bg-white px-4 py-3.5 text-base text-zinc-900 placeholder-zinc-400 focus:outline-none transition-all shadow-inner"
+                      className="rounded-lg border border-border bg-background px-4 py-3.5 text-base text-foreground placeholder-muted-foreground shadow-inner transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                       placeholder="••••••••"
                     />
                     {confirmPassword.length > 0 && newPassword !== confirmPassword && (
-                      <p className="text-xs text-red-600">Passwords don&apos;t match.</p>
+                      <p className="text-xs text-status-critical">Passwords don&apos;t match.</p>
                     )}
                   </div>
                 </>
               )}
 
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-left text-zinc-700">
+                <span className="text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Terms &amp; Conditions and Privacy Policy
                 </span>
-                <div className="rounded-lg border border-zinc-250 bg-zinc-50/50 max-h-56 overflow-y-auto p-4 text-xs text-zinc-700 whitespace-pre-wrap leading-relaxed shadow-inner">
+                <div className="max-h-56 overflow-y-auto rounded-lg border border-border bg-muted/40 p-4 text-xs leading-relaxed text-foreground shadow-inner whitespace-pre-wrap">
                   {termsLoading && "Loading…"}
                   {termsError && <span className="text-red-600">{termsError}</span>}
                   {terms && (
                     <>
                       {terms.terms_and_conditions && (
                         <>
-                          <p className="font-bold text-zinc-900 mb-2">
+                            <p className="mb-2 font-bold text-foreground">
                             Terms &amp; Conditions (v{terms.terms_and_conditions.version})
                           </p>
                           <p className="mb-4">{terms.terms_and_conditions.content}</p>
@@ -199,14 +198,14 @@ export default function ResetPasswordPage() {
                       )}
                       {terms.privacy_policy && (
                         <>
-                          <p className="font-bold text-zinc-900 mb-2">
+                            <p className="mb-2 font-bold text-foreground">
                             Privacy Policy (v{terms.privacy_policy.version})
                           </p>
                           <p>{terms.privacy_policy.content}</p>
                         </>
                       )}
                       {!terms.terms_and_conditions && !terms.privacy_policy && (
-                        <span className="text-zinc-500">No Terms & Conditions configured yet.</span>
+                        <span className="text-muted-foreground">No Terms & Conditions configured yet.</span>
                       )}
                     </>
                   )}
@@ -218,14 +217,14 @@ export default function ResetPasswordPage() {
                     onChange={(e) => setCheckboxAccepted(e.target.checked)}
                     className="mt-0.5 h-4 w-4 accent-sky-600"
                   />
-                  <span className="text-sm text-zinc-700">
+                  <span className="text-sm text-foreground">
                     I have read and agree to the Terms &amp; Conditions and Privacy Policy
                   </span>
                 </label>
               </div>
 
               {error && (
-                <div className="rounded border border-red-200 bg-red-50 px-4 py-3.5 text-sm text-red-600">
+                <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg px-4 py-3.5 text-sm text-status-critical">
                   {error}
                 </div>
               )}
@@ -233,8 +232,7 @@ export default function ResetPasswordPage() {
               <button
                 type="submit"
                 disabled={submitting || !canSubmit}
-                className="mt-2 rounded-lg py-4 text-base font-bold text-white shadow-lg active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-wider bg-sky-600 hover:bg-sky-500 shadow-sky-600/10"
-                style={{ boxShadow: `0 10px 15px -3px rgba(10, 46, 92, 0.15)` }}
+                className="mt-2 rounded-lg bg-primary py-4 text-base font-bold uppercase tracking-wider text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {submitting
                   ? "Saving…"
@@ -247,7 +245,7 @@ export default function ResetPasswordPage() {
         </div>
       </div>
 
-      <footer className="relative z-10 w-full text-center text-sm md:text-base font-bold tracking-wide text-zinc-200 select-none opacity-100 pb-4">
+      <footer className="relative z-10 w-full select-none pb-4 text-center text-sm font-medium tracking-wide text-muted-foreground md:text-base">
         Detect, Reconcile, Predict, Protect every transaction.
       </footer>
     </div>
