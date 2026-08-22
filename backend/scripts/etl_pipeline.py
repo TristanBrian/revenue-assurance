@@ -183,9 +183,13 @@ class DatabaseLoader:
 
     @staticmethod
     def load_to_postgres(dataframes: Dict[str, pd.DataFrame], uri: str = POSTGRES_URI):
+        # Accept either postgresql:// or postgres://
         if not uri or not (uri.startswith("postgresql") or uri.startswith("postgres")):
             logger.info("\n--- Skipping PostgreSQL load (DATABASE_URL not set to a postgresql:// URI) ---")
             return
+        # Convert postgres:// to postgresql:// for SQLAlchemy
+        if uri.startswith("postgres://"):
+            uri = uri.replace("postgres://", "postgresql://", 1)
         logger.info("\n--- Loading to PostgreSQL Database ---")
         try:
             engine = create_engine(uri)
