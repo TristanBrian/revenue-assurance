@@ -18,6 +18,7 @@ Run with (from backend/, after alembic upgrade head + seed_roles.py):
 """
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -58,6 +59,8 @@ def seed():
             user.full_name = full_name
             user.is_active = True
             user.depot_id = depot_id
+            user.must_reset_password = True
+            user.temp_password_expires_at = datetime.now(timezone.utc) + timedelta(hours=48)
             if role:
                 user.roles = [role]
             db.commit()
