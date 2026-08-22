@@ -28,17 +28,22 @@ RAW_DATA_DIR = "data/raw"
 CLEAN_DATA_DIR = "data/clean"
 LOG_DIR = "logs"
 
-# Ensure log directory exists before setting up file logging
+# Ensure log directory exists before setting up file logging.
+# File logging is best-effort: in rootless Podman/Docker the bind-mounted
+# host logs/ dir may be owned by root and unwritable. Never crash startup
+# over that — stdout still reaches `docker compose logs`.
 os.makedirs(LOG_DIR, exist_ok=True)
 LOG_FILE_PATH = os.path.join(LOG_DIR, "kpc_etl_execution.log")
+_log_handlers = [logging.StreamHandler(sys.stdout)]
+try:
+    _log_handlers.insert(0, logging.FileHandler(LOG_FILE_PATH, encoding="utf-8"))
+except OSError:
+    pass
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE_PATH, encoding="utf-8"),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=_log_handlers,
 )
 logger = logging.getLogger("KPC_ETL")
 
@@ -178,9 +183,13 @@ class DatabaseLoader:
 
     @staticmethod
     def load_to_postgres(dataframes: Dict[str, pd.DataFrame], uri: str = POSTGRES_URI):
-        if not uri or not uri.startswith("postgresql"):
+        # Accept either postgresql:// or postgres://
+        if not uri or not (uri.startswith("postgresql") or uri.startswith("postgres")):
             logger.info("\n--- Skipping PostgreSQL load (DATABASE_URL not set to a postgresql:// URI) ---")
             return
+        # Convert postgres:// to postgresql:// for SQLAlchemy
+        if uri.startswith("postgres://"):
+            uri = uri.replace("postgres://", "postgresql://", 1)
         logger.info("\n--- Loading to PostgreSQL Database ---")
         try:
             engine = create_engine(uri)
@@ -227,10 +236,26 @@ def main():
         "disbursements": "disbursements.csv",
     }
 
+    # Outbound (stipend) CSVs are only produced by generate_kpc_data.py.
+    # start.sh skips generation when inbound CSVs already exist, so a
+    # Docker first-run often has dispatches/invoices/payments but not
+    # officers/beneficiaries/etc. Missing outbound files must not abort
+    # the inbound load — that's the data the login dashboard actually reads.
+    OPTIONAL_TABLES = {
+        "officers",
+        "beneficiaries",
+        "attendance",
+        "stipend_authorizations",
+        "disbursements",
+    }
+
     raw_dfs = {}
     for table_name, file_name in file_mapping.items():
         path = os.path.join(RAW_DATA_DIR, file_name)
         if not os.path.exists(path):
+            if table_name in OPTIONAL_TABLES:
+                logger.warning(f"Optional file missing: '{path}' — skipping {table_name}.")
+                continue
             logger.error(f"Required file missing: '{path}'. Pipeline aborted.")
             return
         raw_dfs[table_name] = pd.read_csv(path)
@@ -277,36 +302,6 @@ def main():
     inv_ledger_clean = dq.gate_c_standardize_dates(inv_ledger_clean, "depot_daily_inventory", ["date"])
 
     # C. Clean Outbound Tables (Stage 2 — same 4 gates, no new gate logic)
-    officers_clean = dq.gate_a_deduplicate(raw_dfs["officers"], "officers")
-
-    beneficiaries_clean = dq.gate_a_deduplicate(raw_dfs["beneficiaries"], "beneficiaries")
-    beneficiaries_clean = dq.gate_c_standardize_dates(beneficiaries_clean, "beneficiaries", ["enrollment_date"])
-    beneficiaries_clean = dq.gate_d_referential_integrity(beneficiaries_clean, "beneficiaries", "officer_id", officers_clean, "officer_id")
-
-    attendance_clean = dq.gate_a_deduplicate(raw_dfs["attendance"], "attendance")
-    attendance_clean = dq.gate_c_standardize_dates(attendance_clean, "attendance", ["attendance_date"])
-    attendance_clean = dq.gate_d_referential_integrity(attendance_clean, "attendance", "beneficiary_id", beneficiaries_clean, "beneficiary_id")
-
-    auth_clean = dq.gate_a_deduplicate(raw_dfs["stipend_authorizations"], "stipend_authorizations")
-    auth_clean = dq.gate_b_clean_currency(auth_clean, "stipend_authorizations", ["amount_authorized"])
-    auth_clean = dq.gate_c_standardize_dates(auth_clean, "stipend_authorizations", ["date"])
-    auth_clean = dq.gate_d_referential_integrity(auth_clean, "stipend_authorizations", "attendance_id", attendance_clean, "attendance_id")
-
-    # disbursements.authorization_id is intentionally left un-checked by
-    # Gate D here — ghost payments (authorization_id = NULL, injected by
-    # generate_disbursements()) must NOT be quarantined as a data-quality
-    # defect; they're a real anomaly the reconciliation service is meant
-    # to detect and flag critical. Gate D's own orphan_mask already skips
-    # null FKs (`& child_df[fk].notna()`), so this call is safe to make —
-    # only a disbursement with a NON-null, NON-existent authorization_id
-    # would be quarantined, which is a genuine data-quality defect, not a
-    # ghost payment.
-    disb_clean = dq.gate_a_deduplicate(raw_dfs["disbursements"], "disbursements")
-    disb_clean = dq.gate_b_clean_currency(disb_clean, "disbursements", ["amount_paid"])
-    disb_clean = dq.gate_c_standardize_dates(disb_clean, "disbursements", ["date"])
-    disb_clean = dq.gate_d_referential_integrity(disb_clean, "disbursements", "authorization_id", auth_clean, "authorization_id")
-
-    # 3. COMPILE CLEAN DATASETS
     datasets_clean = {
         "products": products_clean,
         "depots": depots_clean,
@@ -317,14 +312,44 @@ def main():
         "invoices": inv_clean,
         "payments": pay_clean,
         "depot_daily_inventory": inv_ledger_clean,
-        "officers": officers_clean,
-        "beneficiaries": beneficiaries_clean,
-        "attendance": attendance_clean,
-        "stipend_authorizations": auth_clean,
-        "disbursements": disb_clean,
-        "quarantine_audit_log": qm.get_quarantine_dataframe()
     }
 
+    if "officers" in raw_dfs:
+        officers_clean = dq.gate_a_deduplicate(raw_dfs["officers"], "officers")
+        datasets_clean["officers"] = officers_clean
+
+        beneficiaries_clean = dq.gate_a_deduplicate(raw_dfs["beneficiaries"], "beneficiaries")
+        beneficiaries_clean = dq.gate_c_standardize_dates(beneficiaries_clean, "beneficiaries", ["enrollment_date"])
+        beneficiaries_clean = dq.gate_d_referential_integrity(beneficiaries_clean, "beneficiaries", "officer_id", officers_clean, "officer_id")
+        datasets_clean["beneficiaries"] = beneficiaries_clean
+
+        attendance_clean = dq.gate_a_deduplicate(raw_dfs["attendance"], "attendance")
+        attendance_clean = dq.gate_c_standardize_dates(attendance_clean, "attendance", ["attendance_date"])
+        attendance_clean = dq.gate_d_referential_integrity(attendance_clean, "attendance", "beneficiary_id", beneficiaries_clean, "beneficiary_id")
+        datasets_clean["attendance"] = attendance_clean
+
+        auth_clean = dq.gate_a_deduplicate(raw_dfs["stipend_authorizations"], "stipend_authorizations")
+        auth_clean = dq.gate_b_clean_currency(auth_clean, "stipend_authorizations", ["amount_authorized"])
+        auth_clean = dq.gate_c_standardize_dates(auth_clean, "stipend_authorizations", ["date"])
+        auth_clean = dq.gate_d_referential_integrity(auth_clean, "stipend_authorizations", "attendance_id", attendance_clean, "attendance_id")
+        datasets_clean["stipend_authorizations"] = auth_clean
+
+        # disbursements.authorization_id is intentionally left un-checked by
+        # Gate D here — ghost payments (authorization_id = NULL, injected by
+        # generate_disbursements()) must NOT be quarantined as a data-quality
+        # defect; they're a real anomaly the reconciliation service is meant
+        # to detect and flag critical. Gate D's own orphan_mask already skips
+        # null FKs (`& child_df[fk].notna()`), so this call is safe to make —
+        # only a disbursement with a NON-null, NON-existent authorization_id
+        # would be quarantined, which is a genuine data-quality defect, not a
+        # ghost payment.
+        disb_clean = dq.gate_a_deduplicate(raw_dfs["disbursements"], "disbursements")
+        disb_clean = dq.gate_b_clean_currency(disb_clean, "disbursements", ["amount_paid"])
+        disb_clean = dq.gate_c_standardize_dates(disb_clean, "disbursements", ["date"])
+        disb_clean = dq.gate_d_referential_integrity(disb_clean, "disbursements", "authorization_id", auth_clean, "authorization_id")
+        datasets_clean["disbursements"] = disb_clean
+
+    datasets_clean["quarantine_audit_log"] = qm.get_quarantine_dataframe()
     logger.info(f"\n Total quarantined records captured for governance audit: {len(datasets_clean['quarantine_audit_log'])}")
 
     # 4. DATABASE LOAD
