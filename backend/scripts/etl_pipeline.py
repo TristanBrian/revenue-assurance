@@ -183,7 +183,7 @@ class DatabaseLoader:
 
     @staticmethod
     def load_to_postgres(dataframes: Dict[str, pd.DataFrame], uri: str = POSTGRES_URI):
-        if not uri or not uri.startswith("postgresql"):
+        if not uri or not (uri.startswith("postgresql") or uri.startswith("postgres")):
             logger.info("\n--- Skipping PostgreSQL load (DATABASE_URL not set to a postgresql:// URI) ---")
             return
         logger.info("\n--- Loading to PostgreSQL Database ---")
