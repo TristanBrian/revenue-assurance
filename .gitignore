@@ -60,5 +60,10 @@ htmlcov/
 
 # Misc
 get-docker.sh
+<<<<<<< Updated upstream
 *.tmp
 *.zip
+=======
+*.tmpbackup_data/
+>>>>>>> Stashed changes
+backup_data/
