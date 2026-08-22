@@ -301,7 +301,6 @@ Key endpoints:
 
 ## 📸 Screenshots
 
-_Add your own screenshots here._
 
 | Dashboard | Anomaly Table | Fraud Graph |
 |-----------|---------------|-------------|
