@@ -8,7 +8,7 @@ from typing import Optional
 
 from app.services.rag.rag_service import answer_question, ingest_url, reload_knowledge_base
 from app.core.dependencies import require_permission
-from app.models.user import User  # adjust import if needed
+from app.models.auth.user import User
 
 router = APIRouter()
 
