@@ -1,0 +1,93 @@
+Emulate Docker CLI using podman. Create /etc/containers/nodocker to quiet msg.
+[4m>>>> Executing external compose provider "/usr/libexec/docker/cli-plugins/docker-compose". Please see podman-compose(1) for how to disable this message. <<<<
+
+[0m============================= test session starts ==============================
+platform linux -- Python 3.11.16, pytest-8.3.3, pluggy-1.6.0
+rootdir: /app
+plugins: Faker-28.4.1, anyio-4.14.2, cov-5.0.0
+collected 162 items
+
+tests/test_alert_service.py ........................                     [ 14%]
+tests/test_anchor_service.py .........                                   [ 20%]
+tests/test_audit_service.py .........................                    [ 35%]
+tests/test_consent_flow.py .............                                 [ 43%]
+tests/test_data_quality.py .....                                         [ 46%]
+tests/test_detective_service.py .........                                [ 52%]
+tests/test_ebilling.py ......s........                                   [ 61%]
+tests/test_etl.py ....                                                   [ 64%]
+tests/test_forced_password_reset.py ............                         [ 71%]
+tests/test_graph.py .............                                        [ 79%]
+tests/test_outbound_reconciliation.py .............                      [ 87%]
+tests/test_reconciliation.py ..................                          [ 98%]
+tests/test_report_crypto.py ..                                           [100%]
+
+=============================== warnings summary ===============================
+../usr/local/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /usr/local/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+../usr/local/lib/python3.11/site-packages/websockets/legacy/__init__.py:6
+  /usr/local/lib/python3.11/site-packages/websockets/legacy/__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+../usr/local/lib/python3.11/site-packages/_pytest/stepwise.py:51
+  /usr/local/lib/python3.11/site-packages/_pytest/stepwise.py:51: PytestCacheWarning: cache could not write path /app/.pytest_cache/v/cache/stepwise: [Errno 13] Permission denied: '/app/.pytest_cache/v/cache/stepwise'
+    session.config.cache.set(STEPWISE_CACHE_DIR, [])
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+
+---------- coverage: platform linux, python 3.11.16-final-0 ----------
+Name                                            Stmts   Miss  Cover
+-------------------------------------------------------------------
+app/core/__init__.py                                0      0   100%
+app/core/cache.py                                  15      8    47%
+app/core/dependencies.py                           43      9    79%
+app/core/email.py                                  46     20    57%
+app/core/response_envelope.py                      45     11    76%
+app/core/security.py                               60      4    93%
+app/routes/__init__.py                              0      0   100%
+app/routes/alerts/__init__.py                       1      0   100%
+app/routes/alerts/alerts.py                        33     16    52%
+app/routes/audit/__init__.py                        0      0   100%
+app/routes/audit/audit.py                          34     12    65%
+app/routes/auth/__init__.py                         0      0   100%
+app/routes/auth/admin.py                           53     24    55%
+app/routes/auth/auth.py                           134     22    84%
+app/routes/chatbot.py                              27     27     0%
+app/routes/ebilling/__init__.py                     0      0   100%
+app/routes/ebilling/e_billing.py                  151    111    26%
+app/routes/feed/__init__.py                         0      0   100%
+app/routes/feed/feed.py                            35     24    31%
+app/routes/fraud/__init__.py                        0      0   100%
+app/routes/fraud/detective.py                      26     11    58%
+app/routes/fraud/graph.py                          77     54    30%
+app/routes/reconciliation/__init__.py               0      0   100%
+app/routes/reconciliation/heatmap.py               39     27    31%
+app/routes/reconciliation/reconcile.py            280    241    14%
+app/routes/report_verify.py                        27     17    37%
+app/services/__init__.py                            0      0   100%
+app/services/alerts/__init__.py                     0      0   100%
+app/services/alerts/alert_service.py              301     41    86%
+app/services/alerts/alert_types.py                 51      0   100%
+app/services/audit/__init__.py                      0      0   100%
+app/services/audit/anchor_service.py              172    112    35%
+app/services/audit/audit_service.py               172     37    78%
+app/services/auth/__init__.py                       0      0   100%
+app/services/auth/terms_service.py                 39      0   100%
+app/services/auth/user_service.py                 135     77    43%
+app/services/ebilling/__init__.py                   0      0   100%
+app/services/ebilling/e_billing.py                336    168    50%
+app/services/feed/__init__.py                       0      0   100%
+app/services/feed/feed.py                          11      5    55%
+app/services/fraud/__init__.py                      0      0   100%
+app/services/fraud/detective_service.py            96      7    93%
+app/services/fraud/graph_engine.py                216     43    80%
+app/services/reconciliation/__init__.py             0      0   100%
+app/services/reconciliation/heatmap.py             17     17     0%
+app/services/reconciliation/reconciliation.py     375     49    87%
+app/services/report_crypto.py                      23      0   100%
+-------------------------------------------------------------------
+TOTAL                                            3070   1194    61%
+Coverage HTML written to dir test_reports/htmlcov_backend
+
+================= 161 passed, 1 skipped, 3 warnings in 42.64s ==================
