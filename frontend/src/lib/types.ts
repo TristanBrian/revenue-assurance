@@ -51,6 +51,7 @@ export interface Anomaly {
   invoice_id: string | null;
   customer: string;
   product: string;
+  depot: string | null;
   dispatched_kes: number;
   invoiced_kes: number;
   paid_kes: number;
@@ -146,6 +147,53 @@ export interface MetricsResult {
   data_quality: DataQuality;
   ebilling_status: ReconciliationEbillingStatus;
   duplicate_anomalies: unknown[];
+}
+
+// GET /api/reconcile/trend — daily exposure-identified vs recovered, KES (view_metrics).
+export interface ExposureRecoveryPoint {
+  date: string;
+  exposure_identified_kes: number;
+  recovered_kes: number;
+}
+
+export interface ExposureRecoveryTrendResult {
+  days: number;
+  series: ExposureRecoveryPoint[];
+}
+
+// GET /api/reconcile/depot-alerts — Depot Supervisor's own-depot-only alert
+// feed (view_depot_alerts). Deliberately not full AnomalyTableResult shape:
+// there's no pagination, and the server decides the depot, never the client.
+export interface DepotAlertsResult {
+  depot_id: string;
+  critical_count: number;
+  total_count: number;
+  items: Anomaly[];
+}
+
+// GET /api/reconcile/depot-risk — the Heatmap page's Map view (view_heatmap).
+export interface DepotRiskEntry {
+  depot_id: string;
+  leakage_kes: number;
+  anomaly_count: number;
+  critical_count: number;
+  risk_level: "Low" | "Medium" | "High";
+}
+
+export interface DepotRiskResult {
+  depots: DepotRiskEntry[];
+}
+
+// GET /api/reconcile/omc-depot-map — OMC markers on the Heatmap Map view.
+export interface OmcDepotEntry {
+  omc: string;
+  depot_id: string;
+  leakage_kes: number;
+  risk_level: "Low" | "Medium" | "High";
+}
+
+export interface OmcDepotMapResult {
+  omcs: OmcDepotEntry[];
 }
 
 // GET /api/reconcile/anomalies — the "Anomaly Table" feature (view_anomaly_table).

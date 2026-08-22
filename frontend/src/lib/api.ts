@@ -4,8 +4,12 @@ import type {
   AnomalyTableResult,
   AuthUser,
   CreateUserPayload,
+  DepotAlertsResult,
+  DepotRiskResult,
+  OmcDepotMapResult,
   EbillingIntegrationStatus,
   EbillingLogEntry,
+  ExposureRecoveryTrendResult,
   FailureRateMonitor,
   FeedData,
   FraudExplainData,
@@ -219,6 +223,28 @@ export async function getMetrics(materiality = 100000, direction: Direction = "a
   url.searchParams.set("direction", direction);
   const res = await authFetch(url, { method: "POST" });
   return unwrap<MetricsResult>(res);
+}
+
+export async function getDepotAlerts(): Promise<DepotAlertsResult> {
+  const res = await authFetch(new URL("/api/reconcile/depot-alerts", API_URL));
+  return unwrap<DepotAlertsResult>(res);
+}
+
+export async function getDepotRisk(): Promise<DepotRiskResult> {
+  const res = await authFetch(new URL("/api/reconcile/depot-risk", API_URL));
+  return unwrap<DepotRiskResult>(res);
+}
+
+export async function getOmcDepotMap(): Promise<OmcDepotMapResult> {
+  const res = await authFetch(new URL("/api/reconcile/omc-depot-map", API_URL));
+  return unwrap<OmcDepotMapResult>(res);
+}
+
+export async function getExposureRecoveryTrend(days = 30): Promise<ExposureRecoveryTrendResult> {
+  const url = new URL("/api/reconcile/trend", API_URL);
+  url.searchParams.set("days", String(days));
+  const res = await authFetch(url);
+  return unwrap<ExposureRecoveryTrendResult>(res);
 }
 
 export interface AnomalyFilters {

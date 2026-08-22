@@ -11,23 +11,35 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeMode>("dark"); // default to dark
+function readStoredTheme(): ThemeMode {
+  const saved = window.localStorage.getItem("kpc_theme_mode");
+  return saved === "light" || saved === "dark" || saved === "system" ? saved : "dark";
+}
 
-  // Initialize theme from localStorage on mount
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  // Same hardcoded default on server and on the client's first render — the
+  // real preference is read below, after mount, never during render. That
+  // avoids a hydration mismatch (server can't read localStorage) without
+  // going back to the setTimeout-raced version this replaced.
+  const [theme, setThemeState] = useState<ThemeMode>("dark");
+  const skipFirstApply = React.useRef(true);
+
+  // Reconcile with the real stored preference once mounted. The blocking
+  // inline script in layout.tsx already painted the correct .dark class
+  // before hydration, so this only needs to sync React's own state — the
+  // "apply theme" effect below skips its class mutation on this same first
+  // run to avoid stomping what the script already got right.
   useEffect(() => {
-    const saved = localStorage.getItem("kpc_theme_mode") as ThemeMode | null;
-    if (saved === "light" || saved === "dark" || saved === "system") {
-      setTimeout(() => {
-        setThemeState(saved);
-      }, 0);
-    }
+    Promise.resolve().then(() => {
+      const saved = readStoredTheme();
+      setThemeState((current) => (current === saved ? current : saved));
+    });
   }, []);
 
   // Apply theme to document element
   useEffect(() => {
     const root = window.document.documentElement;
-    
+
     function applyTheme(mode: ThemeMode) {
       if (mode === "dark") {
         root.classList.add("dark");
@@ -44,7 +56,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    applyTheme(theme);
+    if (skipFirstApply.current) {
+      skipFirstApply.current = false;
+    } else {
+      applyTheme(theme);
+    }
 
     // Watch for OS theme changes if in system mode
     if (theme === "system") {

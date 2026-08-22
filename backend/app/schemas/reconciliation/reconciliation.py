@@ -32,6 +32,7 @@ class Anomaly(BaseModel):
     invoice_id: Optional[str] = None
     customer: str
     product: str
+    depot: Optional[str] = None
     dispatched_kes: int
     invoiced_kes: int
     paid_kes: int

@@ -370,6 +370,7 @@ def run_reconciliation_on_dataframes(
                     'invoice_id': row['invoice_id'] if not pd.isna(row['invoice_id']) else None,
                     'customer': row[merged_customer_col],
                     'product': row[product_col],
+                    'depot': row['depot'] if 'depot' in row and pd.notna(row['depot']) else None,
                     'dispatched_kes': int(row['dispatched_kes']),
                     'invoiced_kes': int(row['invoiced_kes']),
                     'paid_kes': int(row['paid_kes']),
@@ -512,6 +513,100 @@ def _score_anomalies_for_fraud(anomalies: list, *, direction: str, engine, **tab
         for a in anomalies:
             a.setdefault('fraud_score', None)
             a.setdefault('fraud_tier', None)
+
+def get_depot_alerts(depot_id: str, limit: int = 20) -> Dict:
+    """Return critical/high reconciliation anomalies for one assigned depot."""
+    result = run_reconciliation(materiality=0)
+    depot_anomalies = [a for a in result.get('anomalies', []) if a.get('depot') == depot_id]
+    depot_anomalies.sort(key=lambda a: a['leakage_kes'], reverse=True)
+    critical = [a for a in depot_anomalies if a['status'] == 'Critical']
+    return {
+        'depot_id': depot_id,
+        'critical_count': len(critical),
+        'total_count': len(depot_anomalies),
+        'items': depot_anomalies[:limit],
+    }
+
+
+def get_depot_risk_summary() -> List[Dict]:
+    """Aggregate leakage and risk level by depot for the heatmap map view."""
+    result = run_reconciliation(materiality=0)
+    anomalies = pd.DataFrame(result.get('anomalies', []))
+    if anomalies.empty or 'depot' not in anomalies.columns:
+        return []
+    anomalies = anomalies[anomalies['depot'].notna()]
+    if anomalies.empty:
+        return []
+    stats = anomalies.groupby('depot').agg(
+        leakage_kes=('leakage_kes', 'sum'),
+        anomaly_count=('dispatch_id', 'count'),
+        critical_count=('status', lambda s: (s == 'Critical').sum()),
+    ).reset_index()
+    stats['risk_level'] = pd.cut(
+        stats['leakage_kes'], bins=[0, 100000, 1000000, float('inf')],
+        labels=['Low', 'Medium', 'High'],
+    ).astype(str)
+    stats['leakage_kes'] = stats['leakage_kes'].astype(int)
+    return stats.rename(columns={'depot': 'depot_id'}).to_dict(orient='records')
+
+
+def get_omc_depot_map() -> List[Dict]:
+    """Map each OMC to its highest-exposure depot."""
+    result = run_reconciliation(materiality=0)
+    anomalies = pd.DataFrame(result.get('anomalies', []))
+    if anomalies.empty or 'depot' not in anomalies.columns:
+        return []
+    totals = anomalies.groupby('customer')['leakage_kes'].sum()
+    risk = pd.cut(totals, bins=[0, 100000, 1000000, float('inf')], labels=['Low', 'Medium', 'High']).astype(str)
+    with_depot = anomalies[anomalies['depot'].notna()]
+    if with_depot.empty:
+        return []
+    per_depot = with_depot.groupby(['customer', 'depot'])['leakage_kes'].sum().reset_index()
+    primary = per_depot.loc[per_depot.groupby('customer')['leakage_kes'].idxmax()]
+    output = []
+    for _, row in primary.iterrows():
+        omc = row['customer']
+        output.append({
+            'omc': omc,
+            'depot_id': row['depot'],
+            'leakage_kes': int(totals.get(omc, 0)),
+            'risk_level': risk.get(omc, 'Low'),
+        })
+    return sorted(output, key=lambda item: item['leakage_kes'], reverse=True)
+
+
+def get_exposure_recovery_trend(days: int = 30) -> List[Dict]:
+    """Return daily identified exposure versus recovered payment totals."""
+    engine = get_engine()
+    dispatches = pd.read_sql('SELECT * FROM dispatches', engine)
+    invoices = pd.read_sql('SELECT * FROM invoices', engine)
+    payments = pd.read_sql('SELECT * FROM payments', engine)
+    dispatch_dates = pd.to_datetime(dispatches['date']) if 'date' in dispatches.columns else pd.Series(dtype='datetime64[ns]')
+    reference_date = dispatch_dates.quantile(0.99) if not dispatch_dates.empty else pd.Timestamp.now()
+    today = pd.Timestamp(reference_date).normalize()
+    window_start = today - pd.Timedelta(days=days - 1)
+    date_index = pd.date_range(window_start, today, freq='D')
+
+    result = run_reconciliation_on_dataframes(dispatches, invoices, payments, materiality=0)
+    anomalies = pd.DataFrame(result.get('anomalies', []))
+    if not anomalies.empty:
+        anomalies['bucket_date'] = pd.to_datetime(anomalies['created_at']).dt.normalize()
+        exposure_by_day = anomalies[anomalies['bucket_date'] >= window_start].groupby('bucket_date')['leakage_kes'].sum()
+    else:
+        exposure_by_day = pd.Series(dtype=float)
+
+    if not payments.empty and 'date' in payments.columns and 'value_kes' in payments.columns:
+        payments = payments.copy()
+        payments['bucket_date'] = pd.to_datetime(payments['date']).dt.normalize()
+        recovered_by_day = payments[payments['bucket_date'] >= window_start].groupby('bucket_date')['value_kes'].sum()
+    else:
+        recovered_by_day = pd.Series(dtype=float)
+
+    return [{
+        'date': date.strftime('%Y-%m-%d'),
+        'exposure_identified_kes': int(exposure_by_day.get(date, 0)),
+        'recovered_kes': int(recovered_by_day.get(date, 0)),
+    } for date in date_index]
 
 
 # =============================================================================

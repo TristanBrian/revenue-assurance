@@ -29,34 +29,39 @@ from app.utils.db_connection import SessionLocal
 
 DEMO_PASSWORD = "demo-pass-123"
 
+# Fourth element is the depot assigned to the demo depot_supervisor — the
+# one real value this scoping needs, since it drives every alert they see
+# (see services/alert_scope.py). Null for every other role.
 DEMO_USERS = [
-    ("depot_supervisor@kpc-demo.co.ke", "Demo Depot Supervisor", "depot_supervisor"),
-    ("manager@kpc-demo.co.ke", "Demo Manager", "manager"),
-    ("revenue_assurance@kpc-demo.co.ke", "Demo Revenue Assurance", "revenue_assurance"),
-    ("system_admin@kpc-demo.co.ke", "Demo System Admin", "system_admin"),
+    ("depot_supervisor@kpc-demo.co.ke", "Demo Depot Supervisor", "depot_supervisor", "Nairobi"),
+    ("manager@kpc-demo.co.ke", "Demo Manager", "manager", None),
+    ("revenue_assurance@kpc-demo.co.ke", "Demo Revenue Assurance", "revenue_assurance", None),
+    ("system_admin@kpc-demo.co.ke", "Demo System Admin", "system_admin", None),
     # Outbound (stipend/disbursement) — Stage 2. Read-only, outbound-only —
     # see seed_roles.py's ROLE_PERMISSIONS comment.
-    ("inuka_manager@kpc-demo.co.ke", "Demo Inuka Manager", "inuka_manager"),
+    ("inuka_manager@kpc-demo.co.ke", "Demo Inuka Manager", "inuka_manager", None),
 ]
 
 
 def seed():
     db = SessionLocal()
     try:
-        for email, full_name, role_name in DEMO_USERS:
+        for email, full_name, role_name, depot_id in DEMO_USERS:
             try:
                 register_user(db, email=email, password=DEMO_PASSWORD, full_name=full_name, role_name=role_name)
                 print(f"Created {email} ({role_name})")
             except EmailAlreadyRegisteredError:
-                user = db.query(User).filter(User.email == email).first()
-                role = db.query(Role).filter(Role.name == role_name).first()
-                user.hashed_password = hash_password(DEMO_PASSWORD)
-                user.full_name = full_name
-                user.is_active = True
-                if role:
-                    user.roles = [role]
-                db.commit()
-                print(f"Already existed — reset password/role: {email}")
+                pass
+            user = db.query(User).filter(User.email == email).first()
+            role = db.query(Role).filter(Role.name == role_name).first()
+            user.hashed_password = hash_password(DEMO_PASSWORD)
+            user.full_name = full_name
+            user.is_active = True
+            user.depot_id = depot_id
+            if role:
+                user.roles = [role]
+            db.commit()
+            print(f"Reset password/role/depot: {email}")
     finally:
         db.close()
 

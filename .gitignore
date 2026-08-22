@@ -61,3 +61,4 @@ htmlcov/
 # Misc
 get-docker.sh
 *.tmp
+*.zip
