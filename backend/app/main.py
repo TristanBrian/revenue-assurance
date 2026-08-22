@@ -6,8 +6,9 @@ from app.routes.reconciliation import reconcile, heatmap
 from app.routes.ebilling import e_billing
 from app.routes.feed import feed
 from app.routes.auth import auth, admin
-from app.routes.fraud import detective, graph
+from app.routes.fraud import detective, graph, scoring
 from app.routes.audit import audit
+from app.routes.alerts import alerts
 from app.routes import report_verify
 from app.routes import alerts
 # from app.routes import chatbot
@@ -15,6 +16,8 @@ from app.routes import alerts
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
 from app.services.audit.anchor_service import run_periodic_anchor_check
+from app.services.fraud.graph_snapshot_service import run_periodic_graph_snapshot_refresh
+from app.services.fraud.fraud_scoring_service import run_periodic_retrain_check
 from contextlib import asynccontextmanager
 import asyncio
 import contextlib
@@ -39,10 +42,24 @@ async def lifespan(app: FastAPI):
         logger.error(f"❌ Database connection failed ({safe_url}): {e}")
 
     anchor_task = asyncio.create_task(run_periodic_anchor_check())
+
+    # Fraud scoring layer: graph snapshot refresh (Louvain community
+    # membership, feeding graph_community_size — recomputing per anomaly
+    # would be too slow, see graph_snapshot_service.py) and the retrain
+    # threshold check (fires an actual retrain only once enough
+    # investigator feedback has accumulated — see fraud_scoring_service.
+    # maybe_retrain()). Both always started, both no-op cheaply until a
+    # trained model/enough feedback exists.
+    graph_snapshot_task = asyncio.create_task(run_periodic_graph_snapshot_refresh())
+    retrain_check_task = asyncio.create_task(run_periodic_retrain_check())
+
+    background_tasks = [anchor_task, graph_snapshot_task, retrain_check_task]
     yield
-    anchor_task.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await anchor_task
+    for task in background_tasks:
+        task.cancel()
+    for task in background_tasks:
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
 
 # ============================================================================
 # FASTAPI APP
@@ -69,11 +86,12 @@ app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
 app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
 app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])
 app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
-app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
-app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
-app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
-app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
+app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])  # <-- NEW
+app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
+app.include_router(scoring.router, prefix="/api/fraud", tags=["Fraud Scoring"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
+app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
+app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])  # <-- NEW
 app.include_router(report_verify.router, prefix="/api/reports", tags=["Report Verification"])
 # app.include_router(chatbot.router, prefix="/api", tags=["Chatbot"])
 

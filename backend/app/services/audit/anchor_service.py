@@ -461,6 +461,18 @@ async def run_periodic_anchor_check(interval_seconds: int = 60) -> None:
     conditional startup wiring) — maybe_anchor_chain_tip() itself no-ops
     immediately when anchoring isn't configured, so an un-configured
     deployment just polls and does nothing, cheaply.
+
+    Runs maybe_anchor_chain_tip() in a thread (asyncio.to_thread), not
+    directly — _run()'s sync/async bridge (module docstring above) uses
+    asyncio.run() as its fallback, which raises "cannot be called from a
+    running event loop" when invoked from code that's already running
+    inside one, exactly what this loop is. Verified live: the first time
+    this loop actually found something to anchor, it hit that error and
+    silently skipped the anchor attempt every tick thereafter. A thread
+    has no running loop of its own, so _run()'s existing logic works
+    unmodified once moved there — same fix already applied to
+    graph_snapshot_service.run_periodic_graph_snapshot_refresh() for the
+    identical reason.
     """
     from app.utils.db_connection import SessionLocal
 
@@ -468,7 +480,7 @@ async def run_periodic_anchor_check(interval_seconds: int = 60) -> None:
         try:
             db = SessionLocal()
             try:
-                maybe_anchor_chain_tip(db)
+                await asyncio.to_thread(maybe_anchor_chain_tip, db)
             finally:
                 db.close()
         except asyncio.CancelledError:

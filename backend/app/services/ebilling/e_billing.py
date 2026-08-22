@@ -421,7 +421,10 @@ def sync_anomalies_to_ebilling(anomalies: list) -> dict:
     return sync_invoices_to_ebilling(invoice_ids)
 
 
-def update_anomaly_status(db: Session, dispatch_id: str, status: str, notes: str = '', actor_user_id=None) -> dict:
+def update_anomaly_status(
+    db: Session, dispatch_id: str, status: str, notes: str = '', actor_user_id=None,
+    fraud_feedback_label: Optional[str] = None,
+) -> dict:
     """
     Persists resolution status via the ORM, unlike the rest of this file's
     raw engine/text() upserts — this is a single-record CRUD by primary
@@ -433,6 +436,18 @@ def update_anomaly_status(db: Session, dispatch_id: str, status: str, notes: str
     audit_service.log_action() call below — so the audit entry is atomic
     with the resolution it's recording, not a separate transaction that
     could persist (or vanish) independently of it.
+
+    fraud_feedback_label ("confirmed_fraud" | "false_positive" |
+    "resolved_benign"): optional and independent of `status` — status
+    tracks WORKFLOW state (Pending/Review Required/Resolved), this tracks
+    a FRAUD JUDGMENT, a different axis entirely (an anomaly can be
+    "Resolved" as either confirmed fraud or a false positive). When
+    provided, writes to fraud_feedback (services/fraud/
+    fraud_scoring_service.record_feedback()) in the SAME transaction as
+    everything else this function writes — the retraining loop's whole
+    point is learning from real investigator judgments, so that judgment
+    should never be recorded independently of the resolution action it
+    came from.
     """
     resolution = db.query(AnomalyResolution).filter(AnomalyResolution.dispatch_id == dispatch_id).first()
     if resolution:
@@ -453,6 +468,13 @@ def update_anomaly_status(db: Session, dispatch_id: str, status: str, notes: str
         before={"status": before_status},
         after={"status": status, "notes": notes},
     )
+
+    if fraud_feedback_label:
+        from app.services.fraud.fraud_scoring_service import record_feedback
+
+        record_feedback(
+            db, anomaly_id=dispatch_id, resolution_label=fraud_feedback_label, resolved_by=actor_user_id
+        )
 
     # Same convention as log_action() just above — not defensively wrapped:
     # these are plain INSERTs in the same uncommitted transaction as the

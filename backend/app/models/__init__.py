@@ -21,6 +21,8 @@ from app.models.reconciliation.payment import Payment
 from app.models.reconciliation.depot_ledger import DepotLedger
 from app.models.reconciliation.anomaly_resolution import AnomalyResolution
 from app.models.audit.audit import AuditLog
+from app.models.audit.audit_anchor import AuditAnchorRecord
+from app.models.fraud.fraud_feedback import FraudFeedback
 from app.models.alerts.alert import Alert
 from app.models.alerts.alert_read import AlertRead
 from app.models.auth.terms_document import TermsDocument
@@ -48,6 +50,8 @@ __all__ = [
     "DepotLedger",
     "AnomalyResolution",
     "AuditLog",
+    "AuditAnchorRecord",
+    "FraudFeedback",
     "Alert",
     "AlertRead",
     "TermsDocument",

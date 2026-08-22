@@ -8,6 +8,7 @@ import type {
   EbillingLogEntry,
   FailureRateMonitor,
   FeedData,
+  FraudExplainData,
   FraudGraphData,
   HeatmapData,
   LoginResponse,
@@ -414,6 +415,23 @@ export async function retryEbillingSync(invoiceId: string): Promise<RetrySyncRes
   return unwrap<RetrySyncResult>(res);
 }
 
+export async function explainAnomalyScore(anomalyId: string): Promise<FraudExplainData> {
+  const url = new URL(`/api/fraud/explain/${encodeURIComponent(anomalyId)}`, API_URL);
+  const res = await authFetch(url);
+  const body = await unwrap<{ status: string; data: FraudExplainData }>(res);
+  return body.data;
+}
+
+export async function fraudChat(message: string, anomalyId?: string): Promise<string> {
+  const res = await authFetch(new URL("/api/fraud/chat", API_URL), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, anomaly_id: anomalyId }),
+  });
+  const body = await unwrap<{ status: string; reply: string }>(res);
+  return body.reply;
+}
+
 export async function getFraudGraph(materiality = 0, direction: Direction = "all"): Promise<FraudGraphData> {
   const url = new URL("/api/graph", API_URL);
   url.searchParams.set("materiality", String(materiality));
@@ -449,15 +467,23 @@ export async function getHeatmap(materiality = 0, direction: Direction = "all"):
   return body.data;
 }
 
+// "confirmed_fraud" | "false_positive" | "resolved_benign" — feeds the
+// fraud-scoring layer's retraining loop (fraud_feedback table). Optional
+// and independent of `status`: status tracks workflow state, this
+// tracks a fraud judgment, a different axis entirely.
+export type FraudFeedbackLabel = "confirmed_fraud" | "false_positive" | "resolved_benign";
+
 export async function updateAnomalyStatus(
   dispatchId: string,
   status: string,
   notes = "",
+  fraudFeedbackLabel?: FraudFeedbackLabel,
 ): Promise<UpdateAnomalyResponse> {
   const url = new URL("/api/reconcile/update", API_URL);
   url.searchParams.set("dispatch_id", dispatchId);
   url.searchParams.set("status", status);
   url.searchParams.set("notes", notes);
+  if (fraudFeedbackLabel) url.searchParams.set("fraud_feedback_label", fraudFeedbackLabel);
   const res = await authFetch(url, { method: "POST" });
   return unwrap<UpdateAnomalyResponse>(res);
 }

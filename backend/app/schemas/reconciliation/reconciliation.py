@@ -63,6 +63,16 @@ class Anomaly(BaseModel):
     # _build_outbound_anomaly(). None for inbound anomalies.
     officer_id: Optional[str] = None
     beneficiary_id: Optional[str] = None
+    # Fraud scoring layer (ML) — set by reconciliation.py's
+    # _score_anomalies_for_fraud() right after flow_direction tagging.
+    # None whenever the model isn't trained yet (services/fraud/
+    # fraud_scoring_service.py's is_configured() gate) or scoring itself
+    # failed (best-effort, non-fatal — see that function's docstring):
+    # reconciliation always succeeds either way, fraud_score is an
+    # enrichment on top of it, never a precondition for anomalies to
+    # appear at all.
+    fraud_score: Optional[float] = None
+    fraud_tier: Optional[str] = None
 
 
 class Metrics(BaseModel):

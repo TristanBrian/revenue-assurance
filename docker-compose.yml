@@ -58,6 +58,11 @@ services:
       - .env
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      # Docker sets HOSTNAME to the container ID by default; Next's
+      # standalone server.js binds to process.env.HOSTNAME and does a
+      # DNS lookup on it, which fails (EAI_AGAIN) since the container
+      # ID isn't a resolvable name. Force binding on all interfaces.
+      - HOSTNAME=0.0.0.0
     depends_on:
       - backend
     stdin_open: true
