@@ -11,6 +11,7 @@ import {
   MaterialityProvider,
   useMateriality,
 } from "@/context/MaterialityContext";
+import { DirectionProvider } from "@/context/DirectionContext";
 import { useTheme } from "@/context/ThemeContext";
 import { BRAND_CONFIG } from "@/lib/brand-config";
 
@@ -452,7 +453,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <MaterialityProvider>
-      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      <DirectionProvider>
+        <DashboardLayoutContent>{children}</DashboardLayoutContent>
+      </DirectionProvider>
     </MaterialityProvider>
   );
 }

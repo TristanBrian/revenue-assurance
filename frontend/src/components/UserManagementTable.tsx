@@ -35,14 +35,12 @@ const FALLBACK_TONE = { avatar: "bg-muted text-muted-foreground", badge: "bg-mut
 
 interface UserFormState {
   email: string;
-  password: string;
   full_name: string;
   role_name: RoleName;
 }
 
 const EMPTY_FORM: UserFormState = {
   email: "",
-  password: "",
   full_name: "",
   role_name: "depot_supervisor",
 };
@@ -155,7 +153,6 @@ export default function UserManagementTable() {
     try {
       await createUser({
         email: createForm.email,
-        password: createForm.password,
         full_name: createForm.full_name || undefined,
         role_name: createForm.role_name,
       });
@@ -496,16 +493,9 @@ export default function UserManagementTable() {
                   className="mt-1 w-full rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-foreground"
                 />
               </div>
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Password</label>
-                <input
-                  type="password"
-                  value={createForm.password}
-                  onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
-                  className="mt-1 w-full rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-foreground"
-                  placeholder="At least 8 characters"
-                />
-              </div>
+              <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                A temporary password will be generated and emailed to the new user. They must set a new password on first login.
+              </p>
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Role</label>
                 <select
@@ -525,7 +515,7 @@ export default function UserManagementTable() {
 
               <button
                 onClick={handleCreate}
-                disabled={creating || !createForm.email || !createForm.password}
+                disabled={creating || !createForm.email}
                 className="mt-2 w-full rounded-md bg-primary py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-40"
               >
                 {creating ? "Creating…" : "Create user"}
