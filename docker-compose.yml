@@ -30,6 +30,9 @@ services:
       - ./backend:/app
       - ./backend/data:/app/data
       - /app/__pycache__
+      # Overlay host logs/ (often root-owned from earlier Docker runs) so
+      # rootless Podman can write ETL logs instead of PermissionError-exiting.
+      - /app/logs
     env_file:
       - .env
     environment:
@@ -39,7 +42,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # ✅ Use the start.sh script (file-existence check + all steps)
+    restart: unless-stopped
     command: /app/scripts/start.sh
     stdin_open: true
     tty: true

@@ -520,35 +520,6 @@ export async function deleteUser(userId: string): Promise<void> {
 
 // Governance & Verification APIs
 
-export async function downloadExportWithFields(materiality: number, fields?: string[]): Promise<Blob> {
-  const url = new URL("/api/reconcile/export", API_URL);
-  url.searchParams.set("materiality", String(materiality));
-  if (fields && fields.length > 0) {
-    url.searchParams.set("fields", fields.join(","));
-  }
-
-  const token = getAuthToken();
-  const headers: HeadersInit = {};
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(url.toString(), { headers });
-
-  if (!response.ok) {
-    let message = "Export failed";
-    try {
-      const errorJson = await response.json();
-      message = errorJson.detail || message;
-    } catch {
-      // ignored
-    }
-    throw new ApiError(message, response.status);
-  }
-
-  return response.blob();
-}
-
 export async function verifyReportFile(file: File): Promise<{
   status: "VERIFIED" | "UNKNOWN" | "ALTERED";
   filename: string;

@@ -17,7 +17,15 @@ mkdir -p data/raw data/clean logs
 # ------------------------------------------------------------------
 RUN_ETL=1  # default: run ETL
 
-if [ -n "$DATABASE_URL" ] && [[ "$DATABASE_URL" == postgresql://* ]]; then
+# Accept postgres://, postgresql://, and dialect URLs like postgresql+psycopg2://
+is_postgres_url() {
+    case "$1" in
+        postgres://*|postgresql://*|postgresql+*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+if [ -n "$DATABASE_URL" ] && is_postgres_url "$DATABASE_URL"; then
     echo "✅ PostgreSQL detected (DATABASE_URL set)"
 
     # Check if 'dispatches' table has any rows

@@ -1,7 +1,7 @@
-fastapi==0.115.14
+fastapi==0.115.12
 uvicorn[standard]==0.30.6
 pandas==2.2.3
-numpy==2.2.6
+numpy==1.26.4
 networkx==3.6.1
 python-louvain==0.16
 faker==28.4.1
@@ -21,6 +21,15 @@ pytest==8.3.3
 pytest-cov==5.0.0
 requests==2.32.3
 httpx==0.28.1
+
+ # Ml Models
+langchain==0.3.0
+langchain-community==0.3.0
+faiss-cpu==1.8.0
+sentence-transformers==3.0.1
+beautifulsoup4==4.12.3
+requests==2.32.3
+langchain-ollama==0.2.0
 
 # Immutable audit trail — on-chain anchor (Base Sepolia)
 cdp-sdk==1.44.0
