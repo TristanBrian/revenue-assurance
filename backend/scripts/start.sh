@@ -1,13 +1,9 @@
 #!/bin/bash
-set -e  # exit on error
-set -u  # exit on undefined variable
-
-# Enable debug output (shows each command as it runs)
-# Comment out if too verbose, but useful for debugging
-set -x
+set -e
+set -u
 
 echo "🚀 KPC Revenue Assurance - Startup Script"
-echo "🔍 Environment: $ENVIRONMENT"
+echo "🔍 Environment: ${ENVIRONMENT:-production}"   # <-- default added
 echo "📁 Current directory: $(pwd)"
 
 cd "$(dirname "$0")/.." || exit 1
@@ -29,7 +25,7 @@ is_postgres_url() {
 
 if [ -n "$DATABASE_URL" ] && is_postgres_url "$DATABASE_URL"; then
     echo "✅ PostgreSQL detected (DATABASE_URL set)"
-    # Run a Python script to check if the 'dispatches' table has data.
+    # Run a Python script to check if 'dispatches' table has data.
     # We capture the exit code and ignore the output to avoid parsing errors.
     python3 -c "
 import os, sys
