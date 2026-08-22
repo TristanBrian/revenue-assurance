@@ -1,5 +1,10 @@
 #!/bin/bash
-set -e
+set -e  # exit on error
+set -u  # exit on undefined variable
+
+# Enable debug output (shows each command as it runs)
+# Comment out if too verbose, but useful for debugging
+set -x
 
 echo "🚀 KPC Revenue Assurance - Startup Script"
 echo "🔍 Environment: $ENVIRONMENT"
