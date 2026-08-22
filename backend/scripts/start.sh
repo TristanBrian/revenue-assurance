@@ -1,9 +1,13 @@
 #!/bin/bash
-set -e
-set -u
+set -e          # exit on error
+set -u          # treat unset variables as error
+set -x          # print each command before executing (tracing)
+
+# Trap errors and print the line number
+trap 'echo "❌ Error at line $LINENO (command: $BASH_COMMAND)" >&2; exit 1' ERR
 
 echo "🚀 KPC Revenue Assurance - Startup Script"
-echo "🔍 Environment: ${ENVIRONMENT:-production}"   # <-- default added
+echo "🔍 Environment: ${ENVIRONMENT:-production}"
 echo "📁 Current directory: $(pwd)"
 
 cd "$(dirname "$0")/.." || exit 1
@@ -25,8 +29,6 @@ is_postgres_url() {
 
 if [ -n "$DATABASE_URL" ] && is_postgres_url "$DATABASE_URL"; then
     echo "✅ PostgreSQL detected (DATABASE_URL set)"
-    # Run a Python script to check if 'dispatches' table has data.
-    # We capture the exit code and ignore the output to avoid parsing errors.
     python3 -c "
 import os, sys
 from sqlalchemy import create_engine, text
@@ -64,7 +66,6 @@ if [ "$RUN_ETL" -eq 1 ]; then
     else
         echo "📊 Generating fresh synthetic data..."
         python scripts/generate_kpc_data.py
-        # Copy generated CSVs to ETL expected location
         mkdir -p data/raw
         cp scripts/data/raw/* data/raw/ 2>/dev/null || true
     fi
@@ -91,10 +92,30 @@ echo "🔄 Running Alembic migrations..."
 alembic upgrade head
 
 echo "🔄 Seeding roles and users..."
-python scripts/seed_roles.py
-python scripts/seed_admin.py
-python scripts/seed_demo_users.py
-python scripts/seed_terms_documents.py
+# Check if script exists before running
+if [ -f "scripts/seed_roles.py" ]; then
+    python scripts/seed_roles.py
+else
+    echo "⚠️ seed_roles.py not found – skipping."
+fi
+
+if [ -f "scripts/seed_admin.py" ]; then
+    python scripts/seed_admin.py
+else
+    echo "⚠️ seed_admin.py not found – skipping."
+fi
+
+if [ -f "scripts/seed_demo_users.py" ]; then
+    python scripts/seed_demo_users.py
+else
+    echo "⚠️ seed_demo_users.py not found – skipping."
+fi
+
+if [ -f "scripts/seed_terms_documents.py" ]; then
+    python scripts/seed_terms_documents.py
+else
+    echo "⚠️ seed_terms_documents.py not found – skipping."
+fi
 
 echo "🚀 Starting Uvicorn server..."
 exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
