@@ -67,3 +67,6 @@ get-docker.sh
 *.tmpbackup_data/
 >>>>>>> Stashed changes
 backup_data/
+dist/
+*.egg-info/
+backend/flowguard.egg-info/
