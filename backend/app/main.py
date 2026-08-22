@@ -8,6 +8,7 @@ from app.routes.feed import feed
 from app.routes.auth import auth, admin
 from app.routes.fraud import detective, graph, scoring
 from app.routes.audit import audit
+from app.routes.alerts import alerts
 from app.routes import report_verify
 
 
