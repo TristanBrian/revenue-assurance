@@ -572,6 +572,10 @@ export async function deleteUser(userId: string): Promise<void> {
 
 // Governance & Verification APIs
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 4125a5c (fix(frontend): remove duplicate downloadExportWithFields function in api.ts)
 export async function verifyReportFile(file: File): Promise<{
   status: "VERIFIED" | "UNKNOWN" | "ALTERED";
   filename: string;
