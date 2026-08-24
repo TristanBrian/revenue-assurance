@@ -57,24 +57,27 @@ function ReportsContent() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    Promise.all([
-      getMetrics(materiality, direction),
-      reportType === "icms" ? getEbillingLogs(200) : Promise.resolve([] as EbillingLogEntry[]),
-    ])
-      .then(([metricsResult, logs]) => {
+
+    async function loadReports() {
+      setLoading(true);
+      setError(null);
+      try {
+        const [metricsResult, logs] = await Promise.all([
+          getMetrics(materiality, direction),
+          reportType === "icms" ? getEbillingLogs(200) : Promise.resolve([] as EbillingLogEntry[]),
+        ]);
         if (cancelled) return;
         setMetrics(metricsResult.metrics);
         setAnomalies(((metricsResult as { anomalies?: Anomaly[] }).anomalies ?? []).filter((item) => item.flow_direction !== "outbound"));
         setIcmsLogs(logs);
-      })
-      .catch((err: unknown) => {
+      } catch (err: unknown) {
         if (!cancelled) setError(err instanceof ApiError ? err.message : "Could not load report data.");
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    }
+
+    void loadReports();
     return () => { cancelled = true; };
   }, [direction, materiality, reportType]);
 

@@ -190,26 +190,20 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const isInukaManager = user?.roles.includes("inuka_manager") ?? false;
   const isDepotSupervisor = user?.roles.includes("depot_supervisor") ?? false;
   const canUseDualWorkspace = !isInukaManager && (user?.permissions.includes("view_outgoing_data") ?? false);
-  const [workspace, setWorkspace] = useState<Workspace>("oil");
+  const [workspace, setWorkspace] = useState<Workspace>(() => {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem("kpc_assurance_workspace");
+      if (stored === "oil" || stored === "inuka") return stored;
+    }
+    return "oil";
+  });
   const routeWorkspace: Workspace | null = pathname.startsWith("/dashboard/inuka")
     ? "inuka"
     : pathname.startsWith("/dashboard/review-queue")
       ? null
       : "oil";
-  const isInukaWorkspace = isInukaManager || (canUseDualWorkspace && (routeWorkspace ?? workspace) === "inuka");
-
-  useEffect(() => {
-    if (!routeWorkspace) return;
-    Promise.resolve().then(() => setWorkspace(routeWorkspace));
-  }, [routeWorkspace]);
-
-  useEffect(() => {
-    if (!canUseDualWorkspace || typeof window === "undefined") return;
-    const stored = window.localStorage.getItem("kpc_assurance_workspace");
-    if (stored === "oil" || stored === "inuka") {
-      Promise.resolve().then(() => setWorkspace(stored));
-    }
-  }, [canUseDualWorkspace]);
+  const activeWorkspace = routeWorkspace ?? workspace;
+  const isInukaWorkspace = isInukaManager || (canUseDualWorkspace && activeWorkspace === "inuka");
 
   useEffect(() => {
     if (!isInukaManager) return;
@@ -275,7 +269,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         .then((data) => setDepotAlerts({ depotId: data.depot_id, criticalCount: data.critical_count, items: data.items }))
         .catch(() => {});
     }
-  }, [user, materiality, direction, isInukaManager, isInukaWorkspace, isDepotSupervisor]);
+  }, [user, materiality, isInukaManager, isInukaWorkspace]);
 
   function handleLogout() {
     logout();
@@ -365,7 +359,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 type="button"
                 onClick={() => switchWorkspace(item)}
                 className={`rounded-md px-2 py-2 text-[10px] font-semibold transition-colors ${
-                  (routeWorkspace ?? workspace) === item
+                  activeWorkspace === item
                     ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                     : "text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 }`}
