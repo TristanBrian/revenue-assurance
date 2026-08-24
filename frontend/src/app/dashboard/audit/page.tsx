@@ -1,24 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { getAuditLogs, getAuditSummary, AuditLog } from "@/lib/api";
+import { getAuditLogs, getAuditSummary, AuditLog, AuditSummary } from "@/lib/api";
 import RequirePermission from "@/components/RequirePermission";
 import { format } from "date-fns";
 
-interface SummaryData {
-  total_actions: number;
-  actions_by_type: Record<string, number>;
-  actions_by_actor: Record<string, number>;
-  period_days: number;
-  since: string;
-}
-
 function AuditContent() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [summary, setSummary] = useState<AuditSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const limit = 50;  // constant – no state needed
+  const limit = 50;
   const [offset, setOffset] = useState(0);
   const [filters, setFilters] = useState({
     actor: "",
@@ -29,9 +21,7 @@ function AuditContent() {
   });
   const [total, setTotal] = useState(0);
 
-  // Wrap loadData with useCallback so it doesn't change on every render
   const loadData = useCallback(async () => {
-    // Avoid fetching if already loading (prevents overlapping calls)
     setLoading(true);
     setError(null);
     try {
@@ -41,18 +31,18 @@ function AuditContent() {
       ]);
       setLogs(logsRes.logs || []);
       setTotal(logsRes.total || 0);
-      setSummary(summaryRes as SummaryData);
+      setSummary(summaryRes);   // no cast needed – now matches
     } catch (err) {
       console.error("Audit page error:", err);
       setError(err instanceof Error ? err.message : "Failed to load audit logs");
     } finally {
       setLoading(false);
     }
-  }, [limit, offset, filters]);  // dependencies: re‑create when these change
+  }, [limit, offset, filters]);
 
   useEffect(() => {
     loadData();
-  }, [loadData]);  // only run when loadData changes
+  }, [loadData]);
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));

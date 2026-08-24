@@ -382,10 +382,11 @@ export interface AuditLog {
 }
 
 export interface AuditSummary {
-  total_events: number;
-  by_action: Record<string, number>;
-  by_actor: Array<{ actor: string; count: number }>;
+  total_actions: number;
+  actions_by_type: Record<string, number>;
+  actions_by_actor: Record<string, number>;
   period_days: number;
+  since: string;
 }
 
 // Define a proper response type for getAuditLogs
