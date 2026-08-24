@@ -15,8 +15,7 @@ describe("RequirePermission Component", () => {
       loading: true,
       login: vi.fn(),
       logout: vi.fn(),
-      acceptTerms: vi.fn(),
-      // termsRequired removed
+      completeReset: vi.fn(),  // ✅ added
     });
 
     render(
@@ -41,8 +40,7 @@ describe("RequirePermission Component", () => {
       loading: false,
       login: vi.fn(),
       logout: vi.fn(),
-      acceptTerms: vi.fn(),
-      // termsRequired removed
+      completeReset: vi.fn(),  // ✅ added
     });
 
     render(
@@ -67,8 +65,7 @@ describe("RequirePermission Component", () => {
       loading: false,
       login: vi.fn(),
       logout: vi.fn(),
-      acceptTerms: vi.fn(),
-      // termsRequired removed
+      completeReset: vi.fn(),  // ✅ added
     });
 
     render(
