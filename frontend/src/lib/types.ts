@@ -521,6 +521,15 @@ export interface UpdateAnomalyResponse {
   timestamp: string;
 }
 
+export interface AnomalyAction {
+  id: string;
+  action: string;
+  label?: string;
+  note: string;
+  created_at: string;
+  actor_user_id?: string | null;
+}
+
 // Mirrors backend/app/schemas/heatmap.py.
 export interface HeatmapData {
   data: number[][];

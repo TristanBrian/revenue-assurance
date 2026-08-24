@@ -285,6 +285,19 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const canSeeAllAlerts = user?.permissions.includes("view_anomaly_table") ?? false;
   const canSeeDepotAlerts = user?.permissions.includes("view_depot_alerts") ?? false;
   const isAdmin = user?.roles.includes("system_admin") ?? false;
+  const isRevenueAssurance = user?.roles.includes("revenue_assurance") ?? false;
+  const isManager = user?.roles.includes("manager") ?? false;
+  const workspaceLabel = isInukaWorkspace ? "Inuka Programme Assurance" : "Oil Revenue Assurance";
+  const workspaceDescription = isInukaWorkspace
+    ? "Beneficiary participation, authorisations, and stipend disbursements"
+    : "Dispatch, invoice, payment, and KRA e-billing controls";
+  const roleMode = isRevenueAssurance
+    ? "Investigation & resolution"
+    : isManager
+      ? "Oversight & escalation"
+      : isInukaManager
+        ? "Programme review"
+        : "Operations";
   // Decorative search over anomalies/OMCs/invoices only makes sense on pages
   // that actually show that content — not the Explorer, uploads, reports,
   // e-billing, or fraud graph, and never for admin (their page is users).
@@ -532,6 +545,30 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </header>
+
+        <div className={`border-b px-6 py-2.5 ${isInukaWorkspace ? "border-status-info/20 bg-status-info-bg/50" : "border-primary/15 bg-primary/5"}`}>
+          <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[9px] font-bold ${isInukaWorkspace ? "bg-status-info-bg text-status-info" : "bg-primary/10 text-primary"}`}>
+                {isInukaWorkspace ? "IN" : "OIL"}
+              </span>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <p className="truncate text-xs font-bold text-foreground">{workspaceLabel}</p>
+                  <span className="rounded-full bg-background/70 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {roleMode}
+                  </span>
+                </div>
+                <p className="truncate text-[10px] text-muted-foreground">{workspaceDescription}</p>
+              </div>
+            </div>
+            {canUseDualWorkspace && (
+              <p className="text-[10px] text-muted-foreground sm:text-right">
+                Switch workspace to change the dataset and controls shown.
+              </p>
+            )}
+          </div>
+        </div>
 
         <main className="flex-1 min-h-0 overflow-y-auto overflow-x-auto p-6 bg-background">{children}</main>
       </div>
