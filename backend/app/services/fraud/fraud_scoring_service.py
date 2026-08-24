@@ -19,6 +19,7 @@ an enrichment step applied to that same freshly-computed list, exactly
 like the resolution_status overlay already is. Nothing here needs a
 "score storage" table.
 """
+import ast
 import asyncio
 import json
 import logging
@@ -109,11 +110,70 @@ def reload_models() -> None:
     _shap_explainer = None
 
 
+def _patch_shap_xgboost_base_score() -> None:
+    """One-time monkeypatch of shap's XGBoost model loader, applied lazily
+    on first use (see _get_shap_explainer() below) rather than at module
+    import time — shap is itself only imported lazily, to keep it an
+    optional dependency of a module fraud/reconciliation code can import
+    without it installed (is_configured() gates every caller anyway).
+
+    xgboost>=2 always represents learner_model_param.base_score as a
+    bracketed-array string (e.g. "[5E-1]", not "0.5") in EVERY
+    serialization it produces — verified directly: writing a plain
+    unwrapped value back into a booster and re-serializing it still comes
+    back bracketed, so this isn't something fixable by rewriting the
+    model file, only by fixing how it's read. shap==0.49.1's
+    XGBTreeModelLoader parses that field with a bare
+    float(learner_model_param["base_score"]), which raises "could not
+    convert string to float: '[5E-1]'" for every trained model here —
+    every call to explain_anomaly()/GET /api/fraud/explain/{id} 500s.
+
+    Later shap releases fix this themselves (ast.literal_eval + list/
+    array unwrapping), but every one of them requires numpy>=2, which
+    conflicts with this project's langchain/langchain-community pins
+    (numpy<2 on Python<3.12 — see requirements.txt) used by
+    app/services/rag/, so upgrading shap isn't safely available here.
+
+    Instead: wrap shap.explainers._tree.decode_ubjson_buffer — the exact
+    function XGBTreeModelLoader calls to turn a booster's raw serialized
+    bytes into the dict it then reads base_score from — so the unwrapped
+    value is already in place by the time shap's own code looks at it.
+    Idempotent: marks the wrapper so a second call (e.g. after
+    reload_models() following a retrain) doesn't stack wrappers."""
+    import shap.explainers._tree as shap_tree
+
+    if getattr(shap_tree.decode_ubjson_buffer, "_kpc_base_score_patched", False):
+        return
+
+    original_decode = shap_tree.decode_ubjson_buffer
+
+    def _decode_with_fixed_base_score(fd):
+        doc = original_decode(fd)
+        try:
+            param = doc["learner"]["learner_model_param"]
+            base_score = param.get("base_score")
+            if isinstance(base_score, str) and base_score.strip().startswith("["):
+                value = ast.literal_eval(base_score)
+                if isinstance(value, (list, tuple)):
+                    value = value[0]
+                param["base_score"] = repr(float(value))
+        except (KeyError, TypeError, ValueError, SyntaxError) as exc:
+            # Unexpected shape (a shap/xgboost version bump changed the
+            # format again) — leave doc untouched and let shap raise its
+            # own error rather than fail silently on a wrong value.
+            logger.warning(f"Could not patch xgboost base_score for shap (non-fatal, leaving as-is): {exc}")
+        return doc
+
+    _decode_with_fixed_base_score._kpc_base_score_patched = True
+    shap_tree.decode_ubjson_buffer = _decode_with_fixed_base_score
+
+
 def _get_shap_explainer():
     global _shap_explainer
     if _shap_explainer is None:
         import shap
 
+        _patch_shap_xgboost_base_score()
         xgb_model, _, _ = _load_models()
         _shap_explainer = shap.TreeExplainer(xgb_model)
     return _shap_explainer
