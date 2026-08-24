@@ -4,6 +4,10 @@ import { network } from "hardhat";
 import { getAddress, keccak256, toHex, type Address, type WalletClient } from "viem";
 
 // ────────────────────────────────────────────────────────────────────────────
+// V2 of this contract's test suite — anchors (batchIndex, merkleRoot,
+// batchRootHash) instead of V1's (blockIndex, chainTipHash). See
+// backend/docs/audit-merkle-migration.md and the contract's own module
+// docstring for why. V1's test coverage is preserved in git history.
 
 describe("AuditAnchor", async function () {
   const { viem } = await network.create();
@@ -22,19 +26,21 @@ describe("AuditAnchor", async function () {
     return viem.getContractAt("AuditAnchor", address, { client: { wallet } });
   }
 
-  const SAMPLE_HASH = keccak256(toHex("sample chain tip"));
+  const SAMPLE_MERKLE_ROOT = keccak256(toHex("sample merkle root"));
+  const SAMPLE_BATCH_ROOT_HASH = keccak256(toHex("sample batch root hash"));
 
   // ── backend can anchor ─────────────────────────────────────────────────────
-  it("backend can anchor a block", async () => {
+  it("backend can anchor a batch", async () => {
     const { auditAnchor, backend } = await deployFixture();
 
     const a = await auditAnchorAs(auditAnchor.address, backend);
-    await a.write.anchor([35040n, SAMPLE_HASH]);
+    await a.write.anchor([700n, SAMPLE_MERKLE_ROOT, SAMPLE_BATCH_ROOT_HASH]);
 
     const events = await auditAnchor.getEvents.Anchored();
     assert.equal(events.length, 1);
-    assert.equal(events[0].args.blockIndex, 35040n);
-    assert.equal(events[0].args.chainTipHash, SAMPLE_HASH);
+    assert.equal(events[0].args.batchIndex, 700n);
+    assert.equal(events[0].args.merkleRoot, SAMPLE_MERKLE_ROOT);
+    assert.equal(events[0].args.batchRootHash, SAMPLE_BATCH_ROOT_HASH);
   });
 
   // ── non-backend cannot anchor ──────────────────────────────────────────────
@@ -43,7 +49,7 @@ describe("AuditAnchor", async function () {
 
     const a = await auditAnchorAs(auditAnchor.address, other);
     await assert.rejects(
-      a.write.anchor([0n, SAMPLE_HASH]),
+      a.write.anchor([0n, SAMPLE_MERKLE_ROOT, SAMPLE_BATCH_ROOT_HASH]),
       /Only backend allowed/
     );
   });
@@ -60,8 +66,8 @@ describe("AuditAnchor", async function () {
     const { auditAnchor, backend } = await deployFixture();
     const a = await auditAnchorAs(auditAnchor.address, backend);
 
-    await a.write.anchor([0n, keccak256(toHex("first"))]);
-    await a.write.anchor([50n, keccak256(toHex("second"))]);
+    await a.write.anchor([0n, keccak256(toHex("root-0")), keccak256(toHex("chain-0"))]);
+    await a.write.anchor([1n, keccak256(toHex("root-1")), keccak256(toHex("chain-1"))]);
 
     // fromBlock explicit: getEvents.Anchored() with no range only
     // returns events since the last time it was called on this contract
@@ -69,7 +75,7 @@ describe("AuditAnchor", async function () {
     // deployment.
     const events = await auditAnchor.getEvents.Anchored({}, { fromBlock: 0n });
     assert.equal(events.length, 2);
-    assert.equal(events[0].args.blockIndex, 0n);
-    assert.equal(events[1].args.blockIndex, 50n);
+    assert.equal(events[0].args.batchIndex, 0n);
+    assert.equal(events[1].args.batchIndex, 1n);
   });
 });

@@ -171,9 +171,16 @@ async function main() {
     console.log("(non-fatal) Could not sweep leftover throwaway-key balance:", sweepErr);
   }
 
+  // V2 (batch Merkle anchor — see backend/docs/audit-merkle-migration.md
+  // and AuditAnchor.sol's own module docstring): printed as
+  // AUDIT_ANCHOR_CONTRACT_ADDRESS_V2, a NEW env var, not overwriting
+  // AUDIT_ANCHOR_CONTRACT_ADDRESS — that one still needs to point at the
+  // original V1 contract so anchor_service.py's legacy path can keep
+  // resolving pre-cutover on-chain anchors after this deploy.
   console.log("\nUpdate the backend's .env:");
-  console.log(`AUDIT_ANCHOR_CONTRACT_ADDRESS=${receipt.contractAddress}`);
+  console.log(`AUDIT_ANCHOR_CONTRACT_ADDRESS_V2=${receipt.contractAddress}`);
   console.log(`AUDIT_BACKEND_WALLET_NAME=${AUDIT_BACKEND_WALLET_NAME}`);
+  console.log("\n(Leave the existing AUDIT_ANCHOR_CONTRACT_ADDRESS as-is — do not overwrite it.)");
 }
 
 main().catch((err) => {
