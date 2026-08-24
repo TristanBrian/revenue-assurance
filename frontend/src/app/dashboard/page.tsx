@@ -19,7 +19,7 @@ function AuditContent() {
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [limit, _setLimit] = useState(50); // renamed to avoid unused warning
+  const limit = 50; // renamed to avoid unused warning
   const [offset, setOffset] = useState(0);
   const [filters, setFilters] = useState({
     actor: "",

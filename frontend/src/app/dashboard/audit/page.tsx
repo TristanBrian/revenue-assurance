@@ -1,18 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAuth } from "@/lib/auth-context";
-import { getAuditLogs, getAuditSummary, AuditLog, AuditSummary } from "@/lib/api";
+import { useEffect, useState, useCallback } from "react";
+import { getAuditLogs, getAuditSummary, AuditLog } from "@/lib/api";
 import RequirePermission from "@/components/RequirePermission";
 import { format } from "date-fns";
 
+interface SummaryData {
+  total_actions: number;
+  actions_by_type: Record<string, number>;
+  actions_by_actor: Record<string, number>;
+  period_days: number;
+  since: string;
+}
+
 function AuditContent() {
-  const { user } = useAuth();
   const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [summary, setSummary] = useState<AuditSummary | null>(null);
+  const [summary, setSummary] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [limit, setLimit] = useState(50);
+  const limit = 50;  // constant – no state needed
   const [offset, setOffset] = useState(0);
   const [filters, setFilters] = useState({
     actor: "",
@@ -23,7 +29,9 @@ function AuditContent() {
   });
   const [total, setTotal] = useState(0);
 
-  async function loadData() {
+  // Wrap loadData with useCallback so it doesn't change on every render
+  const loadData = useCallback(async () => {
+    // Avoid fetching if already loading (prevents overlapping calls)
     setLoading(true);
     setError(null);
     try {
@@ -31,24 +39,20 @@ function AuditContent() {
         getAuditLogs({ limit, offset, ...filters }),
         getAuditSummary(7),
       ]);
-      console.log("Audit logs response:", logsRes);
-      console.log("Audit summary response:", summaryRes);
       setLogs(logsRes.logs || []);
       setTotal(logsRes.total || 0);
-      // summaryRes is already the raw data – it has total_actions, actions_by_type, actions_by_actor
-      setSummary(summaryRes);
+      setSummary(summaryRes as SummaryData);
     } catch (err) {
       console.error("Audit page error:", err);
       setError(err instanceof Error ? err.message : "Failed to load audit logs");
     } finally {
       setLoading(false);
     }
-  }
+  }, [limit, offset, filters]);  // dependencies: re‑create when these change
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [limit, offset, filters]);
+  }, [loadData]);  // only run when loadData changes
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -58,25 +62,20 @@ function AuditContent() {
   const handlePrevPage = () => setOffset((o) => Math.max(0, o - limit));
   const handleNextPage = () => setOffset((o) => o + limit);
 
-  // Safely extract top action from actions_by_type
   const getTopAction = (): string => {
     if (!summary) return "—";
-    const byAction = (summary as any).actions_by_type || {};
-    const entries = Object.entries(byAction);
+    const entries = Object.entries(summary.actions_by_type);
     if (entries.length === 0) return "—";
     return entries.sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
   };
 
-  // Safely extract top actor from actions_by_actor
   const getTopActor = (): string => {
     if (!summary) return "—";
-    const byActor = (summary as any).actions_by_actor || {};
-    const entries = Object.entries(byActor);
+    const entries = Object.entries(summary.actions_by_actor);
     if (entries.length === 0) return "—";
     return entries.sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
   };
 
-  // Safe date formatting
   const formatAuditDate = (log: AuditLog): string => {
     const ts = log.event_timestamp || log.created_at;
     if (!ts) return "—";
@@ -96,13 +95,10 @@ function AuditContent() {
         </p>
       </header>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-xs text-muted-foreground uppercase font-semibold">Total Events (7d)</p>
-          <p className="text-2xl font-bold">
-            {summary?.total_actions ?? 0}
-          </p>
+          <p className="text-2xl font-bold">{summary?.total_actions ?? 0}</p>
         </div>
         <div className="bg-card border border-border rounded-lg p-4">
           <p className="text-xs text-muted-foreground uppercase font-semibold">Top Action</p>
@@ -209,9 +205,7 @@ function AuditContent() {
                 ) : (
                   logs.map((log) => (
                     <tr key={log.id} className="border-b border-border hover:bg-muted/30">
-                      <td className="px-4 py-2 text-nowrap">
-                        {formatAuditDate(log)}
-                      </td>
+                      <td className="px-4 py-2 text-nowrap">{formatAuditDate(log)}</td>
                       <td className="px-4 py-2 font-mono text-xs">
                         {log.actor_user_id || log.external_actor || "system"}
                       </td>

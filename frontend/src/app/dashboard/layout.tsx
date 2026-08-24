@@ -226,8 +226,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     const stored = window.localStorage.getItem("kpc_assurance_workspace");
     if (stored === "oil" || stored === "inuka") setWorkspace(stored);
   }, [canUseDualWorkspace]);
-  
-   
+
+  // Redirect Inuka managers away from revenue-only pages
   useEffect(() => {
     if (!isInukaManager) return;
     const revenueOnlyPaths = [
@@ -252,6 +252,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [depotAlerts, setDepotAlerts] = useState<{ depotId: string; criticalCount: number; items: Anomaly[] } | null>(null);
   const [depotAlertsOpen, setDepotAlertsOpen] = useState(false);
 
+  // Data-fetching effect – added isInukaManager to deps
   useEffect(() => {
     if (!user) return;
 
@@ -283,7 +284,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         .then((data) => setDepotAlerts({ depotId: data.depot_id, criticalCount: data.critical_count, items: data.items }))
         .catch(() => {});
     }
-  }, [user, materiality, isInukaWorkspace]);
+  }, [user, materiality, isInukaWorkspace, isInukaManager]);   // ✅ FIXED: added isInukaManager
 
   function handleLogout() {
     logout();
