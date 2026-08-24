@@ -1,6 +1,6 @@
 # backend/app/routes/reconciliation/heatmap.py
 from fastapi import APIRouter, Depends, Query
-from app.core.dependencies import require_permission
+from app.core.dependencies import require_permission, enforce_reconciliation_scope
 from app.schemas.reconciliation.heatmap import HeatmapResponse
 from app.core.cache import get_cached_result, set_cached_result
 from app.services.reconciliation.reconciliation import run_combined_reconciliation
@@ -17,7 +17,7 @@ router = APIRouter()
 def heatmap(
     materiality: float = Query(100000, description="Min leakage to include"),
     direction: str = Query("all", description="inbound | outbound | all — defaults to all"),
-    _=Depends(require_permission("view_heatmap")),
+    user: User = Depends(require_permission("view_heatmap")),
 ):
     """
     Returns leakage heatmap data: rows/columns are 'customer'/'product' as
@@ -31,6 +31,7 @@ def heatmap(
     different entity types would be confusing to show together.
     Uses cached reconciliation data to avoid re-running reconciliation.
     """
+    enforce_reconciliation_scope(user, direction)
     try:
         # Try to get full reconciliation result from cache
         cache_key = f"metrics_{materiality}_{direction}"

@@ -19,7 +19,6 @@ Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka
 - [Hackathon 2 Deliverables](#hackathon-2-deliverables)
 - [Why FlowGuard?](#why-flowguard)
 - [Key Features](#key-features)
-  - [AI Chatbot (RAG)](#ai-chatbot-rag)
 - [Architecture](#architecture)
 - [Quantified Impact](#quantified-impact)
 - [Technology Stack](#technology-stack)
@@ -40,7 +39,7 @@ Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka
 - **Swagger Docs:** [https://revenue-assurance.fly.dev/docs](https://revenue-assurance.fly.dev/docs)  
 - **Frontend (Vercel):** [https://flowgardd.vercel.app](https://flowgardd.vercel.app)  
 
-### 🔑 Demo Logins (Password: `demo-pass-123`)
+### 🔑 Demo Logins (Password: `Demo-Access-123!`)
 
 | Role | Email |
 |------|-------|
@@ -50,7 +49,7 @@ Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka
 | **Inuka Manager** (outbound only) | `inuka_manager@kpc-demo.co.ke` |
 | **System Admin** | `system_admin@kpc-demo.co.ke` |
 
-> **Note:** These are demo accounts seeded automatically.
+> **Note:** These are throwaway demo accounts seeded automatically. 
 
 ---
 
@@ -71,7 +70,7 @@ Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka
 - **Fraud Graph:** Officer ↔ Beneficiary + shared‑account rings (Louvain).
 - **Audit:** Same chain for beneficiary consent and stipend events.
 - **RBAC:** 5 roles – added `Inuka Manager` (view‑only outbound).
-- **AI Assistant:** RAG‑based chatbot (multilingual) for program FAQs and governance queries – extended from the same retrieval engine.
+- **AI Assistant:** RAG chatbot (multilingual) for program FAQs and governance queries.
 
 ### The Core Message
 We **did not rewrite**. We **extended** the same ETL, reconciliation, fraud detection, alerting, auditing **and AI retrieval** framework to a completely different domain – proving the data fabric is **reusable, scalable, and mission‑agnostic**.
@@ -83,8 +82,8 @@ We **did not rewrite**. We **extended** the same ETL, reconciliation, fraud dete
 | Deliverable | How FlowGuard Delivers |
 |-------------|------------------------|
 | **1. Upgraded Data Fabric** | ETL pipeline extended to ingest outbound CSVs (officers, beneficiaries, attendance, stipends, disbursements). Same data quality gates (dedup, currency cleaning, date standardisation, referential integrity). |
-| **2. Application/Analytics Package** | Full dashboard with direction toggle (`inbound`/`outbound`/`all`), anomaly table, fraud graph, E‑Billing status, alert inbox, CSV upload/export, **and a multilingual AI chatbot (RAG).** |
-| **3. Quantified Impact Memo** | Real numbers: 95%+ reconciliation rate, 80% manual effort saved, ~200M KES annual savings for KPC, ~2.4M KES for Inuka (staff hours). See [Quantified Impact](#quantified-impact). |
+| **2. Application/Analytics Package** | Full dashboard with direction toggle (`inbound`/`outbound`/`all`), anomaly table, fraud graph, E‑Billing status, alert inbox, CSV upload/export, and a multilingual AI chatbot. |
+| **3. Quantified Impact Memo** | Real numbers: 95%+ reconciliation rate, 80% manual effort saved, ~200M KES annual savings for KPC, ~2.4M KES for Inuka (staff hours). |
 | **4. QA & UAT Evidence** | [QA_Report.md](QA_Report.md) with 71% test coverage, 13 UAT scenarios, 100% pass rate, and performance benchmarks. CI/CD runs tests on every push. |
 | **5. Presentation** | Pitch deck (submitted separately) and this README – clear narrative, demo links, and business impact. |
 
@@ -115,26 +114,7 @@ We **did not rewrite**. We **extended** the same ETL, reconciliation, fraud dete
 | **Direction Toggle** | N/A | `?direction=inbound|outbound|all` on all reconciliation endpoints |
 | **AI Chatbot** | Basic RAG for KPC documentation | **Extended knowledge base** – answers Inuka program, consent, and privacy queries in **English and Swahili** |
 
----
-
-## 🤖 AI Chatbot (RAG)
-
-FlowGuard includes an optional **Retrieval-Augmented Generation (RAG) chatbot** that provides instant, accurate answers using the platform’s own documentation.
-
-**What it answers:**
-- KPC reconciliation questions (e.g., “How does the three‑way match work?”)
-- Inuka Foundation program details (Scholarship, Plus, Vocational, Tech)
-- Consent and privacy rights (e.g., “How do I withdraw consent?”)
-- Application statuses and eligibility criteria
-
-**Languages:** English and Swahili – beneficiaries can ask in their preferred language.
-
-**Architecture:**
-- **Vector store:** FAISS (local) or managed (e.g., Chatbase)
-- **LLM:** OpenAI or local open‑source model (Ollama)
-- **Knowledge base:** Aggregated from README, program guides, and governance policies
-
-**Impact:** The chatbot reduces support staff workload by ~80%, saving over 20 hours per week – directly aligning with Hackathon 2’s automation goals.
+> Full feature list: [Key Features](#key-features) below.
 
 ---
 
@@ -161,7 +141,7 @@ graph TD
         Routes["/reconcile · /upload · /sync · /status · /export · /webhook · /alerts · /graph · /chatbot"]
     end
 
-    subgraph UI_Layer["Frontend"]
+    subgraph UI_Layer["Frontend & Mobile"]
         Dashboard["Dashboard\n(direction toggle: inbound/outbound/all)"]
         Cards["Metric Cards"]
         Table["Anomaly Table"]
@@ -169,6 +149,7 @@ graph TD
         EBillUI["E-Billing Status"]
         AlertsUI["Alert Inbox"]
         ChatbotUI["Chatbot Widget"]
+        MobileApp["Mobile App\n(Expo / React Native)"]
     end
 
     CSV -->|Load| ETL
@@ -193,6 +174,7 @@ graph TD
     Dashboard --> EBillUI
     Dashboard --> AlertsUI
     Dashboard --> ChatbotUI
+    Routes -->|JSON| MobileApp
 
     classDef data fill:#e8daef,stroke:#8e44ad,stroke-width:2px,color:#000
     classDef service fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px,color:#000
@@ -202,7 +184,7 @@ graph TD
     class CSV,DB data
     class ETL,Recon,Fraud,EBill,Alerts,RAG service
     class API,Routes api
-    class Dashboard,Cards,Table,Graph,EBillUI,AlertsUI,ChatbotUI ui
+    class Dashboard,Cards,Table,Graph,EBillUI,AlertsUI,ChatbotUI,MobileApp ui
 ```
 
 **Key architectural decisions:**
@@ -212,6 +194,7 @@ graph TD
 - **Immutable audit trail** – hash‑chain with optional on‑chain anchoring (Base Sepolia).
 - **Caching** – reconciliation results cached for sub‑200ms dashboard responses.
 - **RAG chatbot** – reuses the same retrieval engine for both KPC and Inuka knowledge bases.
+- **Mobile‑first** – Expo app for field officers and beneficiaries.
 
 ---
 
@@ -242,6 +225,7 @@ graph TD
 | AI / RAG | FAISS, Sentence‑Transformers, Ollama (optional) |
 | Testing | Pytest (backend) |
 | Frontend | Next.js, React, TypeScript, Tailwind CSS |
+| Mobile | Expo (React Native) |
 | Deployment | Docker, Docker Compose, Fly.io |
 | CI/CD | GitHub Actions |
 | API Docs | Swagger UI, ReDoc |
@@ -270,6 +254,9 @@ Full permission mapping in the [API documentation](#api-endpoints).
 git clone git@github.com:TristanBrian/revenue-assurance.git
 cd revenue-assurance
 cp .env.example .env
+# Local demo only: opt in to throwaway demo accounts; use real provisioning in deployment.
+sed -i "s/^SEED_DEMO_USERS=false/SEED_DEMO_USERS=true/" .env
+# Regenerate SECRET_KEY (openssl rand -hex 32) for anything beyond local/demo use.
 docker compose up --build
 ```
 
@@ -301,6 +288,7 @@ Key endpoints:
 
 ## 📸 Screenshots
 
+_Add your own screenshots here._
 
 | Dashboard | Anomaly Table | Fraud Graph |
 |-----------|---------------|-------------|
@@ -352,3 +340,5 @@ MIT License – see the [LICENSE](LICENSE) file for details.
 **Built for the Inuka Hackathon 2026 by Null Terminators**  
 [GitHub Repository](https://github.com/TristanBrian/revenue-assurance)
 ```
+
+---

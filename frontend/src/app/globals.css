@@ -196,6 +196,30 @@ body {
   transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
 }
 
+/* Legacy report widgets predate the KPC token system and contain their own
+   teal, purple, and navy palette. Keep their status semantics, but make the
+   report shell inherit the same warm KPC surfaces, red accent, and borders as
+   the rest of the dashboard. */
+.kpc-reports [class*="bg-white"] { background-color: var(--card) !important; }
+.kpc-reports [class*="bg-slate-9"] { background-color: color-mix(in srgb, var(--card) 92%, var(--primary) 8%) !important; }
+.kpc-reports [class*="border-zinc-"],
+.kpc-reports [class*="border-slate-"] { border-color: var(--border) !important; }
+.kpc-reports [class*="text-emerald-"],
+.kpc-reports [class*="text-cyan-"],
+.kpc-reports [class*="text-purple-"] { color: var(--primary) !important; }
+.kpc-reports [class*="border-emerald-"],
+.kpc-reports [class*="border-cyan-"],
+.kpc-reports [class*="border-purple-"] { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)) !important; }
+.kpc-reports [class*="bg-indigo-"] { background-color: var(--status-info-bg) !important; }
+.kpc-reports [class*="text-indigo-"] { color: var(--status-info) !important; }
+.kpc-reports [class*="border-indigo-"] { border-color: color-mix(in srgb, var(--status-info) 45%, var(--border)) !important; }
+.kpc-reports [class*="bg-rose-"] { background-color: var(--status-critical-bg) !important; }
+.kpc-reports [class*="text-rose-"] { color: var(--status-critical) !important; }
+.kpc-reports [class*="border-rose-"] { border-color: color-mix(in srgb, var(--status-critical) 35%, var(--border)) !important; }
+.kpc-reports [class*="bg-amber-"] { background-color: var(--status-medium-bg) !important; }
+.kpc-reports [class*="text-amber-"] { color: var(--status-medium) !important; }
+.kpc-reports [class*="border-amber-"] { border-color: color-mix(in srgb, var(--status-medium) 35%, var(--border)) !important; }
+
 table {
   border-collapse: separate;
   border-spacing: 0;

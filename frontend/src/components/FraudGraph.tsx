@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { ApiError, getFraudGraph } from "@/lib/api";
 import { useMateriality } from "@/context/MaterialityContext";
-import { useDirection } from "@/context/DirectionContext";
 import type { FraudGraphData, GraphNode } from "@/lib/types";
 
 // Outbound (stipend/disbursement) — Stage 2. "officer"/"beneficiary" nodes
@@ -83,7 +82,6 @@ const HEIGHT = 460;
 
 export default function FraudGraph() {
   const { materiality } = useMateriality(); // ✅ Get from context
-  const { direction } = useDirection();
   const [graph, setGraph] = useState<FraudGraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +93,9 @@ export default function FraudGraph() {
   useEffect(() => {
     let cancelled = false;
 
-    getFraudGraph(materiality, direction) // ✅ Pass the materiality
+    // Risk Intelligence is the Oil graph. Do not inherit an outbound
+    // direction left behind by a previous Inuka workspace visit.
+    getFraudGraph(materiality, "inbound")
       .then((data) => {
         if (!cancelled) setGraph(data);
       })
@@ -114,7 +114,7 @@ export default function FraudGraph() {
     return () => {
       cancelled = true;
     };
-  }, [materiality, direction]); // ✅ Re-run when slider or direction changes
+  }, [materiality]);
 
   const laidOutNodes = useMemo(() => {
     if (!graph) return [];
@@ -231,12 +231,14 @@ export default function FraudGraph() {
     <section className="flex flex-col gap-5 bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm relative text-zinc-800 dark:text-zinc-100">
       <div>
         <h2 className="text-base font-bold text-zinc-900 dark:text-white">
-          Fraud Graph — OMC × Depot Leakage Clusters
+          Risk Intelligence — Oil Leakage Network
         </h2>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mt-1">
-          OMCs ring the depots at the center of the network. Node size scales
-          with leakage value, node/edge color with risk severity — the
-          biggest, reddest shapes are where to look first.
+          This view is deliberately scoped to the Oil Revenue domain. OMCs
+          ring the depots at the center of the network; node size scales with
+          leakage value and color with risk severity. Inuka relationships are
+          investigated from the Inuka workspace instead of being mixed into
+          this graph.
         </p>
       </div>
 

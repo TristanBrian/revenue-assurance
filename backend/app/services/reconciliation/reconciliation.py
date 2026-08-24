@@ -24,6 +24,7 @@ import math
 import traceback
 
 from app.utils.db_connection import get_engine
+from app.services.feed.feed import update_feed
 
 # =============================================================================
 # LOGGING SETUP
