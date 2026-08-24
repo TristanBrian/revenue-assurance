@@ -51,11 +51,7 @@ function AnomaliesContent() {
   const [savingCaseAction, setSavingCaseAction] = useState(false);
 
   useEffect(() => {
-    if (!selectedAnomaly) {
-      setCaseHistory([]);
-      setCaseActionMessage(null);
-      return;
-    }
+    if (!selectedAnomaly) return;
     Promise.resolve().then(async () => {
       try {
         setCaseHistory(await getAnomalyActions(selectedAnomaly.dispatch_id, direction));
@@ -82,6 +78,14 @@ function AnomaliesContent() {
       setCaseActionMessage(err instanceof ApiError ? err.message : "Could not record the case action.");
     } finally {
       setSavingCaseAction(false);
+    }
+  }
+
+  function selectAnomaly(anomaly: Anomaly | null) {
+    setSelectedAnomaly(anomaly);
+    if (anomaly) {
+      setCaseHistory([]);
+      setCaseActionMessage(null);
     }
   }
 
@@ -131,10 +135,6 @@ function AnomaliesContent() {
       setLoading(false);
     }
   }
-
-  useEffect(() => {
-    setPage(1);
-  }, [materiality, direction, breakTypeFilter, statusFilter, searchQuery]);
 
   useEffect(() => {
     // Wrapped in .then() rather than called bare: react-hooks/set-state-in-effect
@@ -187,7 +187,7 @@ function AnomaliesContent() {
             type="text"
             placeholder="Search by OMC, waybill ID, product, or invoice ID..."
             value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
+            onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
             className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:bg-white rounded-lg px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none transition-all shadow-inner"
           />
         </div>
@@ -195,7 +195,7 @@ function AnomaliesContent() {
           <div className="flex flex-col gap-1 w-44">
             <select
               value={breakTypeFilter}
-              onChange={(e) => setBreakTypeFilter(e.target.value)}
+              onChange={(e) => { setBreakTypeFilter(e.target.value); setPage(1); }}
               className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 focus:outline-none transition-all cursor-pointer shadow-sm"
             >
               <option value="All">All Break Types</option>
@@ -208,7 +208,7 @@ function AnomaliesContent() {
           <div className="flex flex-col gap-1 w-36">
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
               className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 focus:outline-none transition-all cursor-pointer shadow-sm"
             >
               <option value="All">All Statuses</option>
@@ -253,7 +253,7 @@ function AnomaliesContent() {
                 ? anomalies
                 : anomalies.filter((a) => a.fraud_tier === fraudTierFilter)
             }
-            onSelectAnomaly={setSelectedAnomaly}
+            onSelectAnomaly={selectAnomaly}
             selectedAnomalyId={selectedAnomaly?.dispatch_id}
           />
           <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-xs dark:border-zinc-800 dark:bg-zinc-900/40 sm:flex-row sm:items-center sm:justify-between">
@@ -273,7 +273,7 @@ function AnomaliesContent() {
           {/* Backdrop overlay */}
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity"
-            onClick={() => setSelectedAnomaly(null)}
+            onClick={() => selectAnomaly(null)}
           ></div>
 
           {/* Centered responsive investigation modal */}
@@ -293,7 +293,7 @@ function AnomaliesContent() {
                 </p>
               </div>
               <button
-                onClick={() => setSelectedAnomaly(null)}
+                onClick={() => selectAnomaly(null)}
                 className="text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-white p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-colors"
               >
                 <svg

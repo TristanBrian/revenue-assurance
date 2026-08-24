@@ -24,16 +24,21 @@ export default function InukaAnomaliesPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCase, setSelectedCase] = useState<InukaRiskCase | null>(null);
 
+
   useEffect(() => {
-    setPillar(new URLSearchParams(window.location.search).get("pillar") || "");
+    Promise.resolve().then(() => setPillar(new URLSearchParams(window.location.search).get("pillar") || ""));
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    getInukaCases({ page, pageSize, status: status || undefined, riskType: riskType || undefined, pillarId: pillar || undefined, search: search || undefined })
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setError(null);
+      return getInukaCases({ page, pageSize, status: status || undefined, riskType: riskType || undefined, pillarId: pillar || undefined, search: search || undefined });
+    })
       .then((result) => {
-        if (cancelled) return;
+        if (cancelled || !result) return;
         setItems(result.cases);
         setTotal(result.pagination.total);
         setTotalPages(result.pagination.total_pages);
