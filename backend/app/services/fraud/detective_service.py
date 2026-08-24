@@ -19,6 +19,22 @@ import numpy as np
 import pandas as pd
 
 
+def _nan_to_none(df: pd.DataFrame) -> pd.DataFrame:
+    """NaN is the correct internal representation for a feature this
+    module can't compute for a given OMC (see compute_omc_risk_features()'s
+    docstring — e.g. an OMC with zero dispatches) and code that consumes
+    the DataFrame directly (detect_risk_communities()'s skipna=True
+    aggregation, feature_builder's z-score lookups) relies on real NaN
+    semantics. But a NaN reaching Optional[float] Pydantic field passes
+    validation fine, then blows up at the actual HTTP response boundary:
+    Starlette's JSONResponse hard-codes allow_nan=False, so json.dumps()
+    raises "Out of range float values are not JSON compliant". Convert at
+    the public wrapper functions below — the last point before a caller
+    turns this into an HTTP response — not inside compute_omc_risk_
+    features() itself."""
+    return df.astype(object).where(df.notna(), None)
+
+
 def _load_tables(engine):
     omcs = pd.read_sql("SELECT omc_id FROM omcs", engine)
     dispatches = pd.read_sql(
@@ -207,8 +223,11 @@ def compute_omc_risk_features(engine) -> pd.DataFrame:
 def get_all_omc_risk_features(engine) -> pd.DataFrame:
     """Thin wrapper around compute_omc_risk_features() — routes call this,
     not the compute function directly, so the public service surface
-    stays stable if the internals change."""
-    return compute_omc_risk_features(engine)
+    stays stable if the internals change. NaN converted to None here (see
+    _nan_to_none()) since every caller either serializes this straight to
+    JSON or to CSV, both fine with None/empty — nothing downstream needs
+    real NaN semantics at this boundary."""
+    return _nan_to_none(compute_omc_risk_features(engine))
 
 
 def get_omc_risk(engine, omc_id: str) -> dict:
@@ -218,4 +237,4 @@ def get_omc_risk(engine, omc_id: str) -> dict:
     row = features[features["omc_id"] == omc_id]
     if row.empty:
         raise ValueError(f"Unknown omc_id: {omc_id}")
-    return row.iloc[0].to_dict()
+    return _nan_to_none(row).iloc[0].to_dict()

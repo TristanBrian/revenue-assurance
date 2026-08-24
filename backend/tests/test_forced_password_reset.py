@@ -39,6 +39,7 @@ from app.models.alerts.alert import Alert  # noqa: E402
 from app.models.alerts.alert_read import AlertRead  # noqa: E402
 from app.models.auth.associations import role_permissions, user_roles  # noqa: E402
 from app.models.audit.audit import AuditLog  # noqa: E402
+from app.models.audit.audit_log_batch import AuditLogBatch  # noqa: E402 — log_action() writes batch-era rows now, see docs/audit-merkle-migration.md
 from app.models.auth.consent_record import ConsentRecord  # noqa: E402
 from app.models.auth.permission import Permission  # noqa: E402
 from app.models.auth.role import Role  # noqa: E402
@@ -69,7 +70,7 @@ def db_session():
         engine,
         tables=[
             User.__table__, Role.__table__, Permission.__table__,
-            user_roles, role_permissions, AuditLog.__table__,
+            user_roles, role_permissions, AuditLog.__table__, AuditLogBatch.__table__,
             Alert.__table__, AlertRead.__table__,
             TermsDocument.__table__, ConsentRecord.__table__,
         ],

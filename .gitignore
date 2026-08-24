@@ -67,4 +67,6 @@ backup_data/
 dist/
 *.egg-info/
 backend/flowguard.egg-info/
+CLAUDE.md
+.claude
 node_modules

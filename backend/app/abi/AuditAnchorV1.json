@@ -16,19 +16,13 @@
       {
         "indexed": true,
         "internalType": "uint256",
-        "name": "batchIndex",
+        "name": "blockIndex",
         "type": "uint256"
       },
       {
         "indexed": false,
         "internalType": "bytes32",
-        "name": "merkleRoot",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "batchRootHash",
+        "name": "chainTipHash",
         "type": "bytes32"
       },
       {
@@ -45,17 +39,12 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "batchIndex",
+        "name": "blockIndex",
         "type": "uint256"
       },
       {
         "internalType": "bytes32",
-        "name": "merkleRoot",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "batchRootHash",
+        "name": "chainTipHash",
         "type": "bytes32"
       }
     ],

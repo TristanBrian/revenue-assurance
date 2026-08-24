@@ -15,11 +15,21 @@ log_ingested_record() for the write path, and services/audit/
 anchor_service.py for periodically anchoring the chain tip on Base
 Sepolia. No UPDATE/DELETE path exists on this table anywhere in the API
 — see routes/audit/audit.py, which only ever reads.
+
+Batch Merkle cutover (see docs/audit-merkle-migration.md): rows written
+before the cutover keep block_hash/prev_block_hash as their only
+integrity commitment (unchanged, still NOT NULL for those rows in
+practice even though the column itself is now nullable — nothing ever
+un-sets an existing value). Rows written at/after the cutover instead get
+batch_index/leaf_index (their position in a sealed AuditLogBatch) and
+leave block_hash/prev_block_hash NULL — data_hash (unchanged either way)
+is what a Merkle leaf commits to. verify_chain_integrity() branches on
+"is block_hash NULL" to pick the right verification path per row's era.
 """
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, JSON, Text
+from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Integer, JSON, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 from app.utils.db_connection import Base
@@ -97,6 +107,18 @@ class AuditLog(Base):
     # block" is an explicit, hashable value rather than a special case
     # every downstream reader has to know about.
     block_index = Column(BigInteger, nullable=False, unique=True, index=True)
-    data_hash = Column(Text, nullable=False)  # sha256(canonical JSON of the event payload)
-    prev_block_hash = Column(Text, nullable=False)  # the prior row's block_hash (or genesis)
-    block_hash = Column(Text, nullable=False, unique=True, index=True)  # sha256(block_index || event_timestamp || data_hash || prev_block_hash)
+    data_hash = Column(Text, nullable=False)  # sha256(canonical JSON of the event payload) — the Merkle leaf's content, unchanged across the cutover
+    # Nullable as of the batch Merkle cutover — NULL for any row written
+    # at/after it (see module docstring above); still always set for
+    # pre-cutover rows, never retroactively cleared.
+    prev_block_hash = Column(Text, nullable=True)  # pre-cutover only: the prior row's block_hash (or genesis)
+    block_hash = Column(Text, nullable=True, unique=True, index=True)  # pre-cutover only: sha256(block_index || event_timestamp || data_hash || prev_block_hash)
+
+    # --- Batch Merkle chain (post-cutover) ---
+    # Both NULL for pre-cutover rows. batch_index identifies the
+    # AuditLogBatch this row belongs to (may still be open/unsealed);
+    # leaf_index is this row's 0-based position within that batch's
+    # Merkle tree, in the same order block_index already gives it — see
+    # services/audit/merkle_service.py.
+    batch_index = Column(BigInteger, nullable=True, index=True)
+    leaf_index = Column(Integer, nullable=True)
