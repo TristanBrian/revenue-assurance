@@ -68,17 +68,6 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    href: "/dashboard/omc-risk",
-    label: "OMC Risk",
-    anyOf: ["view_omc_risk_profile"],
-    badgeKey: "omc_risk",
-    icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-      </svg>
-    ),
-  },
-  {
     href: "/dashboard/fraud",
     label: "Risk Intelligence",
     anyOf: ["view_fraud_graph"],
@@ -223,7 +212,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       "/dashboard/upload",
       "/dashboard/anomalies",
       "/dashboard/heatmap",
-      "/dashboard/omc-risk",
       "/dashboard/ebilling",
       "/dashboard/reports",
       "/dashboard/fraud",
@@ -300,7 +288,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   // Decorative search over anomalies/OMCs/invoices only makes sense on pages
   // that actually show that content — not the Explorer, uploads, reports,
   // e-billing, or fraud graph, and never for admin (their page is users).
-  const SEARCH_RELEVANT_PATHS = isInukaWorkspace ? ["/dashboard/inuka/anomalies", "/dashboard/inuka/programs", "/dashboard/inuka/officers"] : ["/dashboard", "/dashboard/anomalies", "/dashboard/omc-risk"];
+  const SEARCH_RELEVANT_PATHS = isInukaWorkspace ? ["/dashboard/inuka/anomalies", "/dashboard/inuka/programs", "/dashboard/inuka/officers"] : ["/dashboard", "/dashboard/anomalies", "/dashboard/heatmap"];
   const showSearch = !isAdmin && SEARCH_RELEVANT_PATHS.includes(pathname);
 
   function switchWorkspace(next: Workspace) {

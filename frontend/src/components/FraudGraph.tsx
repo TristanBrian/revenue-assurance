@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { ApiError, getFraudGraph } from "@/lib/api";
 import { useMateriality } from "@/context/MaterialityContext";
-import { useDirection } from "@/context/DirectionContext";
 import type { FraudGraphData, GraphNode } from "@/lib/types";
 
 // Outbound (stipend/disbursement) — Stage 2. "officer"/"beneficiary" nodes
@@ -83,7 +82,6 @@ const HEIGHT = 460;
 
 export default function FraudGraph() {
   const { materiality } = useMateriality(); // ✅ Get from context
-  const { direction } = useDirection();
   const [graph, setGraph] = useState<FraudGraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +93,9 @@ export default function FraudGraph() {
   useEffect(() => {
     let cancelled = false;
 
-    getFraudGraph(materiality, direction) // ✅ Pass the materiality
+    // Risk Intelligence is the Oil graph. Do not inherit an outbound
+    // direction left behind by a previous Inuka workspace visit.
+    getFraudGraph(materiality, "inbound")
       .then((data) => {
         if (!cancelled) setGraph(data);
       })
@@ -114,7 +114,7 @@ export default function FraudGraph() {
     return () => {
       cancelled = true;
     };
-  }, [materiality, direction]); // ✅ Re-run when slider or direction changes
+  }, [materiality]);
 
   const laidOutNodes = useMemo(() => {
     if (!graph) return [];
