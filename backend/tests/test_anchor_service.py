@@ -26,15 +26,18 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.models.audit.audit import AuditLog  # noqa: E402 — registers the table on Base.metadata
 from app.models.audit.audit_anchor import AuditAnchorRecord  # noqa: E402
+from app.models.audit.audit_log_batch import AuditLogBatch  # noqa: E402 — log_action() writes batch-era rows now, see docs/audit-merkle-migration.md
 from app.utils.db_connection import Base  # noqa: E402
-from app.services.audit.audit_service import log_action  # noqa: E402
+from app.services.audit.audit_service import GENESIS_PREV_HASH  # noqa: E402
 from app.services.audit import anchor_service  # noqa: E402
 
 
 @pytest.fixture
 def db():
     engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine, tables=[AuditLog.__table__, AuditAnchorRecord.__table__])
+    Base.metadata.create_all(
+        engine, tables=[AuditLog.__table__, AuditAnchorRecord.__table__, AuditLogBatch.__table__]
+    )
     session = sessionmaker(bind=engine)()
     try:
         yield session
@@ -42,37 +45,81 @@ def db():
         session.close()
 
 
+def _write_legacy_row(db, *, block_index: int, prev_hash: str):
+    """Directly constructs an AuditLog row shaped the way a PRE-CUTOVER
+    row actually looked (block_hash/prev_block_hash set) — V1 (legacy)
+    anchoring (anchor_chain_tip()/maybe_anchor_chain_tip(), and
+    get_legacy_chain_tip() they're built on) only ever operates on this
+    shape. log_action() no longer produces it for new writes (every row
+    is batch-era now — see docs/audit-merkle-migration.md), so tests
+    exercising the V1 path construct it directly. Same helper as
+    test_audit_service.py's _write_legacy_row(), duplicated rather than
+    imported across test files per this suite's existing convention (no
+    shared test-fixture module between test_*.py files here)."""
+    import hashlib
+    import json
+    from datetime import datetime, timezone
+
+    event_timestamp = datetime.now(timezone.utc)
+    payload = {
+        "actor_user_id": None, "external_actor": None, "action": "a", "target_type": None,
+        "target_id": None, "before": None, "after": None, "event_timestamp": event_timestamp.isoformat(),
+    }
+    data_hash = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    block_hash = hashlib.sha256(f"{block_index}|{event_timestamp.isoformat()}|{data_hash}|{prev_hash}".encode()).hexdigest()
+    row = AuditLog(
+        action="a", event_timestamp=event_timestamp, block_index=block_index,
+        data_hash=data_hash, prev_block_hash=prev_hash, block_hash=block_hash,
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
 def test_is_configured_is_false_without_credentials():
-    """Documents the actual test-environment state this whole file
-    relies on — if this ever starts failing, every other test below is
-    silently exercising the wrong (configured) code path instead of the
-    one it's meant to."""
+    """Documents this specific test environment's real is_configured()
+    result, WITHOUT forcing it via monkeypatch (unlike every other test
+    below) — this is the one test whose entire point is to observe the
+    actual, unforced state. It's environment-dependent by design: it
+    fails on a deployment/container whose real .env has genuine V1
+    credentials configured (a live demo environment, for instance) —
+    that's a true statement about that environment, not a bug in this
+    test or in is_configured() itself. Every OTHER test in this file
+    forces "not configured" explicitly via monkeypatch specifically so
+    it doesn't depend on which of those two states the ambient
+    environment happens to be in."""
     assert anchor_service.is_configured() is False
 
 
-def test_get_backend_address_returns_none_when_not_configured():
+def test_get_backend_address_returns_none_when_not_configured(monkeypatch):
+    monkeypatch.setattr(anchor_service, "is_configured", lambda: False)
     assert anchor_service.get_backend_address() is None
 
 
-def test_anchor_chain_tip_returns_none_when_not_configured(db):
-    log_action(db, actor_user_id=None, action="a")
+def test_anchor_chain_tip_returns_none_when_not_configured(db, monkeypatch):
+    monkeypatch.setattr(anchor_service, "is_configured", lambda: False)
+    _write_legacy_row(db, block_index=0, prev_hash=GENESIS_PREV_HASH)
     db.commit()
     assert anchor_service.anchor_chain_tip(db) is None
     # And doesn't write a phantom AuditAnchorRecord either.
     assert db.query(AuditAnchorRecord).count() == 0
 
 
-def test_maybe_anchor_chain_tip_returns_none_when_not_configured(db):
-    log_action(db, actor_user_id=None, action="a")
+def test_maybe_anchor_chain_tip_returns_none_when_not_configured(db, monkeypatch):
+    monkeypatch.setattr(anchor_service, "is_configured", lambda: False)
+    _write_legacy_row(db, block_index=0, prev_hash=GENESIS_PREV_HASH)
     db.commit()
     assert anchor_service.maybe_anchor_chain_tip(db) is None
 
 
-def test_fetch_anchor_event_returns_none_when_not_configured():
+def test_fetch_anchor_event_returns_none_when_not_configured(monkeypatch):
+    monkeypatch.setattr(anchor_service, "is_configured", lambda: False)
     assert anchor_service.fetch_anchor_event(0) is None
 
 
-def test_verify_on_chain_anchor_reports_not_configured(db):
+def test_verify_on_chain_anchor_reports_not_configured(db, monkeypatch):
+    monkeypatch.setattr(anchor_service, "is_configured", lambda: False)
+    monkeypatch.setattr(anchor_service, "is_configured_v2", lambda: False)
     result = anchor_service.verify_on_chain_anchor(db)
     assert result == {
         "configured": False,
@@ -99,7 +146,7 @@ def test_maybe_anchor_chain_tip_anchors_immediately_on_first_ever_anchor(db, mon
     and stubbing anchor_chain_tip() itself (this test is about the
     threshold-skipping decision, not about actually sending a
     transaction)."""
-    log_action(db, actor_user_id=None, action="a")
+    _write_legacy_row(db, block_index=0, prev_hash=GENESIS_PREV_HASH)
     db.commit()
 
     monkeypatch.setattr(anchor_service, "is_configured", lambda: True)
@@ -116,9 +163,10 @@ def test_maybe_anchor_chain_tip_skips_when_under_both_thresholds(db, monkeypatch
     nothing."""
     from datetime import datetime, timezone
 
-    log_action(db, actor_user_id=None, action="a")
+    _write_legacy_row(db, block_index=0, prev_hash=GENESIS_PREV_HASH)
     db.commit()
-    tip = log_action(db, actor_user_id=None, action="b")
+    first = db.query(AuditLog).filter(AuditLog.block_index == 0).one()
+    tip = _write_legacy_row(db, block_index=1, prev_hash=first.block_hash)
     db.commit()
 
     db.add(AuditAnchorRecord(
