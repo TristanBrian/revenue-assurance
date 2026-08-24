@@ -25,7 +25,21 @@ RUN_ETL=1
 # 2. Run data generation & ETL
 # ------------------------------------------------------------------
 if [ "$RUN_ETL" -eq 1 ]; then
-    if [ -f "data/raw/dispatches.csv" ] && [ -f "data/raw/invoices.csv" ] && [ -f "data/raw/payments.csv" ]; then
+    # disbursements.csv is the LAST file generate_kpc_data.py writes
+    # (inbound dispatches/invoices/payments first, then substantial
+    # computation, then outbound officers/beneficiaries/attendance/
+    # stipend_authorizations/disbursements — see that script's own
+    # write order). Checking only the three inbound files here used to
+    # let a generation run that crashed/OOM'd/timed out midway (after
+    # inbound, before outbound) look "complete" forever after: this
+    # check would keep finding the inbound CSVs on every restart and
+    # skip regenerating anything, permanently leaving outbound data
+    # missing with no visible error (etl_pipeline.py treats outbound
+    # CSVs as optional and just warns-and-skips them, so nothing else
+    # failed loudly either). Requiring disbursements.csv too means a
+    # partial run gets detected and regenerated from scratch instead of
+    # silently wedging in that state.
+    if [ -f "data/raw/dispatches.csv" ] && [ -f "data/raw/invoices.csv" ] && [ -f "data/raw/payments.csv" ] && [ -f "data/raw/disbursements.csv" ]; then
         echo "✅ CSVs already exist – skipping generation."
     else
         echo "📊 Generating fresh synthetic data..."
