@@ -25,7 +25,15 @@ class Settings(BaseSettings):
     cdp_api_key_secret: str = ""
     cdp_wallet_secret: str = ""
     base_rpc_url: str = "https://sepolia.base.org"
+    # V1 — per-row chain-tip anchor (app/abi/AuditAnchorV1.json). Kept
+    # pointed at the original deployed contract so pre-cutover on-chain
+    # anchors stay resolvable; see docs/audit-merkle-migration.md.
     audit_anchor_contract_address: str = ""
+    # V2 — batch Merkle anchor (app/abi/AuditAnchor.json, current). Set
+    # only after running web3/scripts/deploy_audit_anchor.ts against the
+    # V2 contract — empty means "not deployed/configured yet", same
+    # "not configured, not an error" posture as the V1 address.
+    audit_anchor_contract_address_v2: str = ""
     audit_backend_wallet_name: str = "inuka-audit-backend"
 
     model_config = SettingsConfigDict(env_file=_REPO_ROOT_ENV, extra="ignore")
