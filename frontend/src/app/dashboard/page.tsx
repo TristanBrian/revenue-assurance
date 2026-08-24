@@ -1,345 +1,261 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import Link from "next/link";
-import { ApiError, getMetrics, getOmcRiskProfile } from "@/lib/api";
-import type { Metrics, OmcRiskProfile, MetricsResult } from "@/lib/types";
-import { useAuth } from "@/lib/auth-context";
-import { useMateriality } from "@/context/MaterialityContext";
-import { useDirection } from "@/context/DirectionContext";
-import LiveFeed from "@/components/LiveFeed";
-import StatCard from "@/components/StatCard";
-import ExposureRecoveryChart from "@/components/ExposureRecoveryChart";
-import ManagerAlertsCard from "@/components/ManagerAlertsCard";
-import UserManagementTable from "@/components/UserManagementTable";
-import InukaDashboard from "@/components/InukaDashboard";
+import { useEffect, useState } from "react";
+import { getAuditLogs, getAuditSummary, AuditLog } from "@/lib/api";
+import RequirePermission from "@/components/RequirePermission";
+import { format } from "date-fns";
 
-function formatKesCompact(value: number): string {
-  if (value >= 1e9) return `KES ${(value / 1e9).toFixed(2)}B`;
-  if (value >= 1e6) return `KES ${(value / 1e6).toFixed(2)}M`;
-  return new Intl.NumberFormat("en-KE", {
-    style: "currency",
-    currency: "KES",
-    maximumFractionDigits: 0,
-  }).format(value);
+// Define a proper type for the summary response
+interface SummaryData {
+  total_actions: number;
+  actions_by_type: Record<string, number>;
+  actions_by_actor: Record<string, number>;
+  period_days: number;
+  since: string;
 }
 
-function formatKesFull(value: number): string {
-  return new Intl.NumberFormat("en-KE", {
-    style: "currency",
-    currency: "KES",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-const BREAK_TYPES: { key: keyof Metrics; label: string; color: string }[] = [
-  { key: "missing_invoice_leak", label: "Missing Invoice", color: "var(--chart-1)" },
-  { key: "missing_payment_leak", label: "Missing Payment", color: "var(--chart-2)" },
-  { key: "underpayment_leak", label: "Underpayment", color: "var(--chart-3)" },
-  { key: "overpayment_leak", label: "Overpayment", color: "var(--chart-4)" },
-];
-
-export default function ExecutiveDashboardPage() {
-  const { user } = useAuth();
-  const { materiality, setMateriality } = useMateriality();
-  const { direction } = useDirection();
-  const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [omcProfiles, setOmcProfiles] = useState<OmcRiskProfile[]>([]);
-  const [qualityScore, setQualityScore] = useState<number | null>(null);
+function AuditContent() {
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [summary, setSummary] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [limit, _setLimit] = useState(50); // renamed to avoid unused warning
+  const [offset, setOffset] = useState(0);
+  const [filters, setFilters] = useState({
+    actor: "",
+    action: "",
+    target: "",
+    date_from: "",
+    date_to: "",
+  });
+  const [total, setTotal] = useState(0);
 
-  const canViewMetrics = user?.permissions.includes("view_metrics") ?? false;
-  const canViewOmcRisk = user?.permissions.includes("view_omc_risk_profile") ?? false;
-  const canViewLiveFeed = user?.permissions.includes("view_live_feed") ?? false;
-  const isManager = user?.roles.includes("manager") ?? false;
-  const isInukaManager = user?.roles.includes("inuka_manager") ?? false;
-  const isDepotSupervisor = user?.roles.includes("depot_supervisor") ?? false;
-  const effectiveDirection = isDepotSupervisor ? "inbound" : direction;
-  const canViewAnomalyTable = user?.permissions.includes("view_anomaly_table") ?? false;
-
-  useEffect(() => {
-    if (!user) return;
-
-    let cancelled = false;
-    Promise.resolve().then(() => {
-      if (!cancelled) {
-        setLoading(true);
-        setError(null);
-      }
-    });
-
-    if (isInukaManager) {
-      Promise.resolve().then(() => {
-        if (!cancelled) setLoading(false);
-      });
-      return () => {
-        cancelled = true;
-      };
+  async function loadData() {
+    setLoading(true);
+    setError(null);
+    try {
+      const [logsRes, summaryRes] = await Promise.all([
+        getAuditLogs({ limit, offset, ...filters }),
+        getAuditSummary(7),
+      ]);
+      setLogs(logsRes.logs || []);
+      setTotal(logsRes.total || 0);
+      setSummary(summaryRes as SummaryData);
+    } catch (err) {
+      console.error("Audit page error:", err);
+      setError(err instanceof Error ? err.message : "Failed to load audit logs");
+    } finally {
+      setLoading(false);
     }
-
-    const promises = [
-      canViewMetrics ? getMetrics(materiality, effectiveDirection) : Promise.resolve(null),
-      canViewOmcRisk ? getOmcRiskProfile(materiality, effectiveDirection) : Promise.resolve(null),
-    ];
-
-    Promise.all(promises)
-      .then((results) => {
-        const metricsData = results[0] as MetricsResult | null;
-        const riskData = results[1] as OmcRiskProfile[] | null;
-        if (!cancelled) {
-          if (metricsData) {
-            setMetrics(metricsData.metrics);
-            setQualityScore(metricsData.data_quality.quality_score);
-          }
-          if (riskData) setOmcProfiles(riskData);
-        }
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : "Could not reach the reconciliation API. Is the database online?",
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user, materiality, direction, effectiveDirection, canViewMetrics, canViewOmcRisk, isInukaManager]);
-
-  const totalLeakage = useMemo(() => {
-    if (!omcProfiles.length) return 0;
-    return omcProfiles.reduce((acc, o) => acc + o.leakage_kes, 0);
-  }, [omcProfiles]);
-
-  const highRiskOmcsCount = useMemo(
-    () => omcProfiles.filter((o) => o.risk_level === "High").length,
-    [omcProfiles],
-  );
-
-  const sortedOmcs = useMemo(
-    () => [...omcProfiles].sort((a, b) => b.leakage_kes - a.leakage_kes).slice(0, 5),
-    [omcProfiles],
-  );
-
-  const maxBreakLeak = metrics
-    ? Math.max(...BREAK_TYPES.map((b) => metrics[b.key] as number), 1)
-    : 1;
-
-  if (isInukaManager) return <InukaDashboard />;
-
-  // Admin-only accounts have no operational metrics permission at all —
-  // their "dashboard" is user management, not the executive KPI view.
-  if (user && !canViewMetrics && !canViewOmcRisk) {
-    if (!user.permissions.includes("manage_users")) {
-      return (
-        <div className="mx-auto flex max-w-5xl flex-col gap-6">
-          <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <h2 className="text-base font-bold text-foreground">Welcome, {user.email}</h2>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Your account has no dashboard sections enabled yet. Contact a System Administrator to have a role
-              assigned.
-            </p>
-          </div>
-        </div>
-      );
-    }
-    return <UserManagementTable />;
   }
 
-  return (
-    <div className="flex flex-col gap-6 max-w-6xl mx-auto">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">KPC Order-to-Cash</p>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground mt-1">Executive Dashboard</h1>
-        </div>
+  useEffect(() => {
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [limit, offset, filters]);
 
-        <div className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3 py-1.5">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-            Materiality
-          </span>
-          <input
-            type="range"
-            min="0"
-            max="1000000"
-            step="25000"
-            value={materiality}
-            onChange={(e) => setMateriality(Number(e.target.value))}
-            className="w-24 h-1 accent-primary cursor-pointer"
-          />
-          <span className="text-xs font-mono font-semibold text-foreground w-20 text-right">
-            {formatKesCompact(materiality)}
-          </span>
-        </div>
+  const handleFilterChange = (key: string, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+    setOffset(0);
+  };
+
+  const handlePrevPage = () => setOffset((o) => Math.max(0, o - limit));
+  const handleNextPage = () => setOffset((o) => o + limit);
+
+  const getTopAction = (): string => {
+    if (!summary) return "—";
+    const entries = Object.entries(summary.actions_by_type);
+    if (entries.length === 0) return "—";
+    return entries.sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+  };
+
+  const getTopActor = (): string => {
+    if (!summary) return "—";
+    const entries = Object.entries(summary.actions_by_actor);
+    if (entries.length === 0) return "—";
+    return entries.sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+  };
+
+  const formatAuditDate = (log: AuditLog): string => {
+    const ts = log.event_timestamp || log.created_at;
+    if (!ts) return "—";
+    try {
+      return format(new Date(ts), "yyyy-MM-dd HH:mm:ss");
+    } catch {
+      return "Invalid date";
+    }
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-6">
+      <header>
+        <h1 className="text-2xl font-bold text-foreground">Audit Trail</h1>
+        <p className="text-sm text-muted-foreground">
+          Immutable record of every critical action in the platform.
+        </p>
       </header>
 
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-xs text-muted-foreground uppercase font-semibold">Total Events (7d)</p>
+          <p className="text-2xl font-bold">{summary?.total_actions ?? 0}</p>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-xs text-muted-foreground uppercase font-semibold">Top Action</p>
+          <p className="text-lg font-bold">{getTopAction()}</p>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <p className="text-xs text-muted-foreground uppercase font-semibold">Top Actor</p>
+          <p className="text-lg font-bold">{getTopActor()}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-4 items-end bg-card border border-border rounded-lg p-4">
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Actor</label>
+          <input
+            type="text"
+            value={filters.actor}
+            onChange={(e) => handleFilterChange("actor", e.target.value)}
+            placeholder="User ID or email"
+            className="mt-1 w-48 bg-background border border-border rounded-md px-3 py-1.5 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Action</label>
+          <input
+            type="text"
+            value={filters.action}
+            onChange={(e) => handleFilterChange("action", e.target.value)}
+            placeholder="e.g. anomaly.resolved"
+            className="mt-1 w-48 bg-background border border-border rounded-md px-3 py-1.5 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Target</label>
+          <input
+            type="text"
+            value={filters.target}
+            onChange={(e) => handleFilterChange("target", e.target.value)}
+            placeholder="Record ID"
+            className="mt-1 w-48 bg-background border border-border rounded-md px-3 py-1.5 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Date From</label>
+          <input
+            type="date"
+            value={filters.date_from}
+            onChange={(e) => handleFilterChange("date_from", e.target.value)}
+            className="mt-1 bg-background border border-border rounded-md px-3 py-1.5 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Date To</label>
+          <input
+            type="date"
+            value={filters.date_to}
+            onChange={(e) => handleFilterChange("date_to", e.target.value)}
+            className="mt-1 bg-background border border-border rounded-md px-3 py-1.5 text-sm"
+          />
+        </div>
+        <button
+          onClick={() => {
+            setFilters({ actor: "", action: "", target: "", date_from: "", date_to: "" });
+            setOffset(0);
+          }}
+          className="px-4 py-1.5 text-sm bg-muted hover:bg-muted/80 rounded-md"
+        >
+          Clear
+        </button>
+      </div>
+
+      {loading && (
+        <div className="flex justify-center py-12">
+          <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+        </div>
+      )}
+
       {error && (
-        <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 text-sm text-status-critical">
+        <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-4 text-red-600 dark:text-red-400">
           {error}
         </div>
       )}
 
-      {loading && !error && (
-        <div className="flex items-center justify-center p-12">
-          <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-        </div>
-      )}
-
-      {metrics && !loading && (
-        <div className="flex flex-col gap-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {canViewOmcRisk ? (
-              <StatCard
-                label="Total Leakage"
-                value={formatKesCompact(totalLeakage)}
-                note="Across all flagged OMCs"
-              />
-            ) : (
-              <StatCard
-                label="Total Dispatched"
-                value={formatKesCompact(metrics.total_dispatched_kes)}
-                note="Across registered waybills"
-              />
-            )}
-
-            <StatCard
-              label="Critical Anomalies"
-              value={metrics.critical_count.toLocaleString()}
-              note="Needs immediate review"
-              tone={metrics.critical_count > 0 ? "critical" : "low"}
-              notePill
-              href={canViewAnomalyTable ? "/dashboard/anomalies" : undefined}
-            />
-
-            <StatCard
-              label="Reconciliation Rate"
-              value={`${metrics.reconciliation_rate.toFixed(1)}%`}
-              progress={metrics.reconciliation_rate}
-              tone={metrics.reconciliation_rate >= 90 ? "low" : "medium"}
-            />
-
-            {canViewOmcRisk ? (
-              <StatCard
-                label="High Risk OMCs"
-                value={highRiskOmcsCount.toString()}
-                note="Under active review"
-                tone={highRiskOmcsCount > 0 ? "high" : "low"}
-                href="/dashboard/heatmap"
-              />
-            ) : (
-              <StatCard
-                label="Total Paid Remitted"
-                value={formatKesCompact(metrics.total_paid_kes)}
-                note="Verified payments"
-                tone="low"
-              />
-            )}
+      {!loading && !error && (
+        <>
+          <div className="bg-card border border-border rounded-lg overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 border-b border-border">
+                <tr>
+                  <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Timestamp</th>
+                  <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Actor</th>
+                  <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Action</th>
+                  <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Target</th>
+                  <th className="px-4 py-2 text-left font-semibold text-muted-foreground">Block Index</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!logs || logs.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                      No audit logs found.
+                    </td>
+                  </tr>
+                ) : (
+                  logs.map((log) => (
+                    <tr key={log.id} className="border-b border-border hover:bg-muted/30">
+                      <td className="px-4 py-2 text-nowrap">{formatAuditDate(log)}</td>
+                      <td className="px-4 py-2 font-mono text-xs">
+                        {log.actor_user_id || log.external_actor || "system"}
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs">
+                          {log.action}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-xs">
+                        {log.target_type}: {log.target_id}
+                      </td>
+                      <td className="px-4 py-2 text-xs font-mono">{log.block_index}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
 
-          {isManager ? (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-              <div className="lg:col-span-2">
-                <ExposureRecoveryChart />
-              </div>
-              <ManagerAlertsCard />
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Showing {offset + 1}–{Math.min(offset + limit, total)} of {total}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handlePrevPage}
+                disabled={offset === 0}
+                className="px-4 py-1.5 text-sm border border-border rounded-md disabled:opacity-50 hover:bg-muted"
+              >
+                Previous
+              </button>
+              <button
+                onClick={handleNextPage}
+                disabled={offset + limit >= total}
+                className="px-4 py-1.5 text-sm border border-border rounded-md disabled:opacity-50 hover:bg-muted"
+              >
+                Next
+              </button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-              <div className="lg:col-span-2">
-                {canViewOmcRisk ? (
-                  <div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4 shadow-sm h-full">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h2 className="text-sm font-bold text-foreground">Top Leaking OMCs</h2>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          Materiality &gt; {formatKesCompact(materiality)}
-                        </p>
-                      </div>
-                      <Link
-                        href="/dashboard/heatmap"
-                        className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        View all
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H8m9 0v9" />
-                        </svg>
-                      </Link>
-                    </div>
-
-                    {sortedOmcs.length === 0 ? (
-                      <p className="text-sm text-muted-foreground italic py-8 text-center">
-                        No leakages match the current materiality criteria.
-                      </p>
-                    ) : (
-                      <div className="flex flex-col divide-y divide-border">
-                        {sortedOmcs.map((omc) => (
-                          <div key={omc.customer} className="flex justify-between items-center py-3 first:pt-0 last:pb-0">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <RiskDot level={omc.risk_level} />
-                              <div className="min-w-0">
-                                <h3 className="text-sm font-semibold text-foreground truncate">{omc.customer}</h3>
-                                <p className="text-[11px] text-muted-foreground mt-0.5">
-                                  {omc.anomaly_count} anomalies · {omc.risk_level} risk
-                                </p>
-                              </div>
-                            </div>
-                            <span className="text-sm font-semibold text-status-critical font-mono shrink-0 ml-3">
-                              {formatKesFull(omc.leakage_kes)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  canViewLiveFeed && <LiveFeed />
-                )}
-              </div>
-
-              <div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4 shadow-sm h-full">
-                <h2 className="text-sm font-bold text-foreground">Leakage by Break Type</h2>
-                <div className="flex flex-col gap-3">
-                  {BREAK_TYPES.map((b) => {
-                    const value = metrics[b.key] as number;
-                    const pct = Math.round((value / maxBreakLeak) * 100);
-                    return (
-                      <div key={b.key} className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground font-medium">{b.label}</span>
-                          <span className="font-mono font-semibold text-foreground">{formatKesCompact(value)}</span>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{ width: `${pct}%`, backgroundColor: b.color }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="border-t border-border pt-3 mt-auto flex items-center justify-between">
-                  <span className="text-[11px] text-muted-foreground">Data quality score</span>
-                  <span className="text-xs font-bold text-status-low">
-                    {qualityScore !== null ? `${qualityScore.toFixed(1)}%` : "—"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-function RiskDot({ level }: { level: "Low" | "Medium" | "High" }) {
-  const color = level === "High" ? "bg-status-critical" : level === "Medium" ? "bg-status-medium" : "bg-status-low";
-  return <span className={`w-2 h-2 rounded-full shrink-0 ${color}`} />;
+export default function AuditPage() {
+  return (
+    <RequirePermission code="view_audit">
+      <AuditContent />
+    </RequirePermission>
+  );
 }

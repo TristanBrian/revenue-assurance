@@ -370,9 +370,9 @@ export interface AuditLog {
   action: string;
   target_type: string;
   target_id: string;
-  before_value: any;
-  after_value: any;
-  extra_metadata: any;
+  before_value: unknown;
+  after_value: unknown;
+  extra_metadata: unknown;
   event_timestamp: string;
   created_at: string;
   block_index: number;
@@ -386,6 +386,13 @@ export interface AuditSummary {
   by_action: Record<string, number>;
   by_actor: Array<{ actor: string; count: number }>;
   period_days: number;
+}
+
+// Define a proper response type for getAuditLogs
+interface AuditLogsResponse {
+  logs?: AuditLog[];
+  items?: AuditLog[];
+  total?: number;
 }
 
 /**
@@ -412,7 +419,8 @@ export async function getAuditLogs(params?: {
   if (params?.date_to) query.append('date_to', params.date_to);
   const url = `/api/audit/logs${query.toString() ? '?' + query.toString() : ''}`;
   const res = await authFetch(new URL(url, API_URL));
-  const result = await unwrap<any>(res);
+  // Use the typed unwrap
+  const result = await unwrap<AuditLogsResponse>(res);
   // Normalise: try 'logs', then 'items', then fallback to an empty array.
   const logs = result.logs || result.items || [];
   const total = result.total || logs.length || 0;
