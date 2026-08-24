@@ -359,6 +359,83 @@ export async function getOmcRiskProfile(materiality = 100000, direction: Directi
   return body.omc_risk_profile;
 }
 
+// ============================================================
+// AUDIT TRAIL
+// ============================================================
+
+export interface AuditLog {
+  id: string;
+  actor_user_id: string | null;
+  external_actor: string | null;
+  action: string;
+  target_type: string;
+  target_id: string;
+  before_value: any;
+  after_value: any;
+  extra_metadata: any;
+  event_timestamp: string;
+  created_at: string;
+  block_index: number;
+  data_hash: string;
+  prev_block_hash: string;
+  block_hash: string;
+}
+
+export interface AuditSummary {
+  total_events: number;
+  by_action: Record<string, number>;
+  by_actor: Array<{ actor: string; count: number }>;
+  period_days: number;
+}
+
+/**
+ * Fetch audit logs with pagination and filters.
+ * The backend may return the list under either 'logs' or 'items' key.
+ * This function normalises both cases.
+ */
+export async function getAuditLogs(params?: {
+  limit?: number;
+  offset?: number;
+  actor?: string;
+  action?: string;
+  target?: string;
+  date_from?: string;
+  date_to?: string;
+}): Promise<{ logs: AuditLog[]; total: number }> {
+  const query = new URLSearchParams();
+  if (params?.limit) query.append('limit', String(params.limit));
+  if (params?.offset) query.append('offset', String(params.offset));
+  if (params?.actor) query.append('actor', params.actor);
+  if (params?.action) query.append('action', params.action);
+  if (params?.target) query.append('target', params.target);
+  if (params?.date_from) query.append('date_from', params.date_from);
+  if (params?.date_to) query.append('date_to', params.date_to);
+  const url = `/api/audit/logs${query.toString() ? '?' + query.toString() : ''}`;
+  const res = await authFetch(new URL(url, API_URL));
+  const result = await unwrap<any>(res);
+  // Normalise: try 'logs', then 'items', then fallback to an empty array.
+  const logs = result.logs || result.items || [];
+  const total = result.total || logs.length || 0;
+  return { logs, total };
+}
+
+export async function getAuditSummary(days: number = 7): Promise<AuditSummary> {
+  const url = new URL('/api/audit/summary', API_URL);
+  url.searchParams.set('days', String(days));
+  const res = await authFetch(url);
+  return unwrap<AuditSummary>(res);
+}
+
+export async function getAuditLog(id: string): Promise<AuditLog> {
+  const url = new URL(`/api/audit/logs/${id}`, API_URL);
+  const res = await authFetch(url);
+  return unwrap<AuditLog>(res);
+}
+
+// ============================================================
+// RECONCILIATION UPLOAD
+// ============================================================
+
 interface ReconcileUploadFiles {
   dispatches: File;
   invoices: File;
