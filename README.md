@@ -39,7 +39,7 @@ Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka
 - **Swagger Docs:** [https://revenue-assurance.fly.dev/docs](https://revenue-assurance.fly.dev/docs)  
 - **Frontend (Vercel):** [https://flowgardd.vercel.app](https://flowgardd.vercel.app)  
 
-### 🔑 Demo Logins (Password: `Demo-Access-123!`)
+### 🔑 Demo Logins (Password: `demo-pass-123`)
 
 | Role | Email |
 |------|-------|
@@ -49,7 +49,7 @@ Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka
 | **Inuka Manager** (outbound only) | `inuka_manager@kpc-demo.co.ke` |
 | **System Admin** | `system_admin@kpc-demo.co.ke` |
 
-> **Note:** These are throwaway demo accounts seeded automatically. 
+> **Note:** These are throwaway demo accounts for local or explicitly configured demo deployments. They log in directly with the password above; do not use these credentials in production.
 
 ---
 
