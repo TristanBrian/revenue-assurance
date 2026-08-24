@@ -11,7 +11,7 @@ import {
   MaterialityProvider,
   useMateriality,
 } from "@/context/MaterialityContext";
-import { DirectionProvider } from "@/context/DirectionContext";
+import { DirectionProvider, useDirection } from "@/context/DirectionContext";
 import { useTheme } from "@/context/ThemeContext";
 import { BRAND_CONFIG } from "@/lib/brand-config";
 
@@ -183,10 +183,12 @@ const THEME_ICONS: Record<"light" | "dark" | "system", React.ReactNode> = {
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading, logout } = useAuth();
   const { materiality } = useMateriality();
+  const { direction } = useDirection();
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const isInukaManager = user?.roles.includes("inuka_manager") ?? false;
+  const isDepotSupervisor = user?.roles.includes("depot_supervisor") ?? false;
   const canUseDualWorkspace = !isInukaManager && (user?.permissions.includes("view_outgoing_data") ?? false);
   const [workspace, setWorkspace] = useState<Workspace>(() => {
     if (typeof window !== "undefined") {
@@ -234,7 +236,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     // its nav item — a role without it would otherwise 403 on every
     // dashboard load for a badge it can't even see, on every page.
     if (user.permissions.includes("view_metrics")) {
-      getMetrics(isInukaWorkspace ? 100000 : materiality, isInukaWorkspace ? "outbound" : "all")
+      getMetrics(
+        isInukaWorkspace ? 100000 : materiality,
+        isInukaWorkspace ? "outbound" : isDepotSupervisor ? "inbound" : direction,
+      )
         .then((data) => {
           setAnomalyCount(data.metrics.anomaly_count);
           setCriticalCount(data.metrics.critical_count);
@@ -243,7 +248,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     if (!isInukaManager && user.permissions.includes("view_omc_risk_profile")) {
-      getOmcRiskProfile(materiality)
+      getOmcRiskProfile(materiality, isDepotSupervisor ? "inbound" : direction)
         .then((profiles) => {
           setHighRiskCount(profiles.filter((p) => p.risk_level === "High").length);
         })
