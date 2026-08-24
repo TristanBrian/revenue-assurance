@@ -6,6 +6,7 @@ import { ApiError, getMetrics, getOmcRiskProfile } from "@/lib/api";
 import type { Metrics, OmcRiskProfile, MetricsResult } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { useMateriality } from "@/context/MaterialityContext";
+import { useDirection } from "@/context/DirectionContext";
 import LiveFeed from "@/components/LiveFeed";
 import StatCard from "@/components/StatCard";
 import ExposureRecoveryChart from "@/components/ExposureRecoveryChart";
@@ -41,6 +42,7 @@ const BREAK_TYPES: { key: keyof Metrics; label: string; color: string }[] = [
 export default function ExecutiveDashboardPage() {
   const { user } = useAuth();
   const { materiality, setMateriality } = useMateriality();
+  const { direction } = useDirection();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [omcProfiles, setOmcProfiles] = useState<OmcRiskProfile[]>([]);
   const [qualityScore, setQualityScore] = useState<number | null>(null);
@@ -52,6 +54,8 @@ export default function ExecutiveDashboardPage() {
   const canViewLiveFeed = user?.permissions.includes("view_live_feed") ?? false;
   const isManager = user?.roles.includes("manager") ?? false;
   const isInukaManager = user?.roles.includes("inuka_manager") ?? false;
+  const isDepotSupervisor = user?.roles.includes("depot_supervisor") ?? false;
+  const effectiveDirection = isDepotSupervisor ? "inbound" : direction;
   const canViewAnomalyTable = user?.permissions.includes("view_anomaly_table") ?? false;
 
   useEffect(() => {
@@ -75,8 +79,8 @@ export default function ExecutiveDashboardPage() {
     }
 
     const promises = [
-      canViewMetrics ? getMetrics(materiality) : Promise.resolve(null),
-      canViewOmcRisk ? getOmcRiskProfile(materiality) : Promise.resolve(null),
+      canViewMetrics ? getMetrics(materiality, effectiveDirection) : Promise.resolve(null),
+      canViewOmcRisk ? getOmcRiskProfile(materiality, effectiveDirection) : Promise.resolve(null),
     ];
 
     Promise.all(promises)
@@ -106,7 +110,7 @@ export default function ExecutiveDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, materiality, canViewMetrics, canViewOmcRisk, isInukaManager]);
+  }, [user, materiality, direction, effectiveDirection, canViewMetrics, canViewOmcRisk, isInukaManager]);
 
   const totalLeakage = useMemo(() => {
     if (!omcProfiles.length) return 0;
