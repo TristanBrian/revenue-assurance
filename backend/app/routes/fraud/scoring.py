@@ -18,7 +18,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.core.dependencies import require_permission
+from app.core.dependencies import require_permission, enforce_reconciliation_scope
 from app.models.auth.user import User
 from app.schemas.fraud.scoring import FraudChatRequest, FraudChatResponse, FraudExplainResponse
 from app.services.fraud import feature_builder, fraud_scoring_service
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _find_anomaly_and_context(anomaly_id: str) -> tuple[Optional[dict], Optional[dict]]:
+def _find_anomaly_and_context(anomaly_id: str, direction: str) -> tuple[Optional[dict], Optional[dict]]:
     """Re-runs reconciliation across both directions at materiality=0
     (so a small, non-materiality-crossing anomaly can still be explained
     — the fraud score doesn't depend on materiality), finds the anomaly
@@ -42,7 +42,7 @@ def _find_anomaly_and_context(anomaly_id: str) -> tuple[Optional[dict], Optional
     two context values aren't things the anomaly dict itself carries.
     Returns (anomaly, context) — (None, None) if no anomaly has that id.
     """
-    result = run_combined_reconciliation(direction="all", materiality=0)
+    result = run_combined_reconciliation(direction=direction, materiality=0)
     anomaly = next((a for a in result.get("anomalies", []) if a.get("dispatch_id") == anomaly_id), None)
     if anomaly is None:
         return None, None
@@ -65,15 +65,17 @@ def _find_anomaly_and_context(anomaly_id: str) -> tuple[Optional[dict], Optional
 @router.get("/explain/{anomaly_id}", response_model=FraudExplainResponse)
 def explain_anomaly_score(
     anomaly_id: str,
-    _: User = Depends(require_permission("view_anomaly_table")),
+    direction: str = Query("all", description="inbound | outbound | all"),
+    user: User = Depends(require_permission("view_anomaly_table")),
 ):
+    enforce_reconciliation_scope(user, direction)
     if not fraud_scoring_service.is_configured():
         raise HTTPException(
             status_code=503,
             detail="Fraud scoring model isn't trained yet — run scripts/train_fraud_model.py first.",
         )
 
-    anomaly, context = _find_anomaly_and_context(anomaly_id)
+    anomaly, context = _find_anomaly_and_context(anomaly_id, direction)
     if anomaly is None:
         raise HTTPException(status_code=404, detail=f"No anomaly found with id: {anomaly_id}")
 
@@ -92,15 +94,17 @@ def explain_anomaly_score(
 @router.post("/chat", response_model=FraudChatResponse)
 def fraud_chat(
     payload: FraudChatRequest,
-    _: User = Depends(require_permission("view_anomaly_table")),
+    direction: str = Query("all", description="inbound | outbound | all"),
+    user: User = Depends(require_permission("view_anomaly_table")),
 ):
+    enforce_reconciliation_scope(user, direction)
     """Chat-style explain endpoint (Section 6) — a lightweight canned-
     response function, not an LLM call, grounded in real stored SHAP/
     metrics data. See fraud_scoring_service.chat_explain() for the
     recognized question shapes."""
     anomaly, context = (None, None)
     if payload.anomaly_id:
-        anomaly, context = _find_anomaly_and_context(payload.anomaly_id)
+        anomaly, context = _find_anomaly_and_context(payload.anomaly_id, direction)
 
     reply = fraud_scoring_service.chat_explain(
         payload.message,

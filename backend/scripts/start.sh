@@ -56,11 +56,19 @@ python scripts/load_master_data.py || true
 echo "🔄 Running Alembic migrations..."
 alembic upgrade head
 
-echo "🔄 Seeding roles and users..."
+echo "🔄 Seeding roles and platform bootstrap..."
 python scripts/seed_roles.py
 python scripts/seed_admin.py
-python scripts/seed_demo_users.py
 python scripts/seed_terms_documents.py
+
+# Demo accounts are deliberately opt-in. Running this on every deployment
+# would overwrite demo passwords and force every demo user through reset again.
+if [ "${SEED_DEMO_USERS:-false}" = "true" ]; then
+    echo "🔐 SEED_DEMO_USERS=true — resetting local demo accounts"
+    python scripts/seed_demo_users.py
+else
+    echo "⏭️ Skipping demo-account seeding (set SEED_DEMO_USERS=true for a local demo)"
+fi
 
 echo "🚀 Starting Uvicorn server..."
 exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

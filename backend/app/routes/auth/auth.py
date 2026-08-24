@@ -6,6 +6,7 @@ from jose import JWTError
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, get_db, require_permission
+from app.core.password_policy import PASSWORD_POLICY, PasswordPolicyError, validate_password
 from app.core.security import (
     create_access_token,
     create_reset_token,
@@ -70,6 +71,8 @@ def register(
         raise HTTPException(status_code=400, detail="Email already registered")
     except RoleNotFoundError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except PasswordPolicyError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return user
 
 
@@ -83,6 +86,12 @@ def read_terms(db: Session = Depends(get_db)):
     reset-password screen fetches the text it renders.
     """
     return get_terms_bundle(db)
+
+
+@router.get("/password-policy")
+def read_password_policy():
+    """Publish safe password requirements for the login/reset experience."""
+    return PASSWORD_POLICY
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -242,6 +251,11 @@ def reset_password(payload: ResetPasswordRequest, request: Request, db: Session 
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="New password must be different from the temporary password.",
         )
+
+    try:
+        validate_password(payload.new_password, user.email)
+    except PasswordPolicyError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     # Every check passed — now, and only now, mutate.
     user.hashed_password = hash_password(payload.new_password)

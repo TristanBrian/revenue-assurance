@@ -9,6 +9,7 @@ from app.routes.auth import auth, admin
 from app.routes.fraud import detective, graph, scoring
 from app.routes.audit import audit
 from app.routes.alerts import alerts
+from app.routes import inuka
 from app.routes import report_verify
 from app.routes import alerts
 # from app.routes import chatbot
@@ -22,9 +23,12 @@ from contextlib import asynccontextmanager
 import asyncio
 import contextlib
 import logging
+import os
 import time
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+_log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+_log_level = getattr(logging, _log_level_name, logging.INFO)
+logging.basicConfig(level=_log_level, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("kpc.startup")
 
 # ============================================================================
@@ -71,13 +75,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# ✅ CORS – Allow all origins (no credentials needed for JWT)
+# CORS is explicit by default. Wildcard origins make browser access wider than
+# the deployment requires. Configure the frontend origins through the environment.
+_raw_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001")
+_cors_origins = [origin.strip() for origin in _raw_cors_origins.split(",") if origin.strip()]
+if not _cors_origins:
+    raise RuntimeError("CORS_ORIGINS must contain at least one allowed origin")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],           # Allow any origin (safe for public API with JWT)
-    allow_credentials=False,       # Must be False when using "*"
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 # Include Routers
@@ -92,6 +101,7 @@ app.include_router(scoring.router, prefix="/api/fraud", tags=["Fraud Scoring"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
 app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])  # <-- NEW
+app.include_router(inuka.router, prefix="/api/inuka", tags=["Inuka Assurance"])
 app.include_router(report_verify.router, prefix="/api/reports", tags=["Report Verification"])
 # app.include_router(chatbot.router, prefix="/api", tags=["Chatbot"])
 
