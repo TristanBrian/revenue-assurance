@@ -28,6 +28,7 @@ computation only, same note as detective_service.py.
 """
 from typing import Optional
 
+import numpy as np
 import pandas as pd
 import networkx as nx
 import community as community_louvain
@@ -553,7 +554,16 @@ def detect_risk_communities(engine) -> list[dict]:
                 ],
                 axis=1,
             ).mean(axis=1, skipna=True)
-            aggregate_risk_score = float(per_member_score.mean(skipna=True))
+            raw_score = float(per_member_score.mean(skipna=True))
+            # NaN here (possible if every member's own features are NaN,
+            # e.g. a community of OMCs with zero dispatches) is a
+            # legitimate "can't score this community" result per
+            # compute_omc_risk_features()'s own NaN convention, but a NaN
+            # float passes Optional[float] Pydantic validation and then
+            # fails at the actual HTTP response boundary — Starlette's
+            # JSONResponse hard-codes allow_nan=False. None instead of 0:
+            # 0 would misrepresent "can't score" as "scored, zero risk".
+            aggregate_risk_score = None if np.isnan(raw_score) else raw_score
         else:
             aggregate_risk_score = None
 
@@ -562,7 +572,10 @@ def detect_risk_communities(engine) -> list[dict]:
                 "community_id": community_id,
                 "omc_ids": member_ids,
                 "aggregate_risk_score": aggregate_risk_score,
-                "members": member_features.reset_index().to_dict(orient="records"),
+                # Same NaN->None conversion, same reason, applied to each
+                # member's own risk features (still real NaN up to this
+                # point — the clip()/mean() math just above needs that).
+                "members": detective_service._nan_to_none(member_features).reset_index().to_dict(orient="records"),
             }
         )
 

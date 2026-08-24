@@ -159,10 +159,26 @@ def test_value_delta_zscore_is_relative_not_absolute(engine):
 
 
 def test_get_all_omc_risk_features_matches_compute(engine):
-    """Thin wrapper — same data as compute_omc_risk_features()."""
+    """Thin wrapper — same values as compute_omc_risk_features(), except
+    NaN converted to None (see get_all_omc_risk_features()'s own
+    docstring / detective_service._nan_to_none()): NaN is the correct
+    internal representation for "not computable for this OMC", but it
+    fails Starlette's allow_nan=False JSON encoder at the actual response
+    boundary every caller of this wrapper hits — so dtype legitimately
+    differs (object, not float64) and values legitimately differ
+    wherever the direct result has NaN, by design, not a bug this test
+    should paper over."""
     wrapped = get_all_omc_risk_features(engine)
     direct = compute_omc_risk_features(engine)
-    pd.testing.assert_frame_equal(wrapped, direct)
+
+    assert list(wrapped.columns) == list(direct.columns)
+    assert len(wrapped) == len(direct)
+    for col in direct.columns:
+        for wrapped_val, direct_val in zip(wrapped[col], direct[col]):
+            if pd.isna(direct_val):
+                assert wrapped_val is None
+            else:
+                assert wrapped_val == pytest.approx(direct_val) if isinstance(direct_val, float) else wrapped_val == direct_val
 
 
 def test_get_omc_risk_returns_single_omc_dict(engine):
