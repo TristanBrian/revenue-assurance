@@ -257,7 +257,10 @@ Fully self-contained — includes its own Postgres container, runs migrations an
 ```bash
 git clone git@github.com:TristanBrian/revenue-assurance.git
 cd revenue-assurance
-cp .env.example .env   # works as-is for local/demo use; regenerate SECRET_KEY (openssl rand -hex 32) for anything beyond that
+cp .env.example .env
+# Local demo only: opt in to throwaway demo accounts; use real provisioning in deployment.
+sed -i "s/^SEED_DEMO_USERS=false/SEED_DEMO_USERS=true/" .env
+# Regenerate SECRET_KEY (openssl rand -hex 32) for anything beyond local/demo use.
 docker compose up --build
 ```
 
@@ -282,7 +285,7 @@ python scripts/etl_pipeline.py        # loads to SQLite always, and to Postgres 
 alembic upgrade head                  # creates users/roles/permissions/user_roles/role_permissions/alerts/consent tables
 python scripts/seed_roles.py          # seeds the roles + permissions in the README's Permission Mapping table above, including inuka_manager
 python scripts/seed_admin.py          # bootstraps the first system_admin (admin@yopmail.com / Admin-Access-123!) — required before /api/auth/register works, since that route is itself gated behind manage_users
-python scripts/seed_demo_users.py     # seeds the 5 demo logins above
+SEED_DEMO_USERS=true python scripts/seed_demo_users.py     # opt-in: seeds the 5 throwaway demo logins above
 python scripts/seed_terms_documents.py  # seeds v1 Terms & Conditions / Privacy Policy — every user, including the demo logins above, must (re-)consent once this has run
 
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

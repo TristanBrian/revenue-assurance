@@ -106,6 +106,9 @@ def enforce_reconciliation_scope(user: User, direction: str) -> str:
     """
     if direction not in {"inbound", "outbound", "all"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="direction must be inbound, outbound, or all")
-    if any(role.name == "inuka_manager" for role in user.roles) and direction != "outbound":
+    role_names = {role.name for role in user.roles}
+    if "inuka_manager" in role_names and direction != "outbound":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inuka accounts are restricted to outbound reconciliation")
+    if "depot_supervisor" in role_names and direction != "inbound":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Depot Supervisor accounts are restricted to inbound reconciliation")
     return direction

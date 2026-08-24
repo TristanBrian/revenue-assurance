@@ -226,7 +226,7 @@ export default function ExecutiveDashboardPage() {
                 value={highRiskOmcsCount.toString()}
                 note="Under active review"
                 tone={highRiskOmcsCount > 0 ? "high" : "low"}
-                href="/dashboard/omc-risk"
+                href="/dashboard/heatmap"
               />
             ) : (
               <StatCard
@@ -258,7 +258,7 @@ export default function ExecutiveDashboardPage() {
                         </p>
                       </div>
                       <Link
-                        href="/dashboard/omc-risk"
+                        href="/dashboard/heatmap"
                         className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                       >
                         View all

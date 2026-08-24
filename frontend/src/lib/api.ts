@@ -1,6 +1,7 @@
 import type {
   AcceptTermsResponse,
   AdminUser,
+  AnomalyAction,
   AdminSecurityEvent,
   PasswordPolicy,
   AnomalyTableResult,
@@ -589,6 +590,21 @@ export async function updateAnomalyStatus(
   if (fraudFeedbackLabel) url.searchParams.set("fraud_feedback_label", fraudFeedbackLabel);
   const res = await authFetch(url, { method: "POST" });
   return unwrap<UpdateAnomalyResponse>(res);
+}
+
+export async function getAnomalyActions(dispatchId: string, direction: Direction = "all"): Promise<AnomalyAction[]> {
+  const url = new URL(`/api/reconcile/anomalies/${encodeURIComponent(dispatchId)}/actions`, API_URL);
+  url.searchParams.set("direction", direction);
+  const res = await authFetch(url);
+  const body = await unwrap<{ actions: AnomalyAction[] }>(res);
+  return body.actions;
+}
+
+export async function createAnomalyAction(dispatchId: string, action: string, note = "", direction: Direction = "all"): Promise<AnomalyAction> {
+  const url = new URL(`/api/reconcile/anomalies/${encodeURIComponent(dispatchId)}/actions`, API_URL);
+  url.searchParams.set("direction", direction);
+  const res = await authFetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, note }) });
+  return unwrap<AnomalyAction>(res);
 }
 
 export async function sendEbillingWebhook(payload: {
