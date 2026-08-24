@@ -35,12 +35,17 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.audit.audit import AuditLog
+from app.models.audit.audit_log_batch import AuditLogBatch
 from app.models.auth.user import User
+from app.services.audit import merkle_service
 
 # Fixed 64-hex-char stand-in for "no prior block" — block_index=0's
-# prev_block_hash, so genesis is a real, hashable value rather than a
-# null every downstream reader (including /audit/verify) has to special-
-# case.
+# prev_block_hash under the legacy per-row chain, AND batch_index=0's
+# prev_batch_root_hash under the post-cutover batch chain (see
+# docs/audit-merkle-migration.md Part 1.3 — reused directly, not
+# redefined, so there is exactly one genesis constant in the codebase).
+# So genesis is a real, hashable value rather than a null every
+# downstream reader (including /audit/verify) has to special-case.
 GENESIS_PREV_HASH = "0" * 64
 
 
@@ -148,23 +153,40 @@ def _get_chain_tip(db: Session) -> Optional[AuditLog]:
 
 
 def get_chain_tip(db: Session) -> Optional[AuditLog]:
-    """Public, unlocked read of the current chain tip — for callers that
-    just want to know where the chain currently stands (anchor_service.py
-    deciding what to anchor, /audit/verify's summary) rather than ones
-    about to write the next row. Deliberately NOT the same as
-    _get_chain_tip(): that one locks the row on Postgres so two writers
-    can't race; a read-only peek taking that same lock would hold it for
-    however long the caller takes to act on it (anchor_chain_tip() can be
-    mid-flight on an on-chain transaction for many seconds), needlessly
-    blocking real writers in the meantime."""
+    """Public, unlocked read of the absolute current chain tip (either
+    era) — for callers that just want to know where the chain currently
+    stands rather than ones about to write the next row. Deliberately NOT
+    the same as _get_chain_tip(): that one locks the row on Postgres so
+    two writers can't race; a read-only peek taking that same lock would
+    hold it for however long the caller takes to act on it
+    (anchor_chain_tip() can be mid-flight on an on-chain transaction for
+    many seconds), needlessly blocking real writers in the meantime."""
     return db.query(AuditLog).order_by(AuditLog.block_index.desc()).first()
 
 
-def _build_chain_row(
+def get_legacy_chain_tip(db: Session) -> Optional[AuditLog]:
+    """The latest PRE-CUTOVER row specifically (block_hash IS NOT NULL)
+    — for anchor_service.py's V1 anchoring, which only ever anchors
+    tip.block_hash and would silently anchor None once any batch-era row
+    (block_hash always NULL) became the absolute tip. This value is a
+    fixed constant once the cutover has happened — it never advances
+    again, since no new row ever gets a legacy block_hash — so V1
+    anchoring naturally becomes a no-op after its one final anchor of
+    the true pre-cutover tip; see docs/audit-merkle-migration.md."""
+    return (
+        db.query(AuditLog)
+        .filter(AuditLog.block_hash.isnot(None))
+        .order_by(AuditLog.block_index.desc())
+        .first()
+    )
+
+
+def _build_batch_row(
     db: Session,
     *,
     next_index: int,
-    prev_hash: str,
+    batch_index: int,
+    leaf_index: int,
     actor_user_id=None,
     external_actor: Optional[str] = None,
     action: str,
@@ -177,18 +199,32 @@ def _build_chain_row(
     flush: bool = True,
 ) -> AuditLog:
     """
-    Builds and adds ONE chained AuditLog row, given an already-known
-    next_index/prev_hash — the actual row-construction logic shared by
-    chain_entry() (looks up the tip itself, safe for any single call) and
-    ChainWriter (looks up the tip once, advances in memory across many
-    calls — see that class's docstring for why bulk ingestion needs this
-    instead of chain_entry() called once per row).
+    Builds and adds ONE AuditLog row under the post-cutover batch Merkle
+    scheme (see docs/audit-merkle-migration.md) — the actual row-
+    construction logic shared by chain_entry() (looks up batch state
+    itself, safe for any single call) and ChainWriter (looks up batch
+    state once, advances in memory across many calls — see that class's
+    docstring for why bulk ingestion needs this instead of chain_entry()
+    called once per row). Replaces the retired _build_chain_row(), which
+    computed a per-row block_hash/prev_block_hash instead — see
+    AuditLog's own docstring for why every row written from here on
+    leaves those two columns NULL instead.
+
+    data_hash is computed exactly as it always was (this is the value a
+    Merkle leaf commits to — see merkle_service.leaf_hash()); block_index
+    still increments across the WHOLE table, same single global sequence
+    pre-cutover rows already used, since leaf ordering within a batch
+    still needs to match the row's true write order. What's new is
+    batch_index/leaf_index instead of prev_hash/block_hash — no hash is
+    computed for this row in isolation at write time at all; that only
+    happens when its batch is sealed (see seal_batch() below), over every
+    row in the batch together.
 
     flush=False lets ChainWriter batch many rows into one flush (id is a
-    Python-side uuid4() default, not DB-generated, so entry.id/
-    entry.block_hash are usable immediately either way — flush only
-    matters for whether the row is *queryable* by other code sharing this
-    session before the batch finishes).
+    Python-side uuid4() default, not DB-generated, so entry.id is usable
+    immediately either way — flush only matters for whether the row is
+    *queryable* by other code sharing this session before the batch
+    finishes).
     """
     event_timestamp = event_timestamp or datetime.now(timezone.utc)
     # Sanitize BEFORE both hashing and storage, so data_hash always
@@ -200,7 +236,9 @@ def _build_chain_row(
     # The hashed payload — deliberately built from the same values written
     # to the row below, not derived from the ORM object after insert
     # (which would tie data_hash to SQLAlchemy's column ordering/types
-    # rather than to values this function itself controls).
+    # rather than to values this function itself controls). Unchanged
+    # from the legacy per-row scheme — data_hash's own formula was never
+    # position-dependent, see this module's Context notes.
     payload = {
         "actor_user_id": str(actor_user_id) if actor_user_id else None,
         "external_actor": external_actor,
@@ -212,7 +250,6 @@ def _build_chain_row(
         "event_timestamp": _hashable_timestamp(event_timestamp),
     }
     data_hash = _sha256_hex(_canonical_json(payload))
-    block_hash = _sha256_hex(f"{next_index}|{_hashable_timestamp(event_timestamp)}|{data_hash}|{prev_hash}")
 
     entry = AuditLog(
         actor_user_id=actor_user_id,
@@ -226,13 +263,155 @@ def _build_chain_row(
         event_timestamp=event_timestamp,
         block_index=next_index,
         data_hash=data_hash,
-        prev_block_hash=prev_hash,
-        block_hash=block_hash,
+        prev_block_hash=None,
+        block_hash=None,
+        batch_index=batch_index,
+        leaf_index=leaf_index,
     )
     db.add(entry)
     if flush:
         db.flush()
     return entry
+
+
+def _get_batch_write_state(db: Session) -> tuple[int, int]:
+    """(current_batch_index, rows_already_in_it) for whichever batch new
+    rows should be appended to next. current_batch_index continues from
+    the highest SEALED AuditLogBatch.batch_index + 1, or 0 if none sealed
+    yet (the very first post-cutover batch); rows_already_in_it counts
+    AuditLog rows already carrying that batch_index (written, not yet
+    sealed — see seal_batch()). No "open batch" row exists anywhere on
+    its own; an in-progress batch is just "however many AuditLog rows
+    currently carry the next unsealed batch_index," derived on demand
+    rather than tracked as separate state that could drift from it."""
+    last_sealed = db.query(func.max(AuditLogBatch.batch_index)).scalar()
+    next_batch_index = (last_sealed + 1) if last_sealed is not None else 0
+    rows_in_batch = (
+        db.query(func.count(AuditLog.id)).filter(AuditLog.batch_index == next_batch_index).scalar() or 0
+    )
+    return next_batch_index, rows_in_batch
+
+
+def seal_batch(db: Session, batch_index: int) -> Optional[AuditLogBatch]:
+    """
+    Builds the Merkle tree over every AuditLog row currently carrying
+    `batch_index` (streamed via a server-side cursor, ordered by
+    leaf_index — see app/services/audit/audit_service.py's Part 1.5 note
+    in docs/audit-merkle-migration.md for why streaming matters here the
+    same way it does for verify_chain_integrity()), computes
+    batch_root_hash chaining it to the previous sealed batch, and writes
+    ONE AuditLogBatch row. Returns None (no-op) if `batch_index` has no
+    rows yet — sealing an empty batch is a caller bug, not a state this
+    silently accepts (mirrors merkle_service.build_merkle_tree()'s own
+    "empty raises" stance, just returning None here since a caller in a
+    periodic loop shouldn't crash over "nothing to seal yet").
+
+    Does NOT commit — same commit-boundary convention as chain_entry()/
+    log_action(): whoever triggered the seal (ChainWriter.finalize(), or
+    the periodic batch-seal check) owns the transaction. Idempotent is
+    NOT guaranteed by this function alone — AuditLogBatch.batch_index is
+    unique, so calling this twice for the same batch_index within one
+    transaction raises on flush/commit rather than silently duplicating a
+    seal; callers seal each batch_index exactly once by construction
+    (_get_batch_write_state() always names the next UNSEALED index).
+    """
+    rows_query = (
+        db.query(AuditLog.data_hash, AuditLog.block_index, AuditLog.leaf_index)
+        .filter(AuditLog.batch_index == batch_index)
+        .order_by(AuditLog.leaf_index.asc())
+        .execution_options(stream_results=True)
+        .yield_per(2000)
+    )
+    data_hashes: list[str] = []
+    start_block_index = None
+    end_block_index = None
+    for data_hash, block_index, _leaf_index in rows_query:
+        data_hashes.append(data_hash)
+        if start_block_index is None:
+            start_block_index = block_index
+        end_block_index = block_index
+
+    if not data_hashes:
+        return None
+
+    # is_backfilled excluded — a backfilled batch (negative batch_index,
+    # see AuditLogBatch.is_backfilled's docstring) is never a real
+    # "previous batch" for the live sequence to chain from, even for the
+    # very first live batch (index 0), which must always chain to
+    # GENESIS_PREV_HASH, not to whatever backfilled batch happens to sort
+    # last by batch_index.
+    prev_batch = (
+        db.query(AuditLogBatch)
+        .filter(AuditLogBatch.is_backfilled.is_(False))
+        .order_by(AuditLogBatch.batch_index.desc())
+        .first()
+    )
+    prev_batch_root_hash = prev_batch.batch_root_hash if prev_batch is not None else GENESIS_PREV_HASH
+
+    tree = merkle_service.build_merkle_tree(data_hashes)
+    batch_root_hash = merkle_service.compute_batch_root_hash(
+        batch_index=batch_index,
+        start_block_index=start_block_index,
+        end_block_index=end_block_index,
+        merkle_root_hex=tree.root_hex,
+        prev_batch_root_hash_hex=prev_batch_root_hash,
+    )
+
+    batch = AuditLogBatch(
+        batch_index=batch_index,
+        start_block_index=start_block_index,
+        end_block_index=end_block_index,
+        row_count=len(data_hashes),
+        merkle_root=tree.root_hex,
+        prev_batch_root_hash=prev_batch_root_hash,
+        batch_root_hash=batch_root_hash,
+    )
+    db.add(batch)
+    db.flush()
+    return batch
+
+
+def maybe_seal_open_batch(db: Session) -> Optional[AuditLogBatch]:
+    """
+    Batch/timer trigger for sealing — reuses the exact same rule as
+    today's anchor trigger (see anchor_service.py's ANCHOR_EVERY_N_BLOCKS/
+    ANCHOR_EVERY_SECONDS and maybe_anchor_chain_tip(), same "whichever
+    comes first" shape), just for sealing a batch instead of anchoring
+    one on-chain: seals the currently-open batch once it reaches
+    merkle_service.MAX_BATCH_SIZE rows, or once ANCHOR_EVERY_SECONDS has
+    passed since the oldest unsealed row in it was written — whichever
+    first. Commits its own transaction (unlike chain_entry()/seal_batch()
+    itself) — standalone operation invoked from the periodic background
+    loop, never nested inside another write's atomicity. Called
+    frequently and cheaply no-ops the rest of the time (an open batch
+    under both thresholds).
+    """
+    from app.services.audit.anchor_service import ANCHOR_EVERY_SECONDS
+
+    batch_index, row_count = _get_batch_write_state(db)
+    if row_count == 0:
+        return None
+
+    seal_due_to_size = row_count >= merkle_service.MAX_BATCH_SIZE
+    seal_due_to_time = False
+    if not seal_due_to_size:
+        oldest_open_row = (
+            db.query(AuditLog.created_at)
+            .filter(AuditLog.batch_index == batch_index)
+            .order_by(AuditLog.created_at.asc())
+            .first()
+        )
+        if oldest_open_row is not None:
+            age_seconds = (datetime.now(timezone.utc) - oldest_open_row.created_at.replace(tzinfo=timezone.utc)).total_seconds()
+            seal_due_to_time = age_seconds >= ANCHOR_EVERY_SECONDS
+
+    if not (seal_due_to_size or seal_due_to_time):
+        return None
+
+    batch = seal_batch(db, batch_index)
+    if batch is not None:
+        db.commit()
+    return batch
 
 
 def chain_entry(
@@ -249,30 +428,42 @@ def chain_entry(
     event_timestamp: Optional[datetime] = None,
 ) -> AuditLog:
     """
-    Builds and chains one AuditLog row, looking up the current tip itself
-    (via _get_chain_tip(), locked on Postgres). Shared by log_action()
-    (in-platform actions) and any single ad-hoc ingestion write — same
-    chaining logic, same table, same block_index sequence, per the
-    extension's "one chain, both directions" guiding principle.
+    Builds and writes one AuditLog row under the post-cutover batch
+    Merkle scheme (see docs/audit-merkle-migration.md), looking up
+    current state itself (global block_index via _get_chain_tip(), locked
+    on Postgres; batch_index/leaf_index via _get_batch_write_state()).
+    Shared by log_action() (in-platform actions) and any single ad-hoc
+    ingestion write — same block_index sequence across the whole table,
+    per the extension's original "one chain, both directions" guiding
+    principle, now expressed as batch membership rather than a per-row
+    hash link.
 
-    Safe under concurrent callers (each call re-reads and locks the tip).
+    Safe under concurrent callers (each call re-reads current state; the
+    block_index lock via _get_chain_tip() still serializes concurrent
+    writers the same way it always did — batch_index/leaf_index are
+    derived from committed rows only, so a concurrent writer's
+    not-yet-committed row can't be raced into the same leaf_index).
     NOT what scripts/etl_pipeline.py uses for its per-row ingestion writes
     — see ChainWriter below for why a tens-of-thousands-of-rows bulk load
     needs a different access pattern than "one query per row".
 
     Adds the row to `db` and flushes it (so it gets a generated id and is
     visible to the rest of the caller's transaction), but deliberately
-    does NOT call db.commit() itself — see log_action()'s docstring for
-    why (unchanged from before this extension).
+    does NOT call db.commit() itself, and does NOT seal a batch even if
+    this write happens to fill one to capacity — see log_action()'s
+    docstring for the commit-boundary reasoning (unchanged from before
+    this extension), and maybe_seal_open_batch()'s docstring for why
+    sealing is the periodic loop's job, not inline on every write.
     """
     tip = _get_chain_tip(db)
     next_index = (tip.block_index + 1) if tip is not None else 0
-    prev_hash = tip.block_hash if tip is not None else GENESIS_PREV_HASH
+    batch_index, rows_in_batch = _get_batch_write_state(db)
 
-    return _build_chain_row(
+    return _build_batch_row(
         db,
         next_index=next_index,
-        prev_hash=prev_hash,
+        batch_index=batch_index,
+        leaf_index=rows_in_batch,
         actor_user_id=actor_user_id,
         external_actor=external_actor,
         action=action,
@@ -289,22 +480,30 @@ def chain_entry(
 class ChainWriter:
     """
     Batch-efficient chain writer for scripts/etl_pipeline.py's ingestion
-    path: fetches the chain tip ONCE (one query, still locked on Postgres
-    against any concurrent in-platform write happening at the same
-    moment), then advances block_index/prev_block_hash in memory for
-    every subsequent row instead of re-querying the DB per row. Produces
+    path: fetches the global block_index tip and current batch-write
+    state ONCE (two queries, still locked/consistent against any
+    concurrent in-platform write happening at the same moment), then
+    advances block_index/batch_index/leaf_index in memory for every
+    subsequent row instead of re-querying the DB per row. Produces
     exactly the rows chain_entry() would have produced called once per
     row — this is purely a round-trip optimization for a single run that
     ingests tens of thousands of rows (10k+ dispatches alone), not a
-    different chaining algorithm.
+    different batching algorithm.
+
+    This is the DOMINANT source of row (and therefore batch) volume —
+    see docs/audit-merkle-migration.md's Part 1.1a for why this class
+    specifically, not chain_entry(), is where the batch cap actually gets
+    exercised in practice: a single ETL run's tens of thousands of rows
+    will fill and seal several batches over the course of one
+    write_ingested() loop, well before finalize() is ever called.
 
     NOT safe to share across concurrent writers against the same table —
-    it caches the tip in-process for the lifetime of the writer, so a
+    it caches state in-process for the lifetime of the writer, so a
     second, independent writer (or a route handler calling log_action())
     active at the same time would not see rows added through this
-    instance until finalize() flushes them. etl_pipeline.py runs as a
-    standalone script/boot step with no concurrent writer for the
-    duration of one run, so that constraint holds for its actual use.
+    instance until they're flushed. etl_pipeline.py runs as a standalone
+    script/boot step with no concurrent writer for the duration of one
+    run, so that constraint holds for its actual use.
 
     Usage:
         writer = ChainWriter(db)
@@ -320,7 +519,7 @@ class ChainWriter:
         self.db = db
         tip = _get_chain_tip(db)
         self._next_index = (tip.block_index + 1) if tip is not None else 0
-        self._prev_hash = tip.block_hash if tip is not None else GENESIS_PREV_HASH
+        self._batch_index, self._rows_in_batch = _get_batch_write_state(db)
         self._pending = 0
 
     def write_ingested(
@@ -332,10 +531,11 @@ class ChainWriter:
         record: dict,
         event_timestamp: datetime,
     ) -> AuditLog:
-        entry = _build_chain_row(
+        entry = _build_batch_row(
             self.db,
             next_index=self._next_index,
-            prev_hash=self._prev_hash,
+            batch_index=self._batch_index,
+            leaf_index=self._rows_in_batch,
             actor_user_id=None,
             external_actor=external_actor,
             action="ingested",
@@ -348,17 +548,36 @@ class ChainWriter:
             flush=False,
         )
         self._next_index += 1
-        self._prev_hash = entry.block_hash
+        self._rows_in_batch += 1
         self._pending += 1
         if self._pending >= self._FLUSH_EVERY:
             self.db.flush()
             self._pending = 0
+        if self._rows_in_batch >= merkle_service.MAX_BATCH_SIZE:
+            self._seal_current_batch()
         return entry
+
+    def _seal_current_batch(self) -> None:
+        """Flushes any pending rows first — seal_batch() reads committed-
+        in-this-transaction AuditLog rows back via a query, not from
+        this writer's in-memory state, so every row belonging to the
+        batch being sealed must be flushed (visible to that query) before
+        sealing it, even mid-run, well before finalize()'s own flush."""
+        if self._pending:
+            self.db.flush()
+            self._pending = 0
+        seal_batch(self.db, self._batch_index)
+        self._batch_index += 1
+        self._rows_in_batch = 0
 
     def finalize(self) -> None:
         """Flushes any rows added since the last periodic flush. Does
-        NOT commit — the caller (etl_pipeline.py) owns the transaction,
-        same commit-boundary convention as log_action()/chain_entry()."""
+        NOT commit, and does NOT seal whatever partial batch is left
+        open at the end of this run — same commit-boundary convention as
+        log_action()/chain_entry(), and same reasoning as
+        maybe_seal_open_batch()'s docstring for why sealing a
+        not-yet-full batch is the periodic loop's job, not something
+        every writer forces inline."""
         if self._pending:
             self.db.flush()
             self._pending = 0
@@ -553,27 +772,47 @@ def get_record_audit_history(db: Session, target_type: str, target_id: str) -> l
     )
 
 
-def verify_chain_integrity(db: Session) -> dict:
+def _verify_legacy_chain(db: Session) -> dict:
     """
-    Local half of GET /audit/verify (routes/audit/audit.py) — the other
-    half, the on-chain cross-check, lives in anchor_service.py since it
-    needs an RPC connection this module deliberately doesn't depend on.
+    Pre-cutover half of verify_chain_integrity() — walks every row with
+    block_hash IS NOT NULL (see AuditLog's docstring: this is exactly and
+    only the pre-cutover rows, a fixed, non-growing prefix — a
+    post-cutover row never has block_hash set), recomputing data_hash and
+    block_hash exactly as the old chain_entry() computed them and
+    comparing against what's stored. Returns the first block_index where
+    a recomputed hash doesn't match, if any — a tampered row (edited
+    directly in the DB, bypassing this service entirely) breaks its own
+    data_hash/block_hash immediately, and breaks every later row's
+    prev_block_hash too, but only the FIRST break is the actual point of
+    tampering; the rest are just downstream fallout, which is why this
+    stops at the first mismatch rather than listing every row after it.
 
-    Walks every row from block_index=0 to the current tip, recomputing
-    data_hash and block_hash exactly as chain_entry() originally computed
-    them and comparing against what's stored. Returns the first
-    block_index where a recomputed hash doesn't match, if any — a
-    tampered row (edited directly in the DB, bypassing this service
-    entirely) breaks its own data_hash/block_hash immediately, and breaks
-    every later row's prev_block_hash too, but only the FIRST break is
-    the actual point of tampering; the rest are just downstream fallout,
-    which is why this stops at the first mismatch rather than listing
-    every row after it.
+    Streamed via a server-side cursor (execution_options(stream_results=
+    True) + yield_per()), not db.query(...).all() — this is what stopped
+    verify_chain_integrity() OOM-killing the whole backend process
+    (observed: >5GB RSS, killed by the kernel) on a table that had grown
+    to ~1.9M rows before the batch Merkle cutover existed. yield_per()
+    alone isn't enough — psycopg2 buffers the full result set client-side
+    by default regardless of ORM batching, unless the query is explicitly
+    told to use a server-side cursor via stream_results=True. This
+    function's cost is now a bounded constant (the fixed pre-cutover
+    prefix never grows), not an ever-growing liability — see
+    docs/audit-merkle-migration.md.
     """
-    rows = db.query(AuditLog).order_by(AuditLog.block_index.asc()).all()
+    query = (
+        db.query(AuditLog)
+        .filter(AuditLog.block_hash.isnot(None))
+        .order_by(AuditLog.block_index.asc())
+        .execution_options(stream_results=True)
+        .yield_per(5000)
+    )
     expected_prev = GENESIS_PREV_HASH
     expected_index = 0
-    for row in rows:
+    chain_length = 0
+    tip_block_index = None
+    tip_block_hash = None
+    for row in query:
+        chain_length += 1
         if row.block_index != expected_index:
             return {
                 "intact": False,
@@ -582,7 +821,9 @@ def verify_chain_integrity(db: Session) -> dict:
                     f"block_index sequence has a gap or duplicate — expected "
                     f"{expected_index}, found {row.block_index}"
                 ),
-                "chain_length": len(rows),
+                "chain_length": chain_length,
+                "tip_block_index": tip_block_index,
+                "tip_block_hash": tip_block_hash,
             }
 
         if row.prev_block_hash != expected_prev:
@@ -590,7 +831,9 @@ def verify_chain_integrity(db: Session) -> dict:
                 "intact": False,
                 "broken_at_block_index": row.block_index,
                 "reason": "prev_block_hash does not match the preceding block's block_hash",
-                "chain_length": len(rows),
+                "chain_length": chain_length,
+                "tip_block_index": tip_block_index,
+                "tip_block_hash": tip_block_hash,
             }
 
         payload = {
@@ -609,7 +852,9 @@ def verify_chain_integrity(db: Session) -> dict:
                 "intact": False,
                 "broken_at_block_index": row.block_index,
                 "reason": "data_hash does not match a recomputed hash of the stored payload — before_value/after_value/action/target were edited after the row was written",
-                "chain_length": len(rows),
+                "chain_length": chain_length,
+                "tip_block_index": tip_block_index,
+                "tip_block_hash": tip_block_hash,
             }
 
         recomputed_block_hash = _sha256_hex(
@@ -620,19 +865,346 @@ def verify_chain_integrity(db: Session) -> dict:
                 "intact": False,
                 "broken_at_block_index": row.block_index,
                 "reason": "block_hash does not match a recomputed hash — block_index, event_timestamp, data_hash, or prev_block_hash was edited after the row was written",
-                "chain_length": len(rows),
+                "chain_length": chain_length,
+                "tip_block_index": tip_block_index,
+                "tip_block_hash": tip_block_hash,
             }
 
         expected_prev = row.block_hash
         expected_index += 1
+        tip_block_index = row.block_index
+        tip_block_hash = row.block_hash
 
     return {
         "intact": True,
         "broken_at_block_index": None,
         "reason": None,
-        "chain_length": len(rows),
-        "tip_block_index": rows[-1].block_index if rows else None,
-        "tip_block_hash": rows[-1].block_hash if rows else None,
+        "chain_length": chain_length,
+        "tip_block_index": tip_block_index,
+        "tip_block_hash": tip_block_hash,
+    }
+
+
+def _verify_one_batch(db: Session, batch: AuditLogBatch) -> dict:
+    """
+    Rebuilds one sealed batch's Merkle tree from RAW row field values —
+    recomputing each row's data_hash fresh from before_value/after_value/
+    action/target/event_timestamp, exactly like _verify_legacy_chain()
+    does for pre-cutover rows, trusting no stored hash column at all,
+    including the row's own stored data_hash column, not just the
+    batch's stored merkle_root. A tamper that edited a row's payload but
+    left its data_hash column untouched would otherwise slip straight
+    past a check that only re-derived the tree from stored data_hash
+    values (the tree would "correctly" reproduce the stored merkle_root,
+    since nothing feeding it changed) — recomputing data_hash per row
+    here closes that gap the same way the legacy walk always has.
+
+    Streamed the same way _verify_legacy_chain()/seal_batch() are — a
+    batch is capped at merkle_service.MAX_BATCH_SIZE rows, so this is
+    already cheap even unstreamed, but there's no reason to abandon the
+    same safe-by-default pattern for a code path that will still run
+    fine if the cap is ever raised.
+    """
+    rows_query = (
+        db.query(AuditLog)
+        .filter(AuditLog.batch_index == batch.batch_index)
+        .order_by(AuditLog.leaf_index.asc())
+        .execution_options(stream_results=True)
+        .yield_per(2000)
+    )
+
+    recomputed_data_hashes: list[str] = []
+    expected_leaf_index = 0
+    start_block_index = None
+    end_block_index = None
+    for row in rows_query:
+        if row.leaf_index != expected_leaf_index:
+            return {
+                "batch_index": batch.batch_index,
+                "intact": False,
+                "reason": (
+                    f"leaf_index sequence has a gap or duplicate within this batch — "
+                    f"expected {expected_leaf_index}, found {row.leaf_index}"
+                ),
+                "broken_at_block_index": row.block_index,
+                "row_count": len(recomputed_data_hashes),
+            }
+
+        payload = {
+            "actor_user_id": str(row.actor_user_id) if row.actor_user_id else None,
+            "external_actor": row.external_actor,
+            "action": row.action,
+            "target_type": row.target_type,
+            "target_id": row.target_id,
+            "before": row.before_value,
+            "after": row.after_value,
+            "event_timestamp": _hashable_timestamp(row.event_timestamp),
+        }
+        recomputed_data_hash = _sha256_hex(_canonical_json(payload))
+        if recomputed_data_hash != row.data_hash:
+            return {
+                "batch_index": batch.batch_index,
+                "intact": False,
+                "reason": "data_hash does not match a recomputed hash of the stored payload — before_value/after_value/action/target were edited after the row was written",
+                "broken_at_block_index": row.block_index,
+                "row_count": len(recomputed_data_hashes),
+            }
+
+        recomputed_data_hashes.append(recomputed_data_hash)
+        if start_block_index is None:
+            start_block_index = row.block_index
+        end_block_index = row.block_index
+        expected_leaf_index += 1
+
+    if not recomputed_data_hashes:
+        # Should never happen — seal_batch() refuses to seal an empty
+        # batch_index (returns None instead) — surfaced explicitly
+        # rather than silently treated as "intact" or crashing.
+        return {
+            "batch_index": batch.batch_index,
+            "intact": False,
+            "reason": "sealed batch has no rows in the local table — should never happen",
+            "broken_at_block_index": None,
+            "row_count": 0,
+        }
+
+    tree = merkle_service.build_merkle_tree(recomputed_data_hashes)
+    if tree.root_hex != batch.merkle_root:
+        return {
+            "batch_index": batch.batch_index,
+            "intact": False,
+            "reason": "merkle_root does not match a root recomputed from this batch's rows",
+            "broken_at_block_index": None,
+            "row_count": len(recomputed_data_hashes),
+        }
+
+    if start_block_index != batch.start_block_index or end_block_index != batch.end_block_index:
+        return {
+            "batch_index": batch.batch_index,
+            "intact": False,
+            "reason": (
+                f"stored start/end block_index ({batch.start_block_index}, {batch.end_block_index}) "
+                f"does not match this batch's actual rows ({start_block_index}, {end_block_index})"
+            ),
+            "broken_at_block_index": None,
+            "row_count": len(recomputed_data_hashes),
+        }
+
+    return {
+        "batch_index": batch.batch_index,
+        "intact": True,
+        "reason": None,
+        "broken_at_block_index": None,
+        "row_count": len(recomputed_data_hashes),
+        "merkle_root": tree.root_hex,
+    }
+
+
+def _verify_batch_era(db: Session) -> dict:
+    """
+    Post-cutover half of verify_chain_integrity() — O(batch_count), not
+    O(row_count): rebuilds every sealed AuditLogBatch's Merkle root (via
+    _verify_one_batch()) and walks the (short) batch_root_hash chain
+    sequentially — structurally identical to the legacy per-row
+    prev_block_hash check, just one comparison per batch instead of per
+    row. AuditLogBatch itself is never queried with .all() elsewhere in
+    this module without good reason, but IS here deliberately: at
+    MAX_BATCH_SIZE=5000 rows/batch, even ~1.9M historical rows is under
+    400 batches — a plain list is simpler to read correctly than
+    streaming a table this small, and it isn't the table that caused the
+    original OOM (audit_logs was).
+
+    No cross-batch multiprocessing here despite docs/audit-merkle-
+    migration.md Part 1.4 describing "one ProcessPoolExecutor task per
+    batch" — deliberately simplified for this pass: correctly sharing a
+    process pool's workers with independent, fork-safe DB connections
+    (each worker needs its OWN engine/session — a forked child process
+    inheriting the parent's live psycopg2 connection corrupts both) is a
+    real, separate piece of infrastructure work, not something to bolt on
+    speculatively alongside the Merkle logic itself. What's already true
+    without it: this walk is O(batch_count) sequential steps instead of
+    O(row_count) — at 5000 rows/batch that's already several orders of
+    magnitude fewer sequential steps than the legacy walk needed, which
+    is where nearly all of the wall-clock win actually comes from. Revisit
+    real multiprocessing only if a measurement at real batch counts shows
+    it's still needed.
+    """
+    # is_backfilled excluded: a backfilled batch (see
+    # scripts/backfill_audit_batches.py, AuditLogBatch.is_backfilled's
+    # own docstring) doesn't participate in the live batch_index/
+    # batch_root_hash sequence at all — it's a separate, optional,
+    # offline convenience for spot-checking pre-cutover rows, not part
+    # of this walk.
+    batches = (
+        db.query(AuditLogBatch)
+        .filter(AuditLogBatch.is_backfilled.is_(False))
+        .order_by(AuditLogBatch.batch_index.asc())
+        .all()
+    )
+
+    batch_results: list[dict] = []
+    expected_prev_batch_root = GENESIS_PREV_HASH
+    expected_batch_index = 0
+    total_rows = 0
+    tip_batch_root_hash = None
+    tip_end_block_index = None
+
+    for batch in batches:
+        if batch.batch_index != expected_batch_index:
+            return {
+                "intact": False,
+                "broken_at_batch_index": batch.batch_index,
+                "reason": (
+                    f"batch_index sequence has a gap or duplicate — expected "
+                    f"{expected_batch_index}, found {batch.batch_index}"
+                ),
+                "batch_count": len(batches),
+                "batch_results": batch_results,
+                "total_rows": total_rows,
+                "tip_batch_root_hash": tip_batch_root_hash,
+                "tip_end_block_index": tip_end_block_index,
+            }
+
+        if batch.prev_batch_root_hash != expected_prev_batch_root:
+            return {
+                "intact": False,
+                "broken_at_batch_index": batch.batch_index,
+                "reason": "prev_batch_root_hash does not match the preceding batch's batch_root_hash",
+                "batch_count": len(batches),
+                "batch_results": batch_results,
+                "total_rows": total_rows,
+                "tip_batch_root_hash": tip_batch_root_hash,
+                "tip_end_block_index": tip_end_block_index,
+            }
+
+        result = _verify_one_batch(db, batch)
+        batch_results.append(result)
+        if not result["intact"]:
+            return {
+                "intact": False,
+                "broken_at_batch_index": batch.batch_index,
+                "reason": result["reason"],
+                "batch_count": len(batches),
+                "batch_results": batch_results,
+                "total_rows": total_rows,
+                "tip_batch_root_hash": tip_batch_root_hash,
+                "tip_end_block_index": tip_end_block_index,
+            }
+
+        recomputed_batch_root_hash = merkle_service.compute_batch_root_hash(
+            batch_index=batch.batch_index,
+            start_block_index=batch.start_block_index,
+            end_block_index=batch.end_block_index,
+            merkle_root_hex=result["merkle_root"],
+            prev_batch_root_hash_hex=expected_prev_batch_root,
+        )
+        if recomputed_batch_root_hash != batch.batch_root_hash:
+            return {
+                "intact": False,
+                "broken_at_batch_index": batch.batch_index,
+                "reason": (
+                    "batch_root_hash does not match a recomputed hash — batch_index, "
+                    "start/end_block_index, merkle_root, or prev_batch_root_hash was "
+                    "edited after this batch was sealed"
+                ),
+                "batch_count": len(batches),
+                "batch_results": batch_results,
+                "total_rows": total_rows,
+                "tip_batch_root_hash": tip_batch_root_hash,
+                "tip_end_block_index": tip_end_block_index,
+            }
+
+        total_rows += result["row_count"]
+        expected_prev_batch_root = batch.batch_root_hash
+        expected_batch_index += 1
+        tip_batch_root_hash = batch.batch_root_hash
+        tip_end_block_index = batch.end_block_index
+
+    _, pending_rows = _get_batch_write_state(db)
+
+    return {
+        "intact": True,
+        "broken_at_batch_index": None,
+        "reason": None,
+        "batch_count": len(batches),
+        "batch_results": batch_results,
+        "total_rows": total_rows,
+        "tip_batch_root_hash": tip_batch_root_hash,
+        "tip_end_block_index": tip_end_block_index,
+        "pending_rows": pending_rows,
+    }
+
+
+def verify_chain_integrity(db: Session) -> dict:
+    """
+    Local half of GET /audit/verify (routes/audit/audit.py) — the other
+    half, the on-chain cross-check, lives in anchor_service.py since it
+    needs an RPC connection this module deliberately doesn't depend on.
+
+    Cutover-aware (see docs/audit-merkle-migration.md): combines
+    _verify_legacy_chain() (the fixed, non-growing pre-cutover prefix —
+    O(1) going forward, doesn't get more expensive as new rows arrive)
+    and _verify_batch_era() (every row written since — O(batch_count),
+    not O(row_count)). Both must be intact for the overall result to be
+    intact. Exactly one of broken_at_block_index (legacy break) /
+    broken_at_batch_index (batch-era break) is set on a failure, never
+    both, since only one era can break first when walked independently —
+    they don't depend on each other (the legacy prefix is immutable and
+    already fully written before the cutover; nothing about verifying it
+    depends on what batches exist afterward).
+
+    chain_length is the combined verified row count (legacy rows + rows
+    in every SEALED batch); pending_rows are rows already written into
+    the still-open, not-yet-sealed batch — not counted as broken, just
+    not yet checkable against anything stored (sealing is what produces
+    the merkle_root to check against).
+
+    tip_block_hash's MEANING changes once at least one batch has been
+    sealed: pre-cutover (or before the first batch seals) it's the
+    legacy per-row block_hash, same as always; post-cutover it's the
+    latest sealed batch's batch_root_hash instead — both are "the current
+    chain-of-custody commitment value," just at different granularity,
+    and this field has always meant exactly that, not literally "a single
+    row's hash" specifically.
+    """
+    legacy_result = _verify_legacy_chain(db)
+    batch_result = _verify_batch_era(db)
+
+    intact = legacy_result["intact"] and batch_result["intact"]
+    chain_length = legacy_result["chain_length"] + batch_result["total_rows"]
+
+    if not legacy_result["intact"]:
+        broken_at_block_index = legacy_result["broken_at_block_index"]
+        broken_at_batch_index = None
+        reason = legacy_result["reason"]
+    elif not batch_result["intact"]:
+        broken_at_block_index = None
+        broken_at_batch_index = batch_result["broken_at_batch_index"]
+        reason = batch_result["reason"]
+    else:
+        broken_at_block_index = None
+        broken_at_batch_index = None
+        reason = None
+
+    if batch_result["batch_count"] > 0:
+        tip_block_index = batch_result["tip_end_block_index"]
+        tip_block_hash = batch_result["tip_batch_root_hash"]
+    else:
+        tip_block_index = legacy_result["tip_block_index"]
+        tip_block_hash = legacy_result["tip_block_hash"]
+
+    return {
+        "intact": intact,
+        "broken_at_block_index": broken_at_block_index,
+        "broken_at_batch_index": broken_at_batch_index,
+        "reason": reason,
+        "chain_length": chain_length,
+        "tip_block_index": tip_block_index,
+        "tip_block_hash": tip_block_hash,
+        "legacy_row_count": legacy_result["chain_length"],
+        "batch_count": batch_result["batch_count"],
+        "pending_rows": batch_result.get("pending_rows", 0),
+        "batch_results": batch_result["batch_results"],
     }
 
 
@@ -663,19 +1235,28 @@ def recompute_block_hash_at(db: Session, block_index: int) -> Optional[str]:
     O(block_index) — walks the whole prefix every call. Fine for an
     on-demand admin verification endpoint; don't call this from a hot
     path.
+
+    Streamed via a server-side cursor, same reasoning and same
+    stream_results=True + yield_per() combination as
+    verify_chain_integrity() above — the anchored block_index is
+    typically near the current tip, so "the whole prefix" here means
+    effectively the whole table (millions of rows at real dataset size),
+    and db.query(...).all() previously OOM-killed the backend process
+    materializing that as ORM objects all at once.
     """
-    rows = (
+    query = (
         db.query(AuditLog)
         .filter(AuditLog.block_index <= block_index)
         .order_by(AuditLog.block_index.asc())
-        .all()
+        .execution_options(stream_results=True)
+        .yield_per(5000)
     )
-    if not rows or rows[-1].block_index != block_index:
-        return None
 
     recomputed_prev = GENESIS_PREV_HASH
     recomputed_hash = None
-    for row in rows:
+    last_index_seen = None
+    for row in query:
+        last_index_seen = row.block_index
         payload = {
             "actor_user_id": str(row.actor_user_id) if row.actor_user_id else None,
             "external_actor": row.external_actor,
@@ -691,6 +1272,15 @@ def recompute_block_hash_at(db: Session, block_index: int) -> Optional[str]:
             f"{row.block_index}|{_hashable_timestamp(row.event_timestamp)}|{data_hash}|{recomputed_prev}"
         )
         recomputed_prev = recomputed_hash
+
+    if last_index_seen != block_index:
+        # No row (empty stream), or the highest block_index <=
+        # block_index in the table doesn't actually equal it (a gap) —
+        # same "row for this exact index doesn't exist" check the
+        # previous rows[-1].block_index != block_index comparison made,
+        # just against the last row seen while streaming instead of a
+        # materialized list's last element.
+        return None
 
     return recomputed_hash
 
