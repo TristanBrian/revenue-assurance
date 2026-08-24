@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ApiError, getInukaCases, getMetrics } from "@/lib/api";
 import type { InukaCaseSummary, InukaRiskCase, Metrics } from "@/lib/types";

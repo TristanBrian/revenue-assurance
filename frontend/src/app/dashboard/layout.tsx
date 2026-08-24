@@ -11,7 +11,7 @@ import {
   MaterialityProvider,
   useMateriality,
 } from "@/context/MaterialityContext";
-import { DirectionProvider, useDirection } from "@/context/DirectionContext";
+import { DirectionProvider } from "@/context/DirectionContext";
 import { useTheme } from "@/context/ThemeContext";
 import { BRAND_CONFIG } from "@/lib/brand-config";
 
@@ -183,28 +183,30 @@ const THEME_ICONS: Record<"light" | "dark" | "system", React.ReactNode> = {
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading, logout } = useAuth();
   const { materiality } = useMateriality();
-  const { direction } = useDirection();
   const pathname = usePathname();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const isInukaManager = user?.roles.includes("inuka_manager") ?? false;
-  const isDepotSupervisor = user?.roles.includes("depot_supervisor") ?? false;
   const canUseDualWorkspace = !isInukaManager && (user?.permissions.includes("view_outgoing_data") ?? false);
-  const [workspace, setWorkspace] = useState<Workspace>(() => {
-    if (typeof window !== "undefined") {
-      const stored = window.localStorage.getItem("kpc_assurance_workspace");
-      if (stored === "oil" || stored === "inuka") return stored;
-    }
-    return "oil";
-  });
+  const [workspace, setWorkspace] = useState<Workspace>("oil");
   const routeWorkspace: Workspace | null = pathname.startsWith("/dashboard/inuka")
     ? "inuka"
     : pathname.startsWith("/dashboard/review-queue")
       ? null
       : "oil";
-  const activeWorkspace = routeWorkspace ?? workspace;
-  const isInukaWorkspace = isInukaManager || (canUseDualWorkspace && activeWorkspace === "inuka");
+  const isInukaWorkspace = isInukaManager || (canUseDualWorkspace && (routeWorkspace ?? workspace) === "inuka");
 
+  useEffect(() => {
+    if (routeWorkspace) setWorkspace(routeWorkspace);
+  }, [routeWorkspace]);
+
+  useEffect(() => {
+    if (!canUseDualWorkspace || typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("kpc_assurance_workspace");
+    if (stored === "oil" || stored === "inuka") setWorkspace(stored);
+  }, [canUseDualWorkspace]);
+  
+   
   useEffect(() => {
     if (!isInukaManager) return;
     const revenueOnlyPaths = [
@@ -236,10 +238,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     // its nav item — a role without it would otherwise 403 on every
     // dashboard load for a badge it can't even see, on every page.
     if (user.permissions.includes("view_metrics")) {
-      getMetrics(
-        isInukaWorkspace ? 100000 : materiality,
-        isInukaWorkspace ? "outbound" : isDepotSupervisor ? "inbound" : direction,
-      )
+      getMetrics(isInukaWorkspace ? 100000 : materiality, isInukaWorkspace ? "outbound" : "all")
         .then((data) => {
           setAnomalyCount(data.metrics.anomaly_count);
           setCriticalCount(data.metrics.critical_count);
@@ -248,7 +247,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     if (!isInukaManager && user.permissions.includes("view_omc_risk_profile")) {
-      getOmcRiskProfile(materiality, isDepotSupervisor ? "inbound" : direction)
+      getOmcRiskProfile(materiality)
         .then((profiles) => {
           setHighRiskCount(profiles.filter((p) => p.risk_level === "High").length);
         })
@@ -269,7 +268,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         .then((data) => setDepotAlerts({ depotId: data.depot_id, criticalCount: data.critical_count, items: data.items }))
         .catch(() => {});
     }
-  }, [user, materiality, isInukaManager, isInukaWorkspace]);
+  }, [user, materiality, isInukaWorkspace]);
 
   function handleLogout() {
     logout();
@@ -359,7 +358,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 type="button"
                 onClick={() => switchWorkspace(item)}
                 className={`rounded-md px-2 py-2 text-[10px] font-semibold transition-colors ${
-                  activeWorkspace === item
+                  (routeWorkspace ?? workspace) === item
                     ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                     : "text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 }`}

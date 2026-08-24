@@ -30,13 +30,15 @@ docker compose exec backend pytest tests/ \
 echo "✅ Backend coverage saved to $REPORT_DIR/backend_coverage.txt"
 echo "   HTML report: $REPORT_DIR/htmlcov_backend/index.html"
 
-# 2. Frontend tests (Jest)
-echo "📦 Frontend tests (Jest)..."
-docker compose exec frontend npm test -- --coverage \
-    > "$REPORT_DIR/frontend_tests.txt" 2>&1
-
-# Print summary to console
-docker compose exec frontend npm test -- --coverage --verbose=false
+# 2. Frontend tests (Vitest)
+echo "📦 Frontend tests (Vitest)..."
+if command -v docker &> /dev/null && docker compose ps | grep -q frontend; then
+    docker compose exec frontend npm test > "$REPORT_DIR/frontend_tests.txt" 2>&1
+    docker compose exec frontend npm test
+else
+    npm --prefix frontend test > "$REPORT_DIR/frontend_tests.txt" 2>&1
+    npm --prefix frontend test
+fi
 
 echo "✅ Frontend test output saved to $REPORT_DIR/frontend_tests.txt"
 
