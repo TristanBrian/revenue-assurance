@@ -62,3 +62,8 @@ htmlcov/
 get-docker.sh
 *.tmp
 *.zip
+*.tmpbackup_data/
+backup_data/
+dist/
+*.egg-info/
+backend/flowguard.egg-info/

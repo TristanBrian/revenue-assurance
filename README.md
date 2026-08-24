@@ -123,7 +123,7 @@ This same `ETL`/`Recon`/`Fraud` service layer runs both directions — the boxes
 
 
 
-## 👥 User Roles
+## User Roles
 
 Every API route except `POST /api/auth/login`, `POST /api/auth/register` (bootstrap-only), and `POST /api/e-billing/webhook` (an external KRA callback, not a user action) requires a JWT bearer token — obtain one via `POST /api/auth/login` with `{"email": ..., "password": ...}`. Roles and permissions are seeded with `python scripts/seed_roles.py`; the first `system_admin` account is bootstrapped separately with `python scripts/seed_admin.py` (see [Quick Start](#quick-start)).
 

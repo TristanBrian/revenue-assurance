@@ -23,3 +23,17 @@ README.md
 node_modules
 .next
 .vercel
+.git
+.gitignore
+README.md
+backup_data/
+frontend/
+venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+*.log
+*.db
+*.sqlite3
+node_modules/

@@ -48,8 +48,6 @@ def anomalies_and_dispatches():
         'date': [today] * 4
     })
 
-    # DISP-002 has no invoice (Missing Invoice), DISP-004 has an invoice but
-    # no payment (Missing Payment). DISP-001/DISP-003 reconcile cleanly.
     invoices = pd.DataFrame({
         'invoice_id': ['INV-001', 'INV-003', 'INV-004'],
         'dispatch_id': ['DISP-001', 'DISP-003', 'DISP-004'],
@@ -79,7 +77,7 @@ class TestFraudGraphBuilding:
         assert graph['summary']['edge_count'] > 0
 
         node_ids = {n['id'] for n in graph['nodes']}
-        assert 'omc:OMC-002' in node_ids  # Vivo Energy's missing-invoice dispatch
+        assert 'omc:OMC-002' in node_ids
         assert 'depot:Mombasa' in node_ids
         assert 'depot:Kisumu' in node_ids
 
@@ -91,7 +89,6 @@ class TestFraudGraphBuilding:
             e for e in graph['edges']
             if {e['source'], e['target']} == {'omc:OMC-002', 'depot:Mombasa'}
         )
-        # DISP-002 (Vivo Energy, Mombasa) is a Missing Invoice -> leakage == dispatched value
         assert edge['weight'] == 1200000
 
     def test_communities_assigned(self, anomalies_and_dispatches):
@@ -177,13 +174,6 @@ class TestFraudGraphEdgeCases:
 def engine():
     eng = create_engine("sqlite:///:memory:")
 
-    # Two clearly separate clusters, so Louvain has something to find:
-    # OMC-A / OMC-B both dispatch exclusively through Depot-1 and Depot-2;
-    # OMC-C / OMC-D both dispatch exclusively through Depot-3 and Depot-4.
-    # No OMC in one cluster ever touches the other cluster's depots, so
-    # the projected omc<->omc graph should split cleanly into 2 components
-    # (also 2 communities). OMC-A and OMC-C additionally share a kra_pin,
-    # to exercise the shared-identity edge path.
     omcs = pd.DataFrame(
         {
             "omc_id": ["OMC-A", "OMC-B", "OMC-C", "OMC-D"],
@@ -194,11 +184,6 @@ def engine():
     )
     depots = pd.DataFrame({"depot_id": ["Depot-1", "Depot-2", "Depot-3", "Depot-4"]})
 
-    # Columns beyond omc_id/depot/volume_liters (dispatch_id, date, product,
-    # value_kes) exist only because detect_risk_communities() reuses
-    # detective_service.compute_omc_risk_features(), which reads the full
-    # dispatches schema — build_omc_depot_graph() itself only needs the
-    # first three.
     dispatches = pd.DataFrame(
         {
             "dispatch_id": [f"DISP-{i}" for i in range(1, 9)],
@@ -215,9 +200,6 @@ def engine():
     depots.to_sql("depots", eng, index=False)
     dispatches.to_sql("dispatches", eng, index=False)
 
-    # detective_service.compute_omc_risk_features() also queries invoices/
-    # payments/quota_ledger — empty but present, so that call doesn't
-    # error when detect_risk_communities() reuses it.
     pd.DataFrame(columns=["invoice_id", "dispatch_id", "omc_id", "product", "date", "value_kes"]).to_sql(
         "invoices", eng, index=False
     )
@@ -231,22 +213,18 @@ def engine():
 def test_build_omc_depot_graph_node_and_edge_counts(engine):
     g = build_omc_depot_graph(engine)
 
-    # 4 OMCs + 4 depots
     omc_nodes = [n for n, d in g.nodes(data=True) if d["type"] == "omc"]
     depot_nodes = [n for n, d in g.nodes(data=True) if d["type"] == "depot"]
     assert len(omc_nodes) == 4
     assert len(depot_nodes) == 4
 
-    # 8 omc<->depot edges (one per dispatch row, all distinct omc/depot pairs)
     omc_depot_edges = [
         (u, v) for u, v, d in g.edges(data=True) if "dispatch_count" in d
     ]
     assert len(omc_depot_edges) == 8
 
-    # OMC-A <-> OMC-C shared_identity edge (shared kra_pin)
     assert g.has_edge("OMC-A", "OMC-C")
     assert g["OMC-A"]["OMC-C"]["shared_identity"] == "kra_pin"
-    # OMC-B/OMC-D share nothing
     assert not g.has_edge("OMC-B", "OMC-D")
 
 
@@ -266,23 +244,17 @@ def test_detect_risk_communities_finds_at_least_two_communities(engine):
         for omc_id in c["omc_ids"]:
             omc_to_community[omc_id] = c["community_id"]
 
-    # OMC-A and OMC-B (both Depot-1/Depot-2 only) must land in the same
-    # community; OMC-C and OMC-D (both Depot-3/Depot-4 only) must land in
-    # the same community; the two pairs must be different communities.
     assert omc_to_community["OMC-A"] == omc_to_community["OMC-B"]
     assert omc_to_community["OMC-C"] == omc_to_community["OMC-D"]
     assert omc_to_community["OMC-A"] != omc_to_community["OMC-C"]
 
 
 def test_detect_risk_communities_reuses_single_detective_service_call(engine):
-    """compute_omc_risk_features must be called exactly once — reused
-    across all communities, not recomputed per community (redundant DB
-    round-trips)."""
     with patch.object(
         detective_service, "compute_omc_risk_features", wraps=detective_service.compute_omc_risk_features
     ) as spy:
         communities = detect_risk_communities(engine)
-        assert len(communities) >= 2  # sanity: the run actually did something
+        assert len(communities) >= 2
         assert spy.call_count == 1
 
 
