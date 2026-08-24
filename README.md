@@ -23,6 +23,7 @@ Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka
 - [Architecture](#architecture)
 - [Quantified Impact](#quantified-impact)
 - [Technology Stack](#technology-stack)
+- [FlowGuard Mobile App](#-flowguard-mobile-app-react-native--expo)
 - [User Roles & Permissions](#user-roles--permissions)
 - [Quick Start](#quick-start)
 - [API Endpoints](#api-endpoints)
@@ -244,9 +245,41 @@ graph TD
 | Frontend | Next.js, React, TypeScript, Tailwind CSS |
 | Deployment | Docker, Docker Compose, Fly.io |
 | CI/CD | GitHub Actions |
+| Mobile App | React Native, Expo (v57), Expo Router, SecureStore |
 | API Docs | Swagger UI, ReDoc |
 
 ---
+
+## 📱 FlowGuard Mobile App (React Native & Expo)
+
+FlowGuard includes an **Expo/React Native cross-platform mobile companion app** for iOS and Android.
+
+### Features
+- **Executive Pulse Dashboard:** Dynamic direction toggle (`Revenue` / `Stipends` / `All`) with live exposure cards and pull-to-refresh.
+- **Fraud-Scored Anomaly Queue:** Prioritised list of flagged transactions featuring real-time AI risk scoring percentages.
+- **Explainable AI Analyst:** Conversational fraud investigation assistant.
+- **Response Inbox:** Operational alerts inbox with tap-to-acknowledge functionality (`POST /api/alerts/{id}/read`).
+- **Encrypted Security:** Session persistence using `expo-secure-store`.
+
+### Quick Test Path (Expo Go)
+```bash
+# 1. Start backend & database
+docker compose up db backend
+
+# 2. Configure LAN IP in mobile/.env (e.g. EXPO_PUBLIC_API_URL=http://192.168.1.20:8000)
+cd mobile
+cp .env.example .env
+
+# 3. Start Expo dev server
+npm start
+
+# 4. Scan QR Code via Expo Go app (Android) or Camera app (iOS)
+```
+
+For full setup, emulator guide, 5-flow verification matrix, and EAS publishing instructions, see [`RUNBOOK.md`](RUNBOOK.md) and [`mobile/README.md`](mobile/README.md).
+
+---
+
 
 ## 👥 User Roles & Permissions (Hackathon 2)
 

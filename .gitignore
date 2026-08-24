@@ -70,3 +70,4 @@ backup_data/
 dist/
 *.egg-info/
 backend/flowguard.egg-info/
+node_modules
