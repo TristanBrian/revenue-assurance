@@ -205,7 +205,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     const stored = window.localStorage.getItem("kpc_assurance_workspace");
     if (stored === "oil" || stored === "inuka") setWorkspace(stored);
   }, [canUseDualWorkspace]);
-
+  
+   
   useEffect(() => {
     if (!isInukaManager) return;
     const revenueOnlyPaths = [
