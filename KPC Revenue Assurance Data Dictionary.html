@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KPC Revenue Assurance · Data Dictionary</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: #f5f3f0;
+      font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+      color: #1a1a1a;
+      padding: 2rem 1.5rem;
+    }
+
+    .kpc-container {
+      max-width: 1440px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 28px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      border: 1px solid #e6e0d8;
+    }
+
+    /* KPC header – black, white, red */
+    .kpc-header {
+      background: #1a1a1a;
+      padding: 1.8rem 2.5rem 1.5rem;
+      border-bottom: 6px solid #c8102e;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .kpc-header h1 {
+      color: white;
+      font-weight: 500;
+      font-size: 1.9rem;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .kpc-header h1 small {
+      font-weight: 300;
+      font-size: 1rem;
+      color: #bcb8b2;
+      margin-left: 0.75rem;
+      letter-spacing: 0.2px;
+    }
+
+    .kpc-badge {
+      background: #c8102e;
+      color: white;
+      padding: 0.4rem 1.2rem;
+      border-radius: 40px;
+      font-weight: 500;
+      font-size: 0.8rem;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .kpc-subhead {
+      background: #f9f7f5;
+      padding: 1rem 2.5rem;
+      border-bottom: 1px solid #e0dad2;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .kpc-subhead span {
+      color: #2d2a27;
+      font-weight: 400;
+      font-size: 0.95rem;
+    }
+
+    .kpc-subhead .version {
+      background: #1a1a1a;
+      color: white;
+      padding: 0.2rem 1rem;
+      border-radius: 30px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: 0.4px;
+    }
+
+    /* content */
+    .kpc-content {
+      padding: 2.2rem 2.5rem 2.8rem;
+    }
+
+    .section-title {
+      font-weight: 500;
+      font-size: 1.6rem;
+      color: #1a1a1a;
+      border-left: 8px solid #c8102e;
+      padding-left: 1rem;
+      margin: 2.8rem 0 1.8rem 0;
+      letter-spacing: -0.3px;
+    }
+
+    .section-title:first-of-type {
+      margin-top: 0;
+    }
+
+    .section-desc {
+      background: #f3f0ec;
+      padding: 1.2rem 1.8rem;
+      border-radius: 16px;
+      margin-bottom: 2rem;
+      color: #1e1c1a;
+      border-left: 4px solid #c8102e;
+      font-size: 0.98rem;
+      line-height: 1.5;
+    }
+
+    .schema-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 1.8rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .schema-card {
+      background: white;
+      border-radius: 20px;
+      border: 1px solid #e4ddd4;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+      transition: box-shadow 0.15s;
+    }
+
+    .schema-card:hover {
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
+      border-color: #c8102e;
+    }
+
+    .schema-card-header {
+      background: #1a1a1a;
+      color: white;
+      padding: 0.75rem 1.3rem;
+      font-weight: 500;
+      font-size: 1.05rem;
+      letter-spacing: -0.2px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 3px solid #c8102e;
+    }
+
+    .schema-card-header .badge-new {
+      background: #c8102e;
+      font-size: 0.6rem;
+      font-weight: 600;
+      padding: 0.2rem 0.7rem;
+      border-radius: 40px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .schema-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    .schema-table th {
+      background: #f3efea;
+      color: #1a1a1a;
+      font-weight: 500;
+      text-align: left;
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid #ddd6cc;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .schema-table td {
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid #ece7e0;
+      color: #2d2a27;
+      vertical-align: top;
+      background: white;
+    }
+
+    .schema-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .schema-table td:first-child {
+      font-weight: 500;
+      color: #1a1a1a;
+      background: #fcfaf8;
+      width: 38%;
+    }
+
+    .new-flag {
+      display: inline-block;
+      background: #c8102e;
+      color: white;
+      font-size: 0.55rem;
+      font-weight: 600;
+      padding: 0.1rem 0.6rem;
+      border-radius: 30px;
+      margin-left: 0.3rem;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .footnote {
+      border-top: 1px solid #ddd6cc;
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      font-size: 0.85rem;
+      color: #3d3832;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2rem;
+      justify-content: space-between;
+    }
+
+    .footnote strong {
+      color: #1a1a1a;
+      font-weight: 600;
+    }
+
+    .red-accent {
+      color: #c8102e;
+      font-weight: 500;
+    }
+
+    .kpc-footer {
+      background: #1a1a1a;
+      padding: 0.9rem 2.5rem;
+      color: #b0aaa2;
+      font-size: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      border-top: 2px solid #c8102e;
+    }
+
+    .kpc-footer a {
+      color: #e0d6cc;
+      text-decoration: none;
+      border-bottom: 1px dotted #4d453c;
+    }
+
+    @media (max-width: 700px) {
+      .kpc-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+      }
+      .kpc-content {
+        padding: 1.5rem;
+      }
+      .schema-grid {
+        grid-template-columns: 1fr;
+      }
+      .kpc-subhead {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+      }
+    }
+
+    /* inline list for compact cards */
+    .compact-desc {
+      padding: 0.5rem 1rem 0.8rem;
+      background: #faf8f6;
+      border-bottom: 1px solid #e8e1d8;
+      font-size: 0.8rem;
+      color: #3a3530;
+    }
+
+    .compact-desc strong {
+      color: #1a1a1a;
+    }
+  </style>
+</head>
+<body>
+<div class="kpc-container">
+
+  <!-- HEADER -->
+  <div class="kpc-header">
+    <h1>
+      KPC Revenue Assurance
+      <small>Order-to-Cash · Data Quality</small>
+    </h1>
+    <div class="kpc-badge">Stage 1 &amp; 2 · Inuka Foundation</div>
+  </div>
+
+  <!-- SUBHEAD -->
+  <div class="kpc-subhead">
+    <span><span class="red-accent">●</span> synthetic data dictionary · end-to-end operational flow</span>
+    <span class="version">v2.0 · network graphs + shell detection</span>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="kpc-content">
+
+    <!-- OVERVIEW -->
+    <div class="section-desc">
+      <strong style="color:#1a1a1a;">⚡ reconciliation flow</strong> &nbsp; physical vs commercial · unbilled leakage · outbound stipends · <span class="red-accent">shared directors, fleets &amp; sleeper‑cell patterns</span> injected to expose fraud rings.
+    </div>
+
+    <!-- ============= MASTER DATA ============= -->
+    <h2 class="section-title">I. Master Data · Ground Truth</h2>
+    <div class="schema-grid">
+      <!-- products -->
+      <div class="schema-card">
+        <div class="schema-card-header">products.csv <span class="badge-new">master</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>product_id</td><td>Unique code (PMS, AGO, DPK)</td></tr>
+          <tr><td>product_name</td><td>Official descriptive name</td></tr>
+          <tr><td>unit_price_kes</td><td>Illustrative unit price</td></tr>
+          <tr><td>is_active</td><td>Status flag</td></tr>
+        </table>
+      </div>
+      <!-- depots -->
+      <div class="schema-card">
+        <div class="schema-card-header">depots.csv <span class="badge-new">facility</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>depot_id</td><td>Natural key (e.g. Nairobi)</td></tr>
+          <tr><td>depot_name</td><td>Formal depot name</td></tr>
+          <tr><td>location</td><td>Geographic mapping</td></tr>
+          <tr><td>capacity_litres</td><td>Storage capacity</td></tr>
+          <tr><td>is_active</td><td>Operational status</td></tr>
+        </table>
+      </div>
+      <!-- omcs -->
+      <div class="schema-card">
+        <div class="schema-card-header">omcs.csv <span class="badge-new">client registry</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>omc_id</td><td>Primary key</td></tr>
+          <tr><td>customer_name</td><td>Commercial title</td></tr>
+          <tr><td>kra_pin</td><td>Tax ID</td></tr>
+          <tr><td>payment_terms_days</td><td>Contractual window</td></tr>
+          <tr><td>credit_limit_kes</td><td>Financial ceiling</td></tr>
+          <tr><td>risk_rating</td><td>Low/Medium/High</td></tr>
+          <tr><td>risk_profile</td><td>Good, Small, Medium, High</td></tr>
+          <tr><td>director_name <span class="new-flag">new</span></td><td>Shared‑director fraud detection</td></tr>
+          <tr><td>registered_address <span class="new-flag">new</span></td><td>Shell‑company location</td></tr>
+          <tr><td>incorporation_date <span class="new-flag">new</span></td><td>Sleeper‑cell flag</td></tr>
+          <tr><td>primary_bank_account <span class="new-flag">new</span></td><td>IBAN for reconciliation</td></tr>
+          <tr><td>is_active</td><td>Authorized for loading</td></tr>
+        </table>
+      </div>
+      <!-- tariffs -->
+      <div class="schema-card">
+        <div class="schema-card-header">tariffs.csv <span class="badge-new">pricing engine</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>tariff_id</td><td>Version control</td></tr>
+          <tr><td>product</td><td>Fuel grade</td></tr>
+          <tr><td>depot</td><td>KPC facility</td></tr>
+          <tr><td>pipeline_tariff_per_m3_km</td><td>Transport cost</td></tr>
+          <tr><td>storage_tariff_per_m3_day</td><td>Daily holding cost</td></tr>
+          <tr><td>effective_start</td><td>Activation date</td></tr>
+          <tr><td>effective_end</td><td>Expiration</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============= PHYSICAL vs COMMERCIAL ============= -->
+    <h2 class="section-title">II. Physical vs Commercial Core</h2>
+    <div class="schema-grid">
+      <!-- depot_loading_logs -->
+      <div class="schema-card">
+        <div class="schema-card-header">depot_loading_logs.csv <span class="badge-new">meter truth</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>loading_id</td><td>Digital footprint</td></tr>
+          <tr><td>gantry_bay_id</td><td>Hardware location</td></tr>
+          <tr><td>meter_id</td><td>Flow meter</td></tr>
+          <tr><td>dispatch_id</td><td>Link to waybill (null = leakage)</td></tr>
+          <tr><td>omc_id</td><td>Client receiving product</td></tr>
+          <tr><td>depot</td><td>Gantry site</td></tr>
+          <tr><td>product</td><td>Fuel classification</td></tr>
+          <tr><td>physical_loaded_liters</td><td>Raw meter volume</td></tr>
+          <tr><td>temperature_c</td><td>Thermal state</td></tr>
+          <tr><td>density_kg_m3</td><td>Measured density</td></tr>
+          <tr><td>loading_timestamp</td><td>Completion time</td></tr>
+        </table>
+      </div>
+      <!-- dispatches -->
+      <div class="schema-card">
+        <div class="schema-card-header">dispatches.csv <span class="badge-new">commercial intent</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>dispatch_id</td><td>Official waybill</td></tr>
+          <tr><td>loading_id</td><td>Bridge to meter</td></tr>
+          <tr><td>date / year / month</td><td>Temporal dimensions</td></tr>
+          <tr><td>omc_id / customer_name</td><td>Responsible party</td></tr>
+          <tr><td>product / depot</td><td>Fuel &amp; origin</td></tr>
+          <tr><td>volume_liters</td><td>Intended for billing</td></tr>
+          <tr><td>distance_km</td><td>Journey length</td></tr>
+          <tr><td>truck_reg_number <span class="new-flag">new</span></td><td>Shared‑fleet detection</td></tr>
+          <tr><td>driver_id <span class="new-flag">new</span></td><td>Driver identifier</td></tr>
+          <tr><td>transport_tariff_kes / storage_tariff_kes</td><td>Computed fees</td></tr>
+          <tr><td>value_kes</td><td>Total commercial worth</td></tr>
+          <tr><td>dispatched_by <span class="new-flag">new</span></td><td>KPC clerk</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============= FINANCIAL FLOW ============= -->
+    <h2 class="section-title">III. Financial Flow · Uncollected Revenue</h2>
+    <div class="schema-grid">
+      <div class="schema-card">
+        <div class="schema-card-header">invoices.csv <span class="badge-new">billing record</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>invoice_id</td><td>Financial demand note</td></tr>
+          <tr><td>dispatch_id</td><td>Commercial event</td></tr>
+          <tr><td>omc_id / customer_name</td><td>Debtor</td></tr>
+          <tr><td>product</td><td>Product line</td></tr>
+          <tr><td>date</td><td>Issuance date</td></tr>
+          <tr><td>value_kes</td><td>Total expected</td></tr>
+          <tr><td>prepared_by <span class="new-flag">new</span></td><td>Finance staff</td></tr>
+        </table>
+      </div>
+      <div class="schema-card">
+        <div class="schema-card-header">payments.csv <span class="badge-new">cash reality</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>payment_id</td><td>Receipt number</td></tr>
+          <tr><td>invoice_id</td><td>Bill being cleared</td></tr>
+          <tr><td>omc_id / customer_name</td><td>Source of payment</td></tr>
+          <tr><td>remitting_bank_account <span class="new-flag">new</span></td><td>Origin account</td></tr>
+          <tr><td>date</td><td>Cash recognition</td></tr>
+          <tr><td>value_kes</td><td>Amount received</td></tr>
+          <tr><td>installment_no</td><td>Partial settlement</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============= OUTBOUND (INUKA) ============= -->
+    <h2 class="section-title">IV. Outbound · Inuka Foundation Stage 2</h2>
+    <div class="schema-grid">
+      <div class="schema-card">
+        <div class="schema-card-header">officers.csv <span class="badge-new">program master</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>officer_id</td><td>Primary key</td></tr>
+          <tr><td>officer_name</td><td>Formal name</td></tr>
+          <tr><td>program_site</td><td>Region/site</td></tr>
+          <tr><td>risk_profile</td><td>Leakage behavior</td></tr>
+          <tr><td>phone / is_active</td><td>Contact / status</td></tr>
+        </table>
+      </div>
+      <div class="schema-card">
+        <div class="schema-card-header">beneficiaries.csv <span class="badge-new">participant registry</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>beneficiary_id</td><td>Unique ID</td></tr>
+          <tr><td>beneficiary_name</td><td>Full name</td></tr>
+          <tr><td>officer_id</td><td>Managing officer</td></tr>
+          <tr><td>pillar_id</td><td>Scholarship/Plus/Vocational/Tech</td></tr>
+          <tr><td>guardian_name</td><td>Registered guardian</td></tr>
+          <tr><td>registered_address</td><td>Location</td></tr>
+          <tr><td>mobile_money_number <span class="new-flag">new</span></td><td>Shared‑number fraud ring</td></tr>
+          <tr><td>enrollment_date / is_active</td><td>Entry / eligibility</td></tr>
+        </table>
+      </div>
+      <div class="schema-card">
+        <div class="schema-card-header">beneficiary_consents.csv <span class="badge-new">KDPA</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>consent_id</td><td>Tracking footprint</td></tr>
+          <tr><td>beneficiary_id</td><td>Participant link</td></tr>
+          <tr><td>consent_type</td><td>Photography, SMS, etc.</td></tr>
+          <tr><td>status</td><td>active / withdrawn / expired</td></tr>
+          <tr><td>captured_at / captured_by</td><td>Log &amp; officer</td></tr>
+          <tr><td>status_updated_at</td><td>Change timestamp</td></tr>
+        </table>
+      </div>
+      <div class="schema-card">
+        <div class="schema-card-header">attendance.csv <span class="badge-new">eligibility</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>attendance_id</td><td>Primary tracking</td></tr>
+          <tr><td>beneficiary_id / officer_id</td><td>Participant &amp; verifier</td></tr>
+          <tr><td>pillar_id / period</td><td>Program &amp; month</td></tr>
+          <tr><td>attendance_date</td><td>On‑site date</td></tr>
+          <tr><td>verified_at</td><td>Officer finalization</td></tr>
+          <tr><td>eligible_amount_kes</td><td>Calculated value</td></tr>
+          <tr><td>status</td><td>Verified</td></tr>
+        </table>
+      </div>
+      <div class="schema-card">
+        <div class="schema-card-header">stipend_authorizations.csv <span class="badge-new">sign‑off</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>authorization_id</td><td>Approval identifier</td></tr>
+          <tr><td>attendance_id</td><td>Physical attendance proof</td></tr>
+          <tr><td>beneficiary_id / pillar_id</td><td>Recipient &amp; program</td></tr>
+          <tr><td>period / date</td><td>Month &amp; formalization</td></tr>
+          <tr><td>amount_authorized</td><td>Approved stipend</td></tr>
+          <tr><td>authorized_by</td><td>Officer ID</td></tr>
+        </table>
+      </div>
+      <div class="schema-card">
+        <div class="schema-card-header">disbursements.csv <span class="badge-new">cash outflow</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>disbursement_id</td><td>Outbound receipt</td></tr>
+          <tr><td>authorization_id</td><td>Bridge (NULL = ghost payment)</td></tr>
+          <tr><td>beneficiary_id / pillar_id</td><td>Recipient / funding source</td></tr>
+          <tr><td>period / date</td><td>Month &amp; clearing date</td></tr>
+          <tr><td>amount_paid</td><td>Real cash transferred</td></tr>
+          <tr><td>channel / disbursing_account</td><td>mobile_money / bank</td></tr>
+          <tr><td>processed_by</td><td>HQ payments staff</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============= GOVERNANCE ============= -->
+    <h2 class="section-title">V. Operational Governance</h2>
+    <div class="schema-grid">
+      <div class="schema-card">
+        <div class="schema-card-header">depot_daily_inventory.csv <span class="badge-new">macro reconciliation</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>record_id</td><td>Audit reference</td></tr>
+          <tr><td>date / depot / product</td><td>Window, terminal, fuel</td></tr>
+          <tr><td>opening_stock_liters</td><td>Start volume</td></tr>
+          <tr><td>received_pipeline_liters</td><td>Fresh volume</td></tr>
+          <tr><td>dispatched_liters</td><td>Exited via gantry</td></tr>
+          <tr><td>book_closing_stock_liters</td><td>Paper expectation</td></tr>
+          <tr><td>physical_dip_closing_stock_liters</td><td>Actual tank dip</td></tr>
+          <tr><td>variance_liters</td><td>Critical delta</td></tr>
+        </table>
+      </div>
+      <div class="schema-card">
+        <div class="schema-card-header">quarantine_audit_log <span class="badge-new">quality shield</span></div>
+        <table class="schema-table">
+          <tr><th>Column</th><th>Description</th></tr>
+          <tr><td>quarantine_id</td><td>Failed row marker</td></tr>
+          <tr><td>dataset_name</td><td>Upstream table</td></tr>
+          <tr><td>failed_gate</td><td>ETL rule (Duplicate, Null)</td></tr>
+          <tr><td>reason</td><td>Data quality failure</td></tr>
+          <tr><td>quarantined_at</td><td>Interception timestamp</td></tr>
+          <tr><td>raw_record_json</td><td>Corrupted data preserved</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- FOOTNOTE -->
+    <div class="footnote">
+      <div><strong>🔴 KPC colours</strong> · black #1a1a1a · white · red #c8102e</div>
+      <div><span class="red-accent">⬤</span> <strong>Network graph attributes</strong> shared directors, fleets, temporal sleeper‑cell patterns</div>
+      <div>📌 <strong>Stage 2 Inuka</strong> mapped entity‑for‑entity to inbound processes</div>
+    </div>
+
+  </div> <!-- /content -->
+
+  <!-- FOOTER -->
+  <div class="kpc-footer">
+    <span>KPC Revenue Assurance · synthetic data dictionary v2.0</span>
+    <span>order‑to‑cash · data quality · <span style="color:#c8102e;">shell detection</span></span>
+  </div>
+
+</div> <!-- /container -->
+</body>
+</html>
