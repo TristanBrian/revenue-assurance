@@ -344,14 +344,19 @@ async def run_periodic_retrain_check(interval_seconds: int = 60 * 60) -> None:
     RETRAIN_MIN_NEW_FEEDBACK/RETRAIN_MIN_INTERVAL_SECONDS threshold is
     met — this loop is just the timer, maybe_retrain() is the decision).
     Always started regardless of is_configured() — maybe_retrain() itself
-    no-ops immediately when there's no baseline model yet."""
+    no-ops immediately when there's no baseline model yet.
+
+    maybe_retrain() is sync and blocks on subprocess.run(..., timeout=600)
+    — run it in a worker thread via asyncio.to_thread so a slow/hung
+    training run stalls only that thread, not the event loop the API
+    server itself is running on."""
     from app.utils.db_connection import SessionLocal
 
     while True:
         try:
             db = SessionLocal()
             try:
-                maybe_retrain(db)
+                await asyncio.to_thread(maybe_retrain, db)
             finally:
                 db.close()
         except asyncio.CancelledError:
