@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useMateriality } from "@/context/MaterialityContext";
 import { useDirection } from "@/context/DirectionContext";
-import { getAnomalies, updateAnomalyStatus, ApiError, type FraudFeedbackLabel } from "@/lib/api";
-import type { Anomaly, FraudTier } from "@/lib/types";
+import { getAnomalies, updateAnomalyStatus, getAnomalyActions, createAnomalyAction, ApiError, type FraudFeedbackLabel } from "@/lib/api";
+import type { Anomaly, AnomalyAction, FraudTier } from "@/lib/types";
 import AnomalyTable from "@/components/AnomalyTable";
 import FraudExplainPanel from "@/components/FraudExplainPanel";
 import RequirePermission from "@/components/RequirePermission";
@@ -38,8 +38,52 @@ function AnomaliesContent() {
   // triaging what's already in view, so a server round-trip isn't worth
   // adding a new query param for.
   const [fraudTierFilter, setFraudTierFilter] = useState<"All" | FraudTier>("All");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalAnomalies, setTotalAnomalies] = useState(0);
+  const pageSize = 25;
 
   const [resolving, setResolving] = useState(false);
+  const [caseAction, setCaseAction] = useState("acknowledge");
+  const [caseNote, setCaseNote] = useState("");
+  const [caseHistory, setCaseHistory] = useState<AnomalyAction[]>([]);
+  const [caseActionMessage, setCaseActionMessage] = useState<string | null>(null);
+  const [savingCaseAction, setSavingCaseAction] = useState(false);
+
+  useEffect(() => {
+    if (!selectedAnomaly) {
+      setCaseHistory([]);
+      setCaseActionMessage(null);
+      return;
+    }
+    Promise.resolve().then(async () => {
+      try {
+        setCaseHistory(await getAnomalyActions(selectedAnomaly.dispatch_id, direction));
+      } catch (err) {
+        setCaseActionMessage(err instanceof ApiError ? err.message : "Could not load the case history.");
+      }
+    });
+  }, [selectedAnomaly, direction]);
+
+  async function recordCaseAction() {
+    if (!selectedAnomaly) return;
+    if (["add_note", "request_evidence"].includes(caseAction) && !caseNote.trim()) {
+      setCaseActionMessage("Add a short note so the next reviewer knows what is required.");
+      return;
+    }
+    setSavingCaseAction(true);
+    setCaseActionMessage(null);
+    try {
+      const action = await createAnomalyAction(selectedAnomaly.dispatch_id, caseAction, caseNote.trim(), direction);
+      setCaseHistory((history) => [action, ...history]);
+      setCaseNote("");
+      setCaseActionMessage("Action recorded in the audit trail.");
+    } catch (err) {
+      setCaseActionMessage(err instanceof ApiError ? err.message : "Could not record the case action.");
+    } finally {
+      setSavingCaseAction(false);
+    }
+  }
 
   // Debounce the search box so it doesn't fire a request per keystroke —
   // the dropdowns change infrequently enough to not need this.
@@ -64,12 +108,14 @@ function AnomaliesContent() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getAnomalies(materiality, 1, 100, {
+      const data = await getAnomalies(materiality, page, pageSize, {
         breakType: breakTypeFilter === "All" ? undefined : breakTypeFilter,
         status: statusFilter === "All" ? undefined : statusFilter,
         search: searchQuery || undefined,
       }, direction);
       setAnomalies(data.anomalies);
+      setTotalPages(data.pagination.total_pages);
+      setTotalAnomalies(data.pagination.total);
       // If we had a selected anomaly, update it with fresh data
       if (selectedAnomaly) {
         const fresh = data.anomalies.find((x) => x.dispatch_id === selectedAnomaly.dispatch_id);
@@ -87,13 +133,17 @@ function AnomaliesContent() {
   }
 
   useEffect(() => {
+    setPage(1);
+  }, [materiality, direction, breakTypeFilter, statusFilter, searchQuery]);
+
+  useEffect(() => {
     // Wrapped in .then() rather than called bare: react-hooks/set-state-in-effect
     // flags a directly-invoked function as the effect's synchronous body
     // regardless of what it does internally — this matches the .then/.catch/
     // .finally deferral pattern used everywhere else in this codebase.
     Promise.resolve().then(() => loadAnomalies());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materiality, direction, breakTypeFilter, statusFilter, searchQuery]);
+  }, [materiality, direction, breakTypeFilter, statusFilter, searchQuery, page]);
 
   // fraudFeedbackLabel is optional — an investigator can resolve without
   // giving a fraud judgment (undefined), same as before this feature
@@ -196,18 +246,28 @@ function AnomaliesContent() {
       )}
 
       {!loading && !error && (
-        <AnomalyTable
-          anomalies={
-            fraudTierFilter === "All"
-              ? anomalies
-              : anomalies.filter((a) => a.fraud_tier === fraudTierFilter)
-          }
-          onSelectAnomaly={setSelectedAnomaly}
-          selectedAnomalyId={selectedAnomaly?.dispatch_id}
-        />
+        <>
+          <AnomalyTable
+            anomalies={
+              fraudTierFilter === "All"
+                ? anomalies
+                : anomalies.filter((a) => a.fraud_tier === fraudTierFilter)
+            }
+            onSelectAnomaly={setSelectedAnomaly}
+            selectedAnomalyId={selectedAnomaly?.dispatch_id}
+          />
+          <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-xs dark:border-zinc-800 dark:bg-zinc-900/40 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-zinc-500 dark:text-zinc-400">Showing {anomalies.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, totalAnomalies)} of {totalAnomalies.toLocaleString()} cases</p>
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((current) => Math.max(1, current - 1))} className="rounded-md border border-zinc-200 px-3 py-1.5 font-semibold text-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-200">Previous</button>
+              <span className="min-w-20 text-center font-mono text-zinc-500 dark:text-zinc-400">Page {page} / {totalPages}</span>
+              <button type="button" disabled={page >= totalPages || loading} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} className="rounded-md border border-zinc-200 px-3 py-1.5 font-semibold text-zinc-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-200">Next</button>
+            </div>
+          </div>
+        </>
       )}
 
-      {/* Side Slide-out Detail Drawer */}
+      {/* Centered responsive investigation modal */}
       {selectedAnomaly && (
         <>
           {/* Backdrop overlay */}
@@ -216,8 +276,9 @@ function AnomaliesContent() {
             onClick={() => setSelectedAnomaly(null)}
           ></div>
 
-          {/* Drawer container */}
-          <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-white dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl z-50 flex flex-col transition-all duration-300 transform translate-x-0">
+          {/* Centered responsive investigation modal */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
+            <div className="flex h-[calc(100vh-1.5rem)] max-h-[900px] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-800 dark:bg-zinc-900 sm:h-[calc(100vh-3rem)]">
             {/* Drawer Header */}
             <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-start bg-zinc-50 dark:bg-zinc-950/50">
               <div>
@@ -227,6 +288,9 @@ function AnomaliesContent() {
                 <h2 className="text-lg font-bold text-zinc-900 dark:text-white mt-0.5">
                   Waybill #{selectedAnomaly.dispatch_id}
                 </h2>
+                <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                  Oil revenue assurance · {canResolve ? "Investigation & resolution" : "Oversight & escalation"}
+                </p>
               </div>
               <button
                 onClick={() => setSelectedAnomaly(null)}
@@ -249,7 +313,16 @@ function AnomaliesContent() {
             </div>
 
             {/* Drawer Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-6">
+              <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Investigation context</p>
+                <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">
+                  {canResolve
+                    ? "Review the source records, record a fraud judgment where appropriate, and resolve or escalate the case."
+                    : "This is an evidence view for oversight. Review the source records and escalate the case through the assurance process; resolution controls are restricted to Revenue Assurance."}
+                </p>
+              </div>
+
               {/* Status Section */}
               <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-950/40 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800/50">
                 <div className="flex flex-col">
@@ -452,13 +525,47 @@ function AnomaliesContent() {
               <div className="flex flex-col gap-3 border-t border-zinc-200 dark:border-zinc-800 pt-6">
                 <FraudExplainPanel anomalyId={selectedAnomaly.dispatch_id} />
               </div>
+
+              {/* Review workflow: every non-resolution action is auditable. */}
+              <div className="flex flex-col gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Review action</h3>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Record what was done next so the case can move between teams without losing context.</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_1fr]">
+                  <select value={caseAction} onChange={(event) => setCaseAction(event.target.value)} className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950">
+                    <option value="acknowledge">Acknowledge</option>
+                    <option value="request_evidence">Request evidence</option>
+                    <option value="add_note">Add note</option>
+                    <option value="escalate">Escalate</option>
+                  </select>
+                  <textarea value={caseNote} onChange={(event) => setCaseNote(event.target.value)} maxLength={2000} rows={2} placeholder="Optional context, evidence requested, or escalation reason" className="resize-y rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950" />
+                </div>
+                <button type="button" onClick={recordCaseAction} disabled={savingCaseAction} className="self-start rounded-lg bg-zinc-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200">
+                  {savingCaseAction ? "Recording…" : "Record action"}
+                </button>
+                {caseActionMessage && <p className="text-xs text-zinc-500 dark:text-zinc-400">{caseActionMessage}</p>}
+                {caseHistory.length > 0 && (
+                  <div className="rounded-lg border border-zinc-200 dark:border-zinc-800">
+                    <p className="border-b border-zinc-200 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:border-zinc-800">Case history</p>
+                    <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                      {caseHistory.slice(0, 8).map((item) => (
+                        <div key={item.id} className="px-3 py-2 text-xs">
+                          <div className="flex flex-wrap justify-between gap-2 font-semibold text-zinc-700 dark:text-zinc-200"><span>{item.label ?? item.action}</span><time className="font-normal text-zinc-400">{new Date(item.created_at).toLocaleString()}</time></div>
+                          {item.note && <p className="mt-1 text-zinc-500 dark:text-zinc-400">{item.note}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Drawer Footer Actions */}
+            {/* Modal Footer Actions */}
             {canResolve && selectedAnomaly.status !== "Resolved" && (
-              <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 flex flex-col gap-2">
+              <div className="shrink-0 p-4 sm:p-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 flex flex-col gap-2">
                 <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">
-                  Resolve with a fraud judgment (optional — feeds model retraining)
+                  Investigator actions · resolution is recorded in the audit trail
                 </span>
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -485,6 +592,13 @@ function AnomaliesContent() {
                 </button>
               </div>
             )}
+            {!canResolve && (
+              <div className="shrink-0 border-t border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/50 sm:px-6">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Read-only oversight</p>
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Revenue Assurance owns the resolution decision. Use the review queue or escalation process for follow-up.</p>
+              </div>
+            )}
+            </div>
           </div>
         </>
       )}

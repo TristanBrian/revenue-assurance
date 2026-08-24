@@ -16,7 +16,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, require_permission
+from app.core.dependencies import get_db, require_permission, enforce_reconciliation_scope
 from app.models.auth.user import User
 from app.schemas.fraud.detective import OmcRiskDetail
 from app.schemas.fraud.graph import CommunityOut, FraudGraphResponse, NetworkResponse, OmcDepotEdge, OmcDepotNode
@@ -61,6 +61,7 @@ def fraud_graph(
     dispatches_df is a cheap single-table read either way, so reusing the
     real builder costs nothing extra on the cache-hit path.
     """
+    enforce_reconciliation_scope(user, direction)
     try:
         cache_key = f"metrics_{materiality}_{direction}"
         cached = get_cached_result(cache_key)

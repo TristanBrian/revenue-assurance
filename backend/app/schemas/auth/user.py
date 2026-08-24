@@ -7,6 +7,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
+from app.core.password_policy import MIN_PASSWORD_LENGTH
+
 
 class RoleOut(BaseModel):
     id: str
@@ -38,9 +40,14 @@ class PermissionOut(BaseModel):
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=MIN_PASSWORD_LENGTH)
     full_name: Optional[str] = None
     role_name: str
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().casefold()
 
 
 class AdminCreateUserRequest(BaseModel):
@@ -55,6 +62,11 @@ class AdminCreateUserRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().casefold()
 
 
 class LoginResponse(BaseModel):
@@ -93,7 +105,7 @@ class ResetPasswordRequest(BaseModel):
     client-side matching is a UX nicety only.
     """
     reset_token: str
-    new_password: str = Field(min_length=8)
+    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH)
     confirm_password: str
     checkbox_accepted: bool
 
@@ -172,5 +184,10 @@ class UpdateUserRequest(BaseModel):
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
     role_name: Optional[str] = None
-    password: Optional[str] = Field(default=None, min_length=8)
+    password: Optional[str] = Field(default=None, min_length=MIN_PASSWORD_LENGTH)
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, value: str | None) -> str | None:
+        return value.strip().casefold() if value is not None else None
     is_active: Optional[bool] = None

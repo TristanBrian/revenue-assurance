@@ -11,6 +11,7 @@ import StatCard from "@/components/StatCard";
 import ExposureRecoveryChart from "@/components/ExposureRecoveryChart";
 import ManagerAlertsCard from "@/components/ManagerAlertsCard";
 import UserManagementTable from "@/components/UserManagementTable";
+import InukaDashboard from "@/components/InukaDashboard";
 
 function formatKesCompact(value: number): string {
   if (value >= 1e9) return `KES ${(value / 1e9).toFixed(2)}B`;
@@ -50,6 +51,7 @@ export default function ExecutiveDashboardPage() {
   const canViewOmcRisk = user?.permissions.includes("view_omc_risk_profile") ?? false;
   const canViewLiveFeed = user?.permissions.includes("view_live_feed") ?? false;
   const isManager = user?.roles.includes("manager") ?? false;
+  const isInukaManager = user?.roles.includes("inuka_manager") ?? false;
   const canViewAnomalyTable = user?.permissions.includes("view_anomaly_table") ?? false;
 
   useEffect(() => {
@@ -62,6 +64,15 @@ export default function ExecutiveDashboardPage() {
         setError(null);
       }
     });
+
+    if (isInukaManager) {
+      Promise.resolve().then(() => {
+        if (!cancelled) setLoading(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
 
     const promises = [
       canViewMetrics ? getMetrics(materiality) : Promise.resolve(null),
@@ -95,7 +106,7 @@ export default function ExecutiveDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, materiality, canViewMetrics, canViewOmcRisk]);
+  }, [user, materiality, canViewMetrics, canViewOmcRisk, isInukaManager]);
 
   const totalLeakage = useMemo(() => {
     if (!omcProfiles.length) return 0;
@@ -115,6 +126,8 @@ export default function ExecutiveDashboardPage() {
   const maxBreakLeak = metrics
     ? Math.max(...BREAK_TYPES.map((b) => metrics[b.key] as number), 1)
     : 1;
+
+  if (isInukaManager) return <InukaDashboard />;
 
   // Admin-only accounts have no operational metrics permission at all —
   // their "dashboard" is user management, not the executive KPI view.
@@ -213,7 +226,7 @@ export default function ExecutiveDashboardPage() {
                 value={highRiskOmcsCount.toString()}
                 note="Under active review"
                 tone={highRiskOmcsCount > 0 ? "high" : "low"}
-                href="/dashboard/omc-risk"
+                href="/dashboard/heatmap"
               />
             ) : (
               <StatCard
@@ -245,7 +258,7 @@ export default function ExecutiveDashboardPage() {
                         </p>
                       </div>
                       <Link
-                        href="/dashboard/omc-risk"
+                        href="/dashboard/heatmap"
                         className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                       >
                         View all
@@ -326,4 +339,3 @@ function RiskDot({ level }: { level: "Low" | "Medium" | "High" }) {
   const color = level === "High" ? "bg-status-critical" : level === "Medium" ? "bg-status-medium" : "bg-status-low";
   return <span className={`w-2 h-2 rounded-full shrink-0 ${color}`} />;
 }
-

@@ -18,6 +18,7 @@ Run with (from backend/, after alembic upgrade head + seed_roles.py):
 """
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -27,7 +28,7 @@ from app.models.auth.user import User
 from app.services.auth.user_service import EmailAlreadyRegisteredError, register_user
 from app.utils.db_connection import SessionLocal
 
-DEMO_PASSWORD = "demo-pass-123"
+DEMO_PASSWORD = "Demo-Access-123!"
 
 # Fourth element is the depot assigned to the demo depot_supervisor — the
 # one real value this scoping needs, since it drives every alert they see
@@ -58,6 +59,8 @@ def seed():
             user.full_name = full_name
             user.is_active = True
             user.depot_id = depot_id
+            user.must_reset_password = True
+            user.temp_password_expires_at = datetime.now(timezone.utc) + timedelta(hours=48)
             if role:
                 user.roles = [role]
             db.commit()

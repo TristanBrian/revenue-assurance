@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_permission
+from app.core.password_policy import PasswordPolicyError
 from app.core.email import send_email
 from app.models.auth.user import User
+from app.models.audit.audit import AuditLog
 from app.schemas.auth.user import AdminCreateUserRequest, ResendTempPasswordResponse, UpdateUserRequest, UserOut
 from app.services.auth.user_service import (
     CannotDeleteSelfError,
@@ -19,6 +22,13 @@ from app.services.auth.user_service import (
 )
 
 router = APIRouter()  # prefix="/api/admin" and tags=["Admin"] are supplied by main.py's include_router()
+
+
+ADMIN_SECURITY_ACTIONS = (
+    AuditLog.action.like("user.%"),
+    AuditLog.action.like("auth.%"),
+    AuditLog.action.like("admin.%"),
+)
 
 
 def _send_temp_password_email(user: User, temp_password: str) -> None:
@@ -55,6 +65,41 @@ def get_users(
     _: User = Depends(require_permission("manage_users")),
 ):
     return list_users(db)
+
+
+@router.get("/security-events")
+def get_security_events(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_permission("manage_users")),
+):
+    """Return only authentication and administration events to system admins.
+
+    This deliberately does not grant the admin access to Oil or Inuka audit
+    records. It gives the platform operator enough security visibility to
+    investigate account provisioning, resets, logins, and role changes.
+    """
+    query = db.query(AuditLog).filter(or_(*ADMIN_SECURITY_ACTIONS)).order_by(AuditLog.created_at.desc())
+    total = query.count()
+    rows = query.offset((page - 1) * page_size).limit(page_size).all()
+    return {
+        "items": [
+            {
+                "id": str(row.id),
+                "action": row.action,
+                "target_type": row.target_type,
+                "target_id": row.target_id,
+                "actor_user_id": str(row.actor_user_id) if row.actor_user_id else None,
+                "created_at": row.created_at.isoformat(),
+                "metadata": row.extra_metadata,
+            }
+            for row in rows
+        ],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 @router.post("/users", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -129,6 +174,8 @@ def edit_user(
     except EmailAlreadyRegisteredError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
     except RoleNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except PasswordPolicyError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
