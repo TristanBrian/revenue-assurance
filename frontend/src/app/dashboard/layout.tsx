@@ -20,7 +20,6 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   badgeKey?: "anomalies" | "omc_risk" | "ebilling";
-  /** Shown if the user has ANY of these permissions; omitted = always shown. */
   anyOf?: string[];
 }
 
@@ -101,6 +100,17 @@ const NAV_ITEMS: NavItem[] = [
       </svg>
     ),
   },
+  // 👇 ADDED: Audit Trail
+  {
+    href: "/dashboard/audit",
+    label: "Audit Trail",
+    anyOf: ["view_audit"],
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      </svg>
+    ),
+  },
 ];
 
 const REVIEW_QUEUE_ITEM: NavItem = {
@@ -141,6 +151,17 @@ const INUKA_NAV_ITEMS: NavItem[] = [
     icon: (
       <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m7-10a4 4 0 100-8 4 4 0 000 8zm7-3a4 4 0 010 8m4 5v-2a4 4 0 00-3-3.87" />
+      </svg>
+    ),
+  },
+  // 👇 ADDED: Audit Trail (Inuka workspace)
+  {
+    href: "/dashboard/audit",
+    label: "Audit Trail",
+    anyOf: ["view_audit"],
+    icon: (
+      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
       </svg>
     ),
   },
@@ -205,8 +226,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     const stored = window.localStorage.getItem("kpc_assurance_workspace");
     if (stored === "oil" || stored === "inuka") setWorkspace(stored);
   }, [canUseDualWorkspace]);
-  
-   
+
+  // Redirect Inuka managers away from revenue-only pages
   useEffect(() => {
     if (!isInukaManager) return;
     const revenueOnlyPaths = [
@@ -231,12 +252,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [depotAlerts, setDepotAlerts] = useState<{ depotId: string; criticalCount: number; items: Anomaly[] } | null>(null);
   const [depotAlertsOpen, setDepotAlertsOpen] = useState(false);
 
+  // Data-fetching effect – added isInukaManager to deps
   useEffect(() => {
     if (!user) return;
 
-    // Each badge's source call is gated on the same permission that gates
-    // its nav item — a role without it would otherwise 403 on every
-    // dashboard load for a badge it can't even see, on every page.
     if (user.permissions.includes("view_metrics")) {
       getMetrics(isInukaWorkspace ? 100000 : materiality, isInukaWorkspace ? "outbound" : "all")
         .then((data) => {
@@ -260,15 +279,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         .catch(() => {});
     }
 
-    // Depot Supervisor's alert bell: their own depot only, from a server
-    // endpoint that ignores any client-supplied depot — not the global
-    // view_metrics critical_count above, which is unscoped across every depot.
     if (!isInukaManager && user.permissions.includes("view_depot_alerts")) {
       getDepotAlerts()
         .then((data) => setDepotAlerts({ depotId: data.depot_id, criticalCount: data.critical_count, items: data.items }))
         .catch(() => {});
     }
-  }, [user, materiality, isInukaWorkspace]);
+  }, [user, materiality, isInukaWorkspace, isInukaManager]);   // ✅ FIXED: added isInukaManager
 
   function handleLogout() {
     logout();
@@ -299,9 +315,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       : isInukaManager
         ? "Programme review"
         : "Operations";
-  // Decorative search over anomalies/OMCs/invoices only makes sense on pages
-  // that actually show that content — not the Explorer, uploads, reports,
-  // e-billing, or fraud graph, and never for admin (their page is users).
   const SEARCH_RELEVANT_PATHS = isInukaWorkspace ? ["/dashboard/inuka/anomalies", "/dashboard/inuka/programs", "/dashboard/inuka/officers"] : ["/dashboard", "/dashboard/anomalies", "/dashboard/heatmap"];
   const showSearch = !isAdmin && SEARCH_RELEVANT_PATHS.includes(pathname);
 
@@ -313,10 +326,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      {/* Sidebar — deliberately its own reddish-dark surface (bg-sidebar),
-          distinct from the neutral bg-background main layout in both themes. */}
-      {/* h-full + its own overflow-y-auto — stays put while <main> scrolls,
-          instead of scrolling away with the rest of the page. */}
       <aside className="flex h-full w-60 shrink-0 flex-col overflow-y-auto bg-sidebar border-r border-sidebar-border p-3">
         <div className="flex items-center gap-2.5 px-2 py-3 mb-2">
           {BRAND_CONFIG.logoUrl ? (
@@ -431,9 +440,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         <header className="flex h-14 items-center justify-between gap-4 px-6 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30">
-          {/* Decorative reconciliation search — only on pages that actually
-              show anomalies/OMCs/invoices (see SEARCH_RELEVANT_PATHS above),
-              not on every page regardless of relevance. */}
           {showSearch ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground max-w-md w-full">
               <div className="flex items-center gap-2 w-full rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs">

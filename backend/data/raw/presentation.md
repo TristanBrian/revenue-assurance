@@ -173,7 +173,7 @@ Follow these exact steps during the 3-minute live demonstration.
 ### Step 1: Login & Depot Supervisor Flow (Time: ~45s)
 1.  **Action**: Navigate to the Login screen. Log in as the Depot Supervisor:
     *   **Email**: `depot_supervisor@kpc-demo.co.ke`
-    *   **Password**: `Demo-Access-123!`
+    *   **Password**: `demo-pass-123`
 2.  **Narrative**:
     > "I am logging in as a Depot Supervisor in Nairobi. My dashboard is focused strictly on operations. I have access to the live dispatch feed and the CSV upload tool. Let's navigate to the Upload page."
 3.  **Action**: Go to the **Upload** section.
@@ -187,7 +187,7 @@ Follow these exact steps during the 3-minute live demonstration.
 ### Step 2: Revenue Assurance Flow â€” Anomaly Resolution & KRA Sync (Time: ~1m 30s)
 1.  **Action**: Log in as the Revenue Assurance analyst:
     *   **Email**: `revenue_assurance@kpc-demo.co.ke`
-    *   **Password**: `Demo-Access-123!`
+    *   **Password**: `demo-pass-123`
 2.  **Narrative**:
     > "Now, I am logging in as a Revenue Assurance analyst. My dashboard is fully unlocked. I have access to the complete Anomaly Table, the Risk & Fraud Engine, and the KRA E-Billing Sync panel."
 3.  **Action**: Go to the **Anomalies** tab. Point out the anomalies.
@@ -212,7 +212,7 @@ Follow these exact steps during the 3-minute live demonstration.
 ### Step 3: Executive Manager Flow â€” Metrics & Audit Trail (Time: ~45s)
 1.  **Action**: Log out. Log in as the Manager:
     *   **Email**: `manager@kpc-demo.co.ke`
-    *   **Password**: `Demo-Access-123!`
+    *   **Password**: `demo-pass-123`
 2.  **Narrative**:
     > "Finally, let's log in as a Manager. A Manager does not resolve anomalies or sync invoices, but requires high-level oversight."
 3.  **Action**: Go to the **Overview / Reports** section. Point to the KPI cards (Total Dispatched, Total Leakage, Reconciliation Rate).

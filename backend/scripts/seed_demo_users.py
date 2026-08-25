@@ -18,17 +18,16 @@ Run with (from backend/, after alembic upgrade head + seed_roles.py):
 """
 import os
 import sys
-from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from app.core.password_policy import normalize_email
 from app.core.security import hash_password
 from app.models.auth.role import Role
 from app.models.auth.user import User
-from app.services.auth.user_service import EmailAlreadyRegisteredError, register_user
 from app.utils.db_connection import SessionLocal
 
-DEMO_PASSWORD = "Demo-Access-123!"
+DEMO_PASSWORD = "demo-pass-123"
 
 # Fourth element is the depot assigned to the demo depot_supervisor — the
 # one real value this scoping needs, since it drives every alert they see
@@ -48,19 +47,29 @@ def seed():
     db = SessionLocal()
     try:
         for email, full_name, role_name, depot_id in DEMO_USERS:
-            try:
-                register_user(db, email=email, password=DEMO_PASSWORD, full_name=full_name, role_name=role_name)
-                print(f"Created {email} ({role_name})")
-            except EmailAlreadyRegisteredError:
-                pass
+            email = normalize_email(email)
             user = db.query(User).filter(User.email == email).first()
             role = db.query(Role).filter(Role.name == role_name).first()
+            if role is None:
+                raise RuntimeError(f"Role {role_name!r} is not seeded")
+            if user is None:
+                user = User(
+                    email=email,
+                    full_name=full_name,
+                    hashed_password=hash_password(DEMO_PASSWORD),
+                    roles=[role],
+                )
+                db.add(user)
+                db.flush()
+                print(f"Created {email} ({role_name})")
             user.hashed_password = hash_password(DEMO_PASSWORD)
             user.full_name = full_name
             user.is_active = True
             user.depot_id = depot_id
-            user.must_reset_password = True
-            user.temp_password_expires_at = datetime.now(timezone.utc) + timedelta(hours=48)
+            # Demo accounts are intentionally direct-login accounts for hackathon demos.
+            # Admin-provisioned real users still follow the forced-reset flow.
+            user.must_reset_password = False
+            user.temp_password_expires_at = None
             if role:
                 user.roles = [role]
             db.commit()
