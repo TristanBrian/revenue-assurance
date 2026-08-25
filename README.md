@@ -39,7 +39,7 @@ Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka
 - **Swagger Docs:** [https://revenue-assurance.fly.dev/docs](https://revenue-assurance.fly.dev/docs)  
 - **Frontend (Vercel):** [https://flowgardd.vercel.app](https://flowgardd.vercel.app)  
 
-### 🔑 Demo Logins (Password: `Demo-Access-123!`)
+### 🔑 Demo Logins (Password: `demo-pass-123`)
 
 | Role | Email |
 |------|-------|
