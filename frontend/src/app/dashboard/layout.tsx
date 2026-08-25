@@ -438,7 +438,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex-1 lg:w-[75%] min-h-0 flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         <header className="flex h-14 items-center justify-between gap-4 px-6 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30">
           {showSearch ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground max-w-md w-full">
