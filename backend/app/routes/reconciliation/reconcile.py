@@ -682,6 +682,15 @@ def export_report(
             anomalies_df = pd.DataFrame(anomalies)
 
             # Data Minimization: filter columns if specified
+            # selected_fields_list always defined (even when fields is empty
+            # or anomalies_df is empty) — it's read again below, outside this
+            # block, when logging the report.export audit entry. Left
+            # unassigned in that branch, this raised UnboundLocalError,
+            # silently swallowed by the "non-fatal" try/except around that
+            # logging call — the export itself still succeeded, but the
+            # audit_match ReportVerifierModal depends on was never written,
+            # so a genuinely authentic export came back "UNKNOWN" on verify.
+            selected_fields_list: list[str] = []
             if fields and not anomalies_df.empty:
                 selected_fields_list = [f.strip() for f in fields.split(",") if f.strip()]
                 valid_cols = [col for col in selected_fields_list if col in anomalies_df.columns]
