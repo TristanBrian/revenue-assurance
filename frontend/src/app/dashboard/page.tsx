@@ -138,7 +138,7 @@ export default function ExecutiveDashboardPage() {
   if (user && !canViewMetrics && !canViewOmcRisk) {
     if (!user.permissions.includes("manage_users")) {
       return (
-        <div className="mx-auto flex max-w-5xl flex-col gap-6">
+        <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6">
           <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
             <h2 className="text-base font-bold text-foreground">Welcome, {user.email}</h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -153,7 +153,7 @@ export default function ExecutiveDashboardPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 max-w-6xl mx-auto">
+    <div className="flex flex-col gap-6 w-full max-w-[1700px] mx-auto">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">KPC Order-to-Cash</p>

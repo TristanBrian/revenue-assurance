@@ -49,7 +49,7 @@ export default function InukaAnomaliesPage() {
   }, [page, pageSize, status, riskType, search, pillar]);
 
   return (
-    <div className="flex flex-col gap-5 max-w-6xl mx-auto">
+    <div className="flex flex-col gap-5 w-full max-w-[1700px] mx-auto">
       <header><p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Investigation queue</p><h1 className="text-2xl font-bold tracking-tight text-foreground mt-1">{pillar ? `${pillar} cases` : "Inuka assurance cases"}</h1><p className="text-sm text-muted-foreground mt-1">Every case includes the control failure, evidence confidence, source records, and amount at risk.</p></header>
       <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_210px_110px] gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
         <input value={search} onChange={(event) => { setPage(1); setSearch(event.target.value); }} placeholder="Search beneficiary, officer, case, program…" className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground" />

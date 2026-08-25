@@ -38,7 +38,7 @@ export default function ReviewQueuePage() {
   }, []);
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6">
       <header>
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Shared assurance workspace</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">My review queue</h1>

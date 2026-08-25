@@ -170,7 +170,7 @@ function AnomaliesContent() {
   const canResolve = user?.permissions.includes("resolve_anomaly");
 
   return (
-    <div className="flex flex-col gap-6 max-w-5xl mx-auto relative text-zinc-800 dark:text-zinc-100">
+    <div className="flex flex-col gap-6 w-full max-w-[1700px] mx-auto relative text-zinc-800 dark:text-zinc-100">
       <header>
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
           Anomalies

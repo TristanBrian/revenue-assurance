@@ -554,7 +554,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </header>
 
         <div className={`border-b px-6 py-2.5 ${isInukaWorkspace ? "border-status-info/20 bg-status-info-bg/50" : "border-primary/15 bg-primary/5"}`}>
-          <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-extrabold ${isInukaWorkspace ? "bg-status-info-bg text-status-info" : "bg-primary/10 text-primary"}`}>
                 {isInukaWorkspace ? "IN" : "OIL"}

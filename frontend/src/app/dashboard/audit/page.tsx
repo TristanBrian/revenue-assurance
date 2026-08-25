@@ -77,7 +77,7 @@ function AuditContent() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="w-full max-w-[1700px] mx-auto space-y-6">
       <header>
         <h1 className="text-2xl font-bold text-foreground">Audit Trail</h1>
         <p className="text-sm text-muted-foreground">

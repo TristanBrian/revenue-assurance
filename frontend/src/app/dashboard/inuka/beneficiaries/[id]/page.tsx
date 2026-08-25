@@ -39,7 +39,7 @@ export default function InukaBeneficiaryPage() {
   const sections = ["attendance", "stipend_authorizations", "disbursements", "cases"];
 
   return (
-    <div className="flex flex-col gap-5 max-w-6xl mx-auto">
+    <div className="flex flex-col gap-5 w-full max-w-[1700px] mx-auto">
       <header>
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           Beneficiary 360
