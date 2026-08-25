@@ -30,7 +30,7 @@ const NAV_ITEMS: NavItem[] = [
     href: "/dashboard",
     label: "Dashboard",
     icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2v-4zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z" />
       </svg>
     ),
@@ -40,7 +40,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Upload CSVs",
     anyOf: ["upload_csv"],
     icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
       </svg>
     ),
@@ -51,7 +51,7 @@ const NAV_ITEMS: NavItem[] = [
     anyOf: ["view_anomaly_table"],
     badgeKey: "anomalies",
     icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
       </svg>
     ),
@@ -61,7 +61,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Leakage Explorer",
     anyOf: ["view_heatmap"],
     icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
     ),
@@ -71,7 +71,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Risk Intelligence",
     anyOf: ["view_fraud_graph"],
     icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <circle cx="6" cy="6" r="2.5" />
         <circle cx="18" cy="6" r="2.5" />
         <circle cx="12" cy="18" r="2.5" />
@@ -85,7 +85,7 @@ const NAV_ITEMS: NavItem[] = [
     anyOf: ["manage_ebilling"],
     badgeKey: "ebilling",
     icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
       </svg>
     ),
@@ -95,7 +95,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Reports",
     anyOf: ["export_reports"],
     icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2a4 4 0 014-4h4m0 0l-3-3m3 3l-3 3M4 7h16M4 7a2 2 0 002 2h12a2 2 0 002-2M4 7a2 2 0 012-2h12a2 2 0 012 2" />
       </svg>
     ),
@@ -106,7 +106,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Audit Trail",
     anyOf: ["view_audit"],
     icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
       </svg>
     ),
@@ -118,7 +118,7 @@ const REVIEW_QUEUE_ITEM: NavItem = {
   label: "My Review Queue",
   anyOf: ["view_anomaly_table"],
   icon: (
-    <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5h10M9 12h10M9 19h10M4 5h.01M4 12h.01M4 19h.01" />
     </svg>
   ),
@@ -129,7 +129,7 @@ const INUKA_NAV_ITEMS: NavItem[] = [
     href: "/dashboard/inuka",
     label: "Assurance Overview",
     icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 13h6V4H4v9zm0 7h6v-3H4v3zm10 0h6v-9h-6v9zm0-16v3h6V4h-6z" />
       </svg>
     ),
@@ -139,7 +139,7 @@ const INUKA_NAV_ITEMS: NavItem[] = [
     label: "Pillar Risk",
     anyOf: ["view_metrics"],
     icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 5h16M4 12h16M4 19h16M8 5v14" />
       </svg>
     ),
@@ -149,7 +149,7 @@ const INUKA_NAV_ITEMS: NavItem[] = [
     label: "Officer Assurance",
     anyOf: ["view_metrics"],
     icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m7-10a4 4 0 100-8 4 4 0 000 8zm7-3a4 4 0 010 8m4 5v-2a4 4 0 00-3-3.87" />
       </svg>
     ),
@@ -160,7 +160,7 @@ const INUKA_NAV_ITEMS: NavItem[] = [
     label: "Audit Trail",
     anyOf: ["view_audit"],
     icon: (
-      <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
       </svg>
     ),
@@ -177,7 +177,7 @@ function formatKes(value: number): string {
 
 function BellIcon() {
   return (
-    <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
     </svg>
   );
@@ -327,7 +327,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <aside className="flex h-full w-60 shrink-0 flex-col overflow-y-auto bg-sidebar border-r border-sidebar-border p-3">
-        <div className="flex items-center gap-2.5 px-2 py-3 mb-2">
+        <div className="flex items-center gap-3 px-2 py-3 mb-2">
           {BRAND_CONFIG.logoUrl ? (
             <div className="w-8 h-8 shrink-0 relative">
               <Image
@@ -347,16 +347,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           )}
           <div className="min-w-0">
-            <p className="text-sm font-bold text-sidebar-foreground leading-none truncate">
+            <p className="text-base sm:text-lg font-extrabold text-sidebar-foreground leading-snug truncate">
               {BRAND_CONFIG.companyName}
             </p>
-            <p className="text-[10px] text-sidebar-muted-foreground leading-none mt-1 truncate">
+            <p className="text-xs font-medium text-sidebar-muted-foreground leading-tight mt-1 truncate">
               {isInukaWorkspace ? "Inuka Program Assurance" : BRAND_CONFIG.systemName}
             </p>
           </div>
         </div>
 
-        <p className="px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
+        <p className="px-2 mb-1.5 text-xs font-extrabold uppercase tracking-wider text-sidebar-muted-foreground">
           Workspace
         </p>
         {canUseDualWorkspace && (
@@ -366,7 +366,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 key={item}
                 type="button"
                 onClick={() => switchWorkspace(item)}
-                className={`rounded-md px-2 py-2 text-[10px] font-semibold transition-colors ${
+                className={`rounded-md px-2 py-2 text-xs sm:text-sm font-bold transition-colors ${
                   (routeWorkspace ?? workspace) === item
                     ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                     : "text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
@@ -389,18 +389,18 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group flex items-center justify-between rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors ${
+                className={`group flex items-center justify-between rounded-md px-2.5 py-2 text-sm sm:text-base font-bold transition-colors py-2.5 px-3 ${
                   active
                     ? "bg-sidebar-accent text-sidebar-foreground"
                     : "text-sidebar-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
                 }`}
               >
-                <span className="flex items-center gap-2.5">
+                <span className="flex items-center gap-3">
                   <span className={active ? "text-sidebar-primary" : ""}>{item.icon}</span>
                   {item.label}
                 </span>
                 {count > 0 && (
-                  <span className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-sidebar-primary px-1 text-[9px] font-bold text-sidebar-primary-foreground">
+                  <span className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-sidebar-primary px-1 text-xs font-extrabold text-sidebar-primary-foreground">
                     {count}
                   </span>
                 )}
@@ -410,15 +410,15 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">
-          <div className="border-t border-sidebar-border pt-3 flex items-center gap-2.5 px-1">
+          <div className="border-t border-sidebar-border pt-3 flex items-center gap-3 px-1">
             <div className="w-7 h-7 shrink-0 rounded-full bg-sidebar-primary/20 text-sidebar-primary flex items-center justify-center text-[11px] font-bold">
               {user?.email?.[0]?.toUpperCase() ?? "?"}
             </div>
             <div className="min-w-0 flex-1">
               {!authLoading && user && (
                 <>
-                  <p className="truncate text-[12px] font-semibold text-sidebar-foreground">{user.email}</p>
-                  <p className="text-[10px] capitalize text-sidebar-muted-foreground truncate">
+                  <p className="truncate text-xs sm:text-sm font-bold text-sidebar-foreground">{user.email}</p>
+                  <p className="text-xs capitalize font-medium text-sidebar-muted-foreground truncate">
                     {user.roles.join(", ").replace(/_/g, " ")}
                   </p>
                 </>
@@ -438,7 +438,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div className="flex-1 lg:w-[75%] min-h-0 flex flex-col overflow-hidden">
         <header className="flex h-14 items-center justify-between gap-4 px-6 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30">
           {showSearch ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground max-w-md w-full">
@@ -488,10 +488,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 {depotAlertsOpen && (
                   <div className="absolute right-0 mt-1 w-80 rounded-md border border-border bg-popover shadow-lg py-2 z-40">
                     <div className="px-3 pb-2 border-b border-border">
-                      <p className="text-xs font-bold text-foreground">
+                      <p className="text-sm font-bold text-foreground">
                         {depotAlerts ? depotAlerts.depotId : "Your depot"} — critical alerts
                       </p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Scoped to your assigned depot only</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Scoped to your assigned depot only</p>
                     </div>
                     {!depotAlerts || depotAlerts.items.length === 0 ? (
                       <p className="px-3 py-4 text-xs text-muted-foreground italic">No alerts for your depot right now.</p>
@@ -505,7 +505,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                                 {formatKes(a.leakage_kes)}
                               </span>
                             </div>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               {a.break_type} · {a.dispatch_id}
                             </p>
                           </div>
@@ -555,22 +555,22 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
         <div className={`border-b px-6 py-2.5 ${isInukaWorkspace ? "border-status-info/20 bg-status-info-bg/50" : "border-primary/15 bg-primary/5"}`}>
           <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[9px] font-bold ${isInukaWorkspace ? "bg-status-info-bg text-status-info" : "bg-primary/10 text-primary"}`}>
+            <div className="flex min-w-0 items-center gap-3">
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-extrabold ${isInukaWorkspace ? "bg-status-info-bg text-status-info" : "bg-primary/10 text-primary"}`}>
                 {isInukaWorkspace ? "IN" : "OIL"}
               </span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  <p className="truncate text-xs font-bold text-foreground">{workspaceLabel}</p>
+                  <p className="truncate text-sm font-bold text-foreground">{workspaceLabel}</p>
                   <span className="rounded-full bg-background/70 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
                     {roleMode}
                   </span>
                 </div>
-                <p className="truncate text-[10px] text-muted-foreground">{workspaceDescription}</p>
+                <p className="truncate text-xs text-muted-foreground">{workspaceDescription}</p>
               </div>
             </div>
             {canUseDualWorkspace && (
-              <p className="text-[10px] text-muted-foreground sm:text-right">
+              <p className="text-xs text-muted-foreground sm:text-right">
                 Switch workspace to change the dataset and controls shown.
               </p>
             )}
