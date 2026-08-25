@@ -28,7 +28,7 @@ Expo/React Native companion application for the FlowGuard Revenue Assurance and 
    Verify status at `http://localhost:8000/health`.
 
 2. **Configure Mobile API URL:**
-   Find your workstation LAN IP (`hostname -I`, e.g., `192.168.1.20`).
+   Find your workstation LAN IP (``hostname -I``, e.g., `192.168.1.20`).
    ```bash
    cp .env.example .env
    ```

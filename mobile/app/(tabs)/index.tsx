@@ -1,4 +1,145 @@
-import{useCallback,useEffect,useState}from"react";import{Pressable,RefreshControl,ScrollView,StyleSheet,Text,View}from"react-native";import{Direction,Metrics,metrics}from"@/api";import{useAuth}from"@/auth";import{MobileHeader,useShell}from"@/shell";import{c,compactMoney}from"@/theme";
-export default function Overview(){const{user}=useAuth(),{workspace}=useShell(),canToggle=!!user?.permissions.includes("view_outgoing_data")&&!user.roles.includes("inuka_manager"),locked:Direction=user?.roles.includes("inuka_manager")?"outbound":user?.permissions.includes("view_outgoing_data")?"all":"inbound",[d,setD]=useState<Direction>(locked),[data,setData]=useState<Metrics>(),[loading,setLoading]=useState(true),[error,setError]=useState("");useEffect(()=>setD(workspace==="inuka"?"outbound":canToggle?"all":"inbound"),[workspace,canToggle]);const load=useCallback(async()=>{setLoading(true);setError("");try{setData(await metrics(d))}catch(e){setError(e instanceof Error?e.message:"Load failed")}finally{setLoading(false)}},[d]);useEffect(()=>{void load()},[load]);return <View style={s.page}><MobileHeader/><View style={s.context}><View style={s.contextIcon}><Text style={s.contextMark}>{workspace==="oil"?"OIL":"INK"}</Text></View><View style={{flex:1}}><Text style={s.contextTitle}>{workspace==="oil"?"Oil Revenue Assurance":"Inuka Programme Assurance"} <Text style={s.pill}>{user?.roles.includes("manager")?" OVERSIGHT & ESCALATION ":" INVESTIGATION & RESOLUTION "}</Text></Text><Text style={s.contextCopy}>{workspace==="oil"?"Dispatch, invoice, payment, and KRA e-billing controls":"Beneficiary participation, authorisations, and stipend disbursements"}</Text></View></View><ScrollView contentContainerStyle={s.body} refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={c.red}/>}><Text style={s.eye}>KPC ORDER-TO-CASH</Text><Text style={s.title}>{workspace==="oil"?"Executive Dashboard":"Assurance Overview"}</Text>{canToggle&&<View style={s.picker}>{(["inbound","outbound","all"]as Direction[]).map(x=><Pressable key={x} onPress={()=>setD(x)} style={[s.pick,d===x&&s.active]}><Text style={[s.pickText,d===x&&s.pickTextOn]}>{x==="inbound"?"Oil":x==="outbound"?"Inuka":"All"}</Text></Pressable>)}</View>}<View style={s.material}><Text style={s.materialText}>MATERIALITY</Text><View style={s.track}><View style={s.trackFill}/><View style={s.knob}/></View><Text style={s.amount}>Ksh 100,000</Text></View>{!!error&&<Text style={s.error}>{error}</Text>}{data&&<><Stat label="Total Leakage" value={compactMoney(data.total_leakage_kes)} caption="Across all flagged OMCs"/><Stat label="Critical Anomalies" value={String(data.critical_count)} chip="Needs immediate review"/><Stat label="Reconciliation Rate" value={data.reconciliation_rate.toFixed(1)+"%"} progress={data.reconciliation_rate}/><Stat label="High Risk OMCs" value={String(data.review_count)} caption="Under active review" danger/></>}</ScrollView></View>}
-function Stat({label,value,caption,chip,progress,danger}:{label:string;value:string;caption?:string;chip?:string;progress?:number;danger?:boolean}){return <View style={s.card}><Text style={s.cardLabel}>{label}</Text><Text style={s.value}>{value}</Text>{caption&&<Text style={[s.caption,danger&&{color:"#CF725E"}]}>{caption}</Text>}{chip&&<View style={s.chip}><Text style={s.chipText}>{chip}</Text></View>}{progress!=null&&<View style={s.progress}><View style={[s.progressFill,{width:`${Math.min(progress,100)}%`}]}/></View>}</View>}
-const s=StyleSheet.create({page:{flex:1,backgroundColor:c.bg},context:{flexDirection:"row",padding:14,paddingHorizontal:20,gap:10,backgroundColor:"#F8EDEA",borderBottomWidth:1,borderBottomColor:"#E8C9C5"},contextIcon:{width:30,height:30,borderRadius:7,backgroundColor:"#F1DAD6",alignItems:"center",justifyContent:"center"},contextMark:{color:c.red,fontWeight:"900",fontSize:8},contextTitle:{fontWeight:"900",fontSize:12,color:c.text},pill:{fontSize:8,color:c.muted,fontWeight:"700"},contextCopy:{color:c.muted,fontSize:10,marginTop:4},body:{padding:20,paddingBottom:44},eye:{fontSize:10,letterSpacing:.6,color:c.muted,fontWeight:"700"},title:{color:c.text,fontSize:25,fontWeight:"900",marginTop:6,marginBottom:17},picker:{flexDirection:"row",backgroundColor:"#EEEAE6",padding:3,borderRadius:8,marginBottom:10},pick:{flex:1,padding:8,alignItems:"center",borderRadius:6},active:{backgroundColor:c.red},pickText:{fontSize:10,fontWeight:"700",color:c.muted},pickTextOn:{color:"white"},material:{height:31,alignSelf:"flex-start",minWidth:288,borderWidth:1,borderColor:c.line,borderRadius:6,flexDirection:"row",alignItems:"center",paddingHorizontal:11,marginBottom:24,gap:10,backgroundColor:c.card},materialText:{fontSize:9,color:c.muted,fontWeight:"700"},track:{width:89,height:3,backgroundColor:"#C8C5C2"},trackFill:{width:"24%",height:3,backgroundColor:c.red},knob:{position:"absolute",left:16,top:-5,width:13,height:13,borderRadius:7,backgroundColor:c.red},amount:{fontFamily:"monospace",fontWeight:"800",fontSize:11,color:c.text},error:{color:c.red,marginBottom:14},card:{backgroundColor:c.card,borderRadius:13,borderWidth:1,borderColor:c.line,padding:16,marginBottom:15,minHeight:120,justifyContent:"center",shadowColor:"#2A211D",shadowOpacity:.1,shadowRadius:5,shadowOffset:{width:0,height:2},elevation:3},cardLabel:{color:c.muted,fontSize:12},value:{fontSize:30,color:c.text,fontWeight:"900",marginTop:8},caption:{color:c.muted,fontSize:11,marginTop:8},chip:{alignSelf:"flex-start",marginTop:9,backgroundColor:c.redSoft,borderRadius:10,paddingVertical:4,paddingHorizontal:8},chipText:{color:c.red,fontSize:10,fontWeight:"800"},progress:{height:5,backgroundColor:"#ECE9E6",borderRadius:4,marginTop:13,overflow:"hidden"},progressFill:{height:5,backgroundColor:c.amber,borderRadius:4}})
+import { useEffect, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from "react-native";
+import { metrics, type Metrics } from "@/api";
+import { useAuth } from "@/auth";
+import { c } from "@/theme";
+
+function formatKes(value: number): string {
+  if (value >= 1e9) return `KES ${(value / 1e9).toFixed(2)}B`;
+  if (value >= 1e6) return `KES ${(value / 1e6).toFixed(2)}M`;
+  return `KES ${value.toLocaleString()}`;
+}
+
+export default function Overview() {
+  const { user } = useAuth();
+  const [data, setData] = useState<Metrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadData = async () => {
+    try {
+      const result = await metrics("all");
+      setData(result);
+    } catch (error) {
+      console.error("Failed to load metrics:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
+
+  if (loading) {
+    return (
+      <View style={s.center}>
+        <ActivityIndicator color={c.cyan} size="large" />
+      </View>
+    );
+  }
+
+  const cards = [
+    { label: "Total Paid", value: data?.total_paid_kes ?? 0, format: "KES" },
+    { label: "Total Leakage", value: data?.total_leakage_kes ?? 0, format: "KES" },
+    { label: "Anomalies", value: data?.anomaly_count ?? 0 },
+    { label: "Critical", value: data?.critical_count ?? 0, tone: "critical" },
+    { label: "Pending", value: data?.pending_count ?? 0 },
+    { label: "Reconciliation Rate", value: data?.reconciliation_rate ?? 0, format: "percent" },
+  ];
+
+  return (
+    <ScrollView
+      style={s.page}
+      contentContainerStyle={{ padding: 20 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.cyan} />}
+    >
+      <Text style={s.greeting}>Welcome back,</Text>
+      <Text style={s.name}>{user?.full_name || user?.email?.split("@")[0] || "User"}</Text>
+
+      <View style={s.grid}>
+        {cards.map((card, i) => {
+          let displayValue: string;
+          if (card.format === "KES") {
+            displayValue = formatKes(card.value as number);
+          } else if (card.format === "percent") {
+            displayValue = `${(card.value as number).toFixed(1)}%`;
+          } else {
+            displayValue = (card.value as number).toLocaleString();
+          }
+
+          const isCritical = card.tone === "critical" && (card.value as number) > 0;
+
+          return (
+            <View key={i} style={[s.card, isCritical && s.cardCritical]}>
+              <Text style={s.cardLabel}>{card.label}</Text>
+              <Text style={[s.cardValue, isCritical && s.cardValueCritical]}>{displayValue}</Text>
+            </View>
+          );
+        })}
+      </View>
+
+      {/* Quick actions */}
+      <View style={s.quickActions}>
+        <Text style={s.sectionTitle}>Quick Actions</Text>
+        <View style={s.actionRow}>
+          <View style={s.actionButton}>
+            <Text style={s.actionIcon}>📊</Text>
+            <Text style={s.actionLabel}>Anomalies</Text>
+          </View>
+          <View style={s.actionButton}>
+            <Text style={s.actionIcon}>🤖</Text>
+            <Text style={s.actionLabel}>AI Analyst</Text>
+          </View>
+          <View style={s.actionButton}>
+            <Text style={s.actionIcon}>🔔</Text>
+            <Text style={s.actionLabel}>Alerts</Text>
+          </View>
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+const s = StyleSheet.create({
+  page: { flex: 1, backgroundColor: c.bg },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: c.bg },
+  greeting: { color: c.muted, fontSize: 14 },
+  name: { color: c.text, fontSize: 28, fontWeight: "900", marginBottom: 20 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  card: {
+    backgroundColor: c.card,
+    borderRadius: 16,
+    padding: 16,
+    width: "47%",
+    borderWidth: 1,
+    borderColor: c.line,
+  },
+  cardCritical: {
+    borderColor: c.red,
+    backgroundColor: c.card + "15",
+  },
+  cardLabel: { color: c.muted, fontSize: 12, fontWeight: "600" },
+  cardValue: { color: c.text, fontSize: 20, fontWeight: "900", marginTop: 6 },
+  cardValueCritical: { color: c.red },
+  quickActions: { marginTop: 24 },
+  sectionTitle: { color: c.text, fontSize: 16, fontWeight: "700", marginBottom: 12 },
+  actionRow: { flexDirection: "row", gap: 12 },
+  actionButton: {
+    backgroundColor: c.card,
+    borderRadius: 12,
+    padding: 14,
+    flex: 1,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: c.line,
+  },
+  actionIcon: { fontSize: 24, marginBottom: 4 },
+  actionLabel: { color: c.muted, fontSize: 11, fontWeight: "600" },
+});

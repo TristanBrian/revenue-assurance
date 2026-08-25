@@ -1,1 +1,29 @@
-{"expo":{"name":"FlowGuard","slug":"flowguard-mobile","scheme":"flowguard","version":"1.0.0","orientation":"default","userInterfaceStyle":"light","newArchEnabled":true,"plugins":["expo-router","expo-secure-store"],"ios":{"supportsTablet":true,"bundleIdentifier":"ke.co.kpc.flowguard"},"android":{"package":"ke.co.kpc.flowguard"},"extra":{"apiUrl":"http://localhost:8000"}}}
+{
+  "expo": {
+    "name": "FlowGuard",
+    "slug": "flowguard-mobile",
+    "scheme": "flowguard",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ke.co.kpc.flowguard"
+    },
+    "android": {
+      "package": "ke.co.kpc.flowguard"
+    },
+    "extra": {
+      "apiUrl": "https://revenue-assurance.fly.dev",
+      "router": {},
+      "eas": {
+        "projectId": "e123b08b-eac0-43c8-8828-fbe7d5f80962"
+      }
+    }
+  }
+}
