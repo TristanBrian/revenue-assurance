@@ -301,7 +301,7 @@ function ReportsContent() {
       {/* Page Header */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500 uppercase tracking-widest leading-none">
+          <span className="text-[10px] font-bold text-[#b3312c] dark:text-[#ec835a] uppercase tracking-widest leading-none">
             FlowGuard Audit & Governance Reporting Center
           </span>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white mt-1">
@@ -314,19 +314,19 @@ function ReportsContent() {
       </header>
 
       {/* Compliance & Governance Banner */}
-      <div className="bg-emerald-50/90 dark:bg-emerald-950/25 border border-emerald-300/80 dark:border-emerald-500/30 rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm my-2">
+      <div className="bg-[#f1ede9]/90 dark:bg-[#2a2725]/90 border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm my-2">
         <div className="flex items-center space-x-4">
-          <div className="p-3.5 bg-emerald-100 dark:bg-emerald-500/15 rounded-xl text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/20 shrink-0">
+          <div className="p-3.5 bg-[#b3312c]/10 dark:bg-[#b3312c]/20 rounded-xl text-[#b3312c] dark:text-[#ec835a] border border-[#b3312c]/20 shrink-0">
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm sm:text-base font-black text-emerald-950 dark:text-emerald-400 uppercase tracking-wide">Governance Health Metric:</span>
-              <span className="text-sm sm:text-base font-extrabold text-emerald-800 dark:text-emerald-300">98.4% Verified Active Consent & KRA PIN Coverage</span>
+              <span className="text-sm sm:text-base font-black text-emerald-950 dark:text-[#ec835a] uppercase tracking-wide">Governance Health Metric:</span>
+              <span className="text-sm sm:text-base font-extrabold text-[#b3312c] dark:text-[#ec835a]">98.4% Verified Active Consent & KRA PIN Coverage</span>
             </div>
-            <p className="text-xs sm:text-sm font-medium text-emerald-900/90 dark:text-zinc-400 mt-1.5 leading-relaxed">
+            <p className="text-xs sm:text-sm font-medium text-[#736c67] dark:text-[#b2aeac] mt-1.5 leading-relaxed">
               Order-to-Cash and Beneficiary Stipend exports are cryptographically signed with SHA-256 digests and audited under KDPA standards.
             </p>
           </div>
@@ -354,8 +354,8 @@ function ReportsContent() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         {/* LEFT COLUMN: Visual Funnel Chart Card (Spans 2 columns) */}
         <div className="lg:col-span-2 flex flex-col gap-6">
-          <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-7 shadow-md flex flex-col gap-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-100 dark:border-slate-800 pb-5">
+          <div className="bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-7 shadow-md flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#e8e3de] dark:border-[#33302c] pb-5">
               <div>
                 <h2 className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">
                   Revenue & Stipend Lifecycle State ({direction.toUpperCase()})
@@ -388,17 +388,17 @@ function ReportsContent() {
               <div className="flex flex-col gap-6">
                 
                 {/* 1. HERO RECOVERY STAT BANNER */}
-                <div className="bg-gradient-to-r from-emerald-900/90 via-slate-900 to-slate-900 border border-emerald-500/40 p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="bg-gradient-to-r from-[#3f201e] via-[#1f1b19] to-[#1f1b19] border border-[#b3312c]/40 p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center space-x-4">
-                    <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+                    <div className="w-14 h-14 rounded-2xl bg-[#b3312c]/20 border border-[#b3312c]/40 flex items-center justify-center text-[#ec835a] shrink-0 shadow-inner">
                       <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
                     <div>
                       <div className="flex items-center space-x-2">
-                        <span className="text-xs font-black uppercase tracking-widest text-emerald-400">HERO VALUE RECOVERY</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        <span className="text-xs font-black uppercase tracking-widest text-[#ec835a]">HERO VALUE RECOVERY</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#0ca30c]/20 text-[#0ca30c] dark:text-[#4ade80] border border-[#0ca30c]/30">
                           {funnelData.payPercent.toFixed(1)}% Settled Cash
                         </span>
                       </div>
@@ -413,7 +413,7 @@ function ReportsContent() {
 
                   <div className="flex flex-col items-start sm:items-end gap-1.5 shrink-0 bg-slate-955/80 border border-slate-800 p-3.5 rounded-xl">
                     <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Identified Risk Exposure</span>
-                    <span className="text-lg font-black font-mono text-rose-400">
+                    <span className="text-lg font-black font-mono text-[#d03b3b]">
                       {formatKesCompact(funnelData.ghostLeak + funnelData.unpaidLeak)}
                     </span>
                     <span className="text-[10px] font-bold text-slate-400">Ghost Loads / Payments + Unpaid Invoices</span>
@@ -429,16 +429,16 @@ function ReportsContent() {
                       onClick={() => handleFunnelStageClick("dispatched")}
                       className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-4 shadow-sm relative ${
                         activeFunnelFilter === "dispatched"
-                          ? "bg-slate-900 border-cyan-500/90 shadow-xl shadow-cyan-500/10 ring-2 ring-cyan-500/40"
-                          : "bg-white dark:bg-slate-950/80 border-zinc-200 dark:border-slate-800 hover:border-cyan-500/50"
+                          ? "bg-slate-900 border-[#2a78d6] shadow-xl shadow-[#2a78d6]/10 ring-2 ring-[#2a78d6]/40"
+                          : "bg-white dark:bg-slate-950/80 border-[#e8e3de] dark:border-[#33302c] hover:border-[#2a78d6]/50"
                       }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
-                          <span className="text-xs font-black uppercase tracking-wider text-cyan-600 dark:text-cyan-400">STAGE 1 CHECKPOINT</span>
+                          <span className="text-xs font-black uppercase tracking-wider text-[#2a78d6]">STAGE 1 CHECKPOINT</span>
                           <h3 className="text-lg font-extrabold text-zinc-900 dark:text-slate-100">Dispatched / Attendance</h3>
                         </div>
-                        <div className="w-11 h-11 rounded-xl border-2 border-cyan-500/40 flex items-center justify-center text-sm font-black font-mono text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-500/10 shrink-0">
+                        <div className="w-11 h-11 rounded-xl border-2 border-[#2a78d6]/40 flex items-center justify-center text-sm font-black font-mono text-[#2a78d6] dark:text-[#60a5fa] bg-[#2a78d6]/10 shrink-0">
                           100%
                         </div>
                       </div>
@@ -450,7 +450,7 @@ function ReportsContent() {
                         </p>
                       </div>
 
-                      <div className="pt-3 border-t border-zinc-200 dark:border-slate-800/80 flex items-center justify-between text-xs font-extrabold text-cyan-700 dark:text-cyan-400">
+                      <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c]/80 flex items-center justify-between text-xs font-extrabold text-[#2a78d6]">
                         <span>Physical Meter Baseline</span>
                         <span>Filter Stage &rarr;</span>
                       </div>
@@ -462,16 +462,16 @@ function ReportsContent() {
                         onClick={() => handleFunnelStageClick("invoiced")}
                         className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-4 shadow-sm relative ${
                           activeFunnelFilter === "invoiced" || activeFunnelFilter === "ghost"
-                            ? "bg-slate-900 border-purple-500/90 shadow-xl shadow-purple-500/10 ring-2 ring-purple-500/40"
-                            : "bg-white dark:bg-slate-955/80 border-zinc-200 dark:border-slate-800 hover:border-purple-500/50"
+                            ? "bg-slate-900 border-[#b3312c] shadow-xl shadow-[#b3312c]/10 ring-2 ring-[#b3312c]/40"
+                            : "bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] hover:border-[#b3312c]/50"
                         }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="space-y-1">
-                            <span className="text-xs font-black uppercase tracking-wider text-purple-600 dark:text-purple-400">STAGE 2 CHECKPOINT</span>
+                            <span className="text-xs font-black uppercase tracking-wider text-[#b3312c] dark:text-[#ec835a]">STAGE 2 CHECKPOINT</span>
                             <h3 className="text-lg font-extrabold text-zinc-900 dark:text-slate-100">Invoices / Authorisations</h3>
                           </div>
-                          <div className="w-11 h-11 rounded-xl border-2 border-purple-500/40 flex items-center justify-center text-sm font-black font-mono text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-500/10 shrink-0">
+                          <div className="w-11 h-11 rounded-xl border-2 border-[#b3312c]/40 flex items-center justify-center text-sm font-black font-mono text-[#b3312c] dark:text-[#ec835a] bg-[#b3312c]/10 shrink-0">
                             {funnelData.invPercent.toFixed(0)}%
                           </div>
                         </div>
@@ -483,7 +483,7 @@ function ReportsContent() {
                           </p>
                         </div>
 
-                        <div className="pt-3 border-t border-zinc-200 dark:border-slate-800/80 flex items-center justify-between text-xs font-extrabold text-purple-700 dark:text-purple-400">
+                        <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c]/80 flex items-center justify-between text-xs font-extrabold text-[#b3312c] dark:text-[#ec835a]">
                           <span>Declared SAP Invoices</span>
                           <span>Filter Stage &rarr;</span>
                         </div>
@@ -494,19 +494,19 @@ function ReportsContent() {
                         onClick={() => handleFunnelStageClick("ghost")}
                         className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between shadow-xs ${
                           activeFunnelFilter === "ghost"
-                            ? "bg-rose-950/90 border-rose-500 text-rose-200 ring-2 ring-rose-500/50"
-                            : "bg-rose-50/90 dark:bg-rose-950/50 border-rose-200 dark:border-rose-500/40 hover:border-rose-500 text-rose-900 dark:text-rose-300"
+                            ? "bg-[#fdecec] dark:bg-[#d03b3b]/20 border-[#d03b3b] text-[#d03b3b] dark:text-[#f87171] ring-2 ring-[#d03b3b]/40"
+                            : "bg-[#fdecec]/60 dark:bg-[#d03b3b]/10 border-[#d03b3b]/30 hover:border-[#d03b3b] text-[#d03b3b] dark:text-[#f87171]"
                         }`}
                       >
                         <div className="flex items-center space-x-3">
-                          <div className="w-3.5 h-3.5 rounded-full bg-rose-500 shrink-0 animate-pulse" />
+                          <div className="w-3.5 h-3.5 rounded-full bg-[#d03b3b] shrink-0 animate-pulse" />
                           <div>
-                            <span className="text-[11px] font-black uppercase tracking-wider block text-rose-700 dark:text-rose-400">LEAKAGE EXCEPTION SIGNAL</span>
+                            <span className="text-[11px] font-black uppercase tracking-wider block text-rose-700 dark:text-[#d03b3b]">LEAKAGE EXCEPTION SIGNAL</span>
                             <span className="text-xs font-extrabold">Ghost Loads / Unbilled Exposure: </span>
-                            <span className="text-xs font-black font-mono text-rose-600 dark:text-rose-300">{formatKesCompact(funnelData.ghostLeak)}</span>
+                            <span className="text-xs font-black font-mono text-[#d03b3b]">{formatKesCompact(funnelData.ghostLeak)}</span>
                           </div>
                         </div>
-                        <span className="text-xs font-black text-rose-600 dark:text-rose-400">&rarr;</span>
+                        <span className="text-xs font-black text-rose-600 dark:text-[#d03b3b]">&rarr;</span>
                       </div>
                     </div>
 
@@ -516,28 +516,28 @@ function ReportsContent() {
                         onClick={() => handleFunnelStageClick("settled")}
                         className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-4 shadow-sm relative ${
                           activeFunnelFilter === "settled" || activeFunnelFilter === "unpaid"
-                            ? "bg-slate-900 border-emerald-500/90 shadow-xl shadow-emerald-500/10 ring-2 ring-emerald-500/40"
-                            : "bg-white dark:bg-slate-955/80 border-zinc-200 dark:border-slate-800 hover:border-emerald-500/50"
+                            ? "bg-slate-900 border-[#0ca30c] shadow-xl shadow-[#0ca30c]/10 ring-2 ring-[#0ca30c]/40"
+                            : "bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] hover:border-[#0ca30c]/50"
                         }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="space-y-1">
-                            <span className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">STAGE 3 CHECKPOINT</span>
+                            <span className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-[#ec835a]">STAGE 3 CHECKPOINT</span>
                             <h3 className="text-lg font-extrabold text-zinc-900 dark:text-slate-100">Settled Cash / Disbursements</h3>
                           </div>
-                          <div className="w-11 h-11 rounded-xl border-2 border-emerald-500/40 flex items-center justify-center text-sm font-black font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/10 shrink-0">
+                          <div className="w-11 h-11 rounded-xl border-2 border-[#0ca30c]/40 flex items-center justify-center text-sm font-black font-mono text-[#0ca30c] dark:text-[#4ade80] bg-[#0ca30c]/10 shrink-0">
                             {funnelData.payPercent.toFixed(0)}%
                           </div>
                         </div>
 
                         <div>
-                          <div className="text-3xl font-black font-mono text-emerald-600 dark:text-emerald-400 tracking-tight">{formatKesCompact(funnelData.pay)}</div>
+                          <div className="text-3xl font-black font-mono text-emerald-600 dark:text-[#ec835a] tracking-tight">{formatKesCompact(funnelData.pay)}</div>
                           <p className="text-xs font-medium text-zinc-600 dark:text-slate-400 mt-1.5 leading-relaxed">
                             Bank remittances verified & stipend payments disbursed.
                           </p>
                         </div>
 
-                        <div className="pt-3 border-t border-zinc-200 dark:border-slate-800/80 flex items-center justify-between text-xs font-extrabold text-emerald-700 dark:text-emerald-400">
+                        <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c]/80 flex items-center justify-between text-xs font-extrabold text-emerald-700 dark:text-[#ec835a]">
                           <span>Bank Remittances Verified</span>
                           <span>Filter Stage &rarr;</span>
                         </div>
@@ -548,19 +548,19 @@ function ReportsContent() {
                         onClick={() => handleFunnelStageClick("unpaid")}
                         className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between shadow-xs ${
                           activeFunnelFilter === "unpaid"
-                            ? "bg-amber-950/90 border-amber-500 text-amber-200 ring-2 ring-amber-500/50"
-                            : "bg-amber-50/90 dark:bg-amber-950/50 border-amber-200 dark:border-amber-500/40 hover:border-amber-500 text-amber-900 dark:text-amber-300"
+                            ? "bg-[#fdf3de] dark:bg-[#b6790a]/20 border-[#b6790a] text-[#b6790a] dark:text-[#fbbf24] ring-2 ring-[#b6790a]/40"
+                            : "bg-[#fdf3de]/60 dark:bg-[#b6790a]/10 border-[#b6790a]/30 hover:border-[#b6790a] text-[#b6790a] dark:text-[#fbbf24]"
                         }`}
                       >
                         <div className="flex items-center space-x-3">
-                          <div className="w-3.5 h-3.5 rounded-full bg-amber-500 shrink-0" />
+                          <div className="w-3.5 h-3.5 rounded-full bg-[#b6790a] shrink-0" />
                           <div>
-                            <span className="text-[11px] font-black uppercase tracking-wider block text-amber-700 dark:text-amber-400">OVERDUE EXCEPTION SIGNAL</span>
+                            <span className="text-[11px] font-black uppercase tracking-wider block text-[#b6790a]">OVERDUE EXCEPTION SIGNAL</span>
                             <span className="text-xs font-extrabold">Unpaid Invoice Exposure: </span>
-                            <span className="text-xs font-black font-mono text-amber-600 dark:text-amber-300">{formatKesCompact(funnelData.unpaidLeak)}</span>
+                            <span className="text-xs font-black font-mono text-[#b6790a]">{formatKesCompact(funnelData.unpaidLeak)}</span>
                           </div>
                         </div>
-                        <span className="text-xs font-black text-amber-600 dark:text-amber-400">&rarr;</span>
+                        <span className="text-xs font-black text-[#b6790a]">&rarr;</span>
                       </div>
                     </div>
 
@@ -577,7 +577,7 @@ function ReportsContent() {
         <div className="flex flex-col gap-6">
           
           {/* Card A: Report Focus Selector */}
-          <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-6 sm:p-7 shadow-md flex flex-col gap-5">
+          <div className="bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-6 sm:p-7 shadow-md flex flex-col gap-5">
             <div>
               <h3 className="text-base font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">Report Focus</h3>
               <p className="text-sm font-medium text-zinc-500 dark:text-slate-400 mt-1">Select the operational or governance view to inspect and export.</p>
@@ -589,13 +589,13 @@ function ReportsContent() {
                 onClick={() => handleReportTypeChange("operational")}
                 className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
                   reportType === "operational"
-                    ? "bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-bold shadow-xs"
-                    : "bg-white dark:bg-slate-955/60 border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
+                    ? "bg-[#b3312c]/10 dark:bg-[#b3312c]/20 border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] font-bold shadow-xs"
+                    : "bg-white dark:bg-slate-955/60 border-[#e8e3de] dark:border-[#33302c] hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
                 }`}
               >
                 <div className="flex items-center justify-between font-bold text-sm sm:text-base">
                   <span>Operational Audit Report</span>
-                  {reportType === "operational" && <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>}
+                  {reportType === "operational" && <span className="w-2.5 h-2.5 rounded-full bg-[#b3312c]"></span>}
                 </div>
                 <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
                   Audits fuel dispatch volume matching & ghost loads (KPC inbound).
@@ -607,13 +607,13 @@ function ReportsContent() {
                 onClick={() => handleReportTypeChange("financial")}
                 className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
                   reportType === "financial"
-                    ? "bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-bold shadow-xs"
-                    : "bg-white dark:bg-slate-955/60 border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
+                    ? "bg-[#b3312c]/10 dark:bg-[#b3312c]/20 border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] font-bold shadow-xs"
+                    : "bg-white dark:bg-slate-955/60 border-[#e8e3de] dark:border-[#33302c] hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
                 }`}
               >
                 <div className="flex items-center justify-between font-bold text-sm sm:text-base">
                   <span>Financial Settlement Report</span>
-                  {reportType === "financial" && <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>}
+                  {reportType === "financial" && <span className="w-2.5 h-2.5 rounded-full bg-[#b3312c]"></span>}
                 </div>
                 <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
                   Audits invoiced value vs banking cash deposits.
@@ -625,13 +625,13 @@ function ReportsContent() {
                 onClick={() => handleReportTypeChange("icms")}
                 className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
                   reportType === "icms"
-                    ? "bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-bold shadow-xs"
-                    : "bg-white dark:bg-slate-955/60 border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
+                    ? "bg-[#b3312c]/10 dark:bg-[#b3312c]/20 border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] font-bold shadow-xs"
+                    : "bg-white dark:bg-slate-955/60 border-[#e8e3de] dark:border-[#33302c] hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
                 }`}
               >
                 <div className="flex items-center justify-between font-bold text-sm sm:text-base">
                   <span>iCMS Tax Sync Report</span>
-                  {reportType === "icms" && <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>}
+                  {reportType === "icms" && <span className="w-2.5 h-2.5 rounded-full bg-[#b3312c]"></span>}
                 </div>
                 <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
                   Audits KRA e-billing status, retries, and failed queues.
@@ -643,13 +643,13 @@ function ReportsContent() {
                 onClick={() => handleReportTypeChange("inuka")}
                 className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
                   reportType === "inuka"
-                    ? "bg-emerald-50/80 dark:bg-emerald-950/50 border-emerald-500 text-emerald-900 dark:text-emerald-300 font-bold shadow-xs"
-                    : "bg-white dark:bg-slate-955/60 border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
+                    ? "bg-[#0ca30c]/10 dark:bg-[#0ca30c]/20 border-[#0ca30c] text-[#0ca30c] dark:text-[#4ade80] font-bold shadow-xs"
+                    : "bg-white dark:bg-slate-955/60 border-[#e8e3de] dark:border-[#33302c] hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
                 }`}
               >
                 <div className="flex items-center justify-between font-bold text-sm sm:text-base">
                   <span>Inuka Stipend Governance Report</span>
-                  {reportType === "inuka" && <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>}
+                  {reportType === "inuka" && <span className="w-2.5 h-2.5 rounded-full bg-[#0ca30c]"></span>}
                 </div>
                 <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
                   Audits beneficiary stipend authorizations & ghost payments (Outbound).
@@ -659,7 +659,7 @@ function ReportsContent() {
           </div>
 
           {/* Card B: Download & Export Trigger */}
-          <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-6 sm:p-7 shadow-md flex flex-col gap-5">
+          <div className="bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-6 sm:p-7 shadow-md flex flex-col gap-5">
             <div>
               <h3 className="text-base font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">Export Settings</h3>
               <p className="text-sm font-medium text-zinc-500 dark:text-slate-400 mt-1">Download formatted files with KDPA data minimization.</p>
@@ -669,7 +669,7 @@ function ReportsContent() {
               <button
                 type="button"
                 onClick={handleExportExcel}
-                className="w-full py-3.5 px-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm sm:text-base rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center space-x-2.5 cursor-pointer"
+                className="w-full py-3.5 px-5 bg-emerald-600 hover:bg-[#0ca30c] text-white font-bold text-sm sm:text-base rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center space-x-2.5 cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -681,7 +681,7 @@ function ReportsContent() {
                 type="button"
                 onClick={handleExportCsv}
                 disabled={exporting}
-                className="w-full py-3.5 px-5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-sm sm:text-base rounded-xl transition border border-slate-200 dark:border-slate-700 flex items-center justify-center space-x-2.5 cursor-pointer"
+                className="w-full py-3.5 px-5 bg-[#f1ede9] dark:bg-[#2a2725] hover:bg-[#e8e3de] dark:hover:bg-[#33302c] text-[#26221f] dark:text-[#f5f2ef] font-bold text-sm sm:text-base rounded-xl transition border border-[#e8e3de] dark:border-[#33302c] flex items-center justify-center space-x-2.5 cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -695,10 +695,10 @@ function ReportsContent() {
       </div>
 
       {/* BOTTOM WORKSPACE SECTION: Report Data Preview Table Grid */}
-      <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-6 shadow-md flex flex-col gap-5">
+      <div className="bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-6 shadow-md flex flex-col gap-5">
         
         {/* Toolbar Header for Table Preview */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-200 dark:border-slate-800 pb-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#e8e3de] dark:border-[#33302c] pb-4">
           <div>
             <h3 className="text-sm font-bold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">
               {reportType === "operational" ? "Operational Audit Log Preview" : 
@@ -718,7 +718,7 @@ function ReportsContent() {
               placeholder="Search active table..."
               value={searchQuery}
               onChange={handleSearchChange}
-              className="w-full bg-zinc-50 dark:bg-slate-955/80 border border-zinc-200 dark:border-slate-800 hover:border-zinc-300 dark:hover:border-slate-700 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2 text-xs text-zinc-800 dark:text-slate-200 placeholder-zinc-400 focus:outline-none transition-all shadow-inner font-medium"
+              className="w-full bg-zinc-50 dark:bg-slate-955/80 border border-[#e8e3de] dark:border-[#33302c] hover:border-zinc-300 dark:hover:border-slate-700 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2 text-xs text-zinc-800 dark:text-slate-200 placeholder-zinc-400 focus:outline-none transition-all shadow-inner font-medium"
             />
           </div>
         </div>
@@ -732,7 +732,7 @@ function ReportsContent() {
           <div className="flex flex-col gap-4">
             
             {/* Table wrapper */}
-            <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-955/90">
+            <div className="overflow-x-auto rounded-xl border border-[#e8e3de] dark:border-[#33302c] bg-[#ffffff] dark:bg-[#221d1a]">
 
               {totalItems === 0 ? (
                 <div className="py-12 text-center text-xs text-zinc-500 italic">
@@ -742,7 +742,7 @@ function ReportsContent() {
                 <table className="w-full min-w-[700px] text-left text-xs">
                   
                   {/* Table Headers */}
-                  <thead className="border-b border-zinc-200 dark:border-slate-800 bg-zinc-100 dark:bg-slate-900/90 text-zinc-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[11px]">
+                  <thead className="border-b border-[#e8e3de] dark:border-[#33302c] bg-[#f1ede9] dark:bg-[#2a2725] text-[#26221f] dark:text-[#f5f2ef] font-bold uppercase tracking-wider text-[11px]">
                     {reportType === "operational" ? (
                       <tr>
                         <th className="px-4 py-3">Dispatch ID</th>
@@ -791,20 +791,20 @@ function ReportsContent() {
                   </thead>
 
                   {/* Table Body Content */}
-                  <tbody className="divide-y divide-zinc-200 dark:divide-zinc-900 text-zinc-700 dark:text-zinc-355">
+                  <tbody className="divide-y divide-[#e8e3de] dark:divide-[#33302c] text-zinc-700 dark:text-zinc-355">
                     
                     {reportType === "operational" &&
                       (paginatedData as Anomaly[]).map((a, i) => (
-                        <tr key={i} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/40 transition-colors">
+                        <tr key={i} className="hover:bg-[#f1ede9]/50 dark:hover:bg-[#2a2725]/50 transition-colors">
                           <td className="px-4 py-3 font-mono font-semibold">{a.dispatch_id}</td>
                           <td className="px-4 py-3 font-medium">{a.customer}</td>
                           <td className="px-4 py-3 font-mono">{a.product}</td>
                           <td className="px-4 py-3 font-mono">{formatKes(a.dispatched_kes)}</td>
                           <td className="px-4 py-3 font-mono">{a.invoice_id ? formatKes(a.invoiced_kes) : "—"}</td>
-                          <td className="px-4 py-3 font-mono font-bold text-rose-600 dark:text-rose-400">{formatKes(a.leakage_kes)}</td>
+                          <td className="px-4 py-3 font-mono font-bold text-rose-600 dark:text-[#d03b3b]">{formatKes(a.leakage_kes)}</td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              a.break_type === "Missing Invoice" ? "bg-rose-500/10 text-rose-500" : "bg-amber-500/10 text-amber-500"
+                              a.break_type === "Missing Invoice" ? "bg-[#d03b3b]/10 text-rose-500" : "bg-[#b6790a]/10 text-amber-500"
                             }`}>
                               {a.break_type}
                             </span>
@@ -813,7 +813,7 @@ function ReportsContent() {
                             <button
                               type="button"
                               onClick={() => setHistoryTarget({ type: "dispatch", id: a.dispatch_id })}
-                              className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded text-[10px] font-mono transition cursor-pointer"
+                              className="px-2 py-1 bg-[#b3312c]/10 hover:bg-[#b3312c]/20 text-indigo-400 border border-indigo-500/20 rounded text-[10px] font-mono transition cursor-pointer"
                             >
                               History
                             </button>
@@ -823,15 +823,15 @@ function ReportsContent() {
 
                     {reportType === "financial" &&
                       (paginatedData as Anomaly[]).map((a, i) => (
-                        <tr key={i} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/40 transition-colors">
+                        <tr key={i} className="hover:bg-[#f1ede9]/50 dark:hover:bg-[#2a2725]/50 transition-colors">
                           <td className="px-4 py-3 font-mono font-semibold">{a.invoice_id ?? "—"}</td>
                           <td className="px-4 py-3 font-mono text-zinc-500">{a.dispatch_id}</td>
                           <td className="px-4 py-3 font-medium">{a.customer}</td>
                           <td className="px-4 py-3 font-mono">{formatKes(a.invoiced_kes)}</td>
                           <td className="px-4 py-3 font-mono">{formatKes(a.paid_kes)}</td>
-                          <td className="px-4 py-3 font-mono font-bold text-rose-600 dark:text-rose-400">{formatKes(a.leakage_kes)}</td>
+                          <td className="px-4 py-3 font-mono font-bold text-rose-600 dark:text-[#d03b3b]">{formatKes(a.leakage_kes)}</td>
                           <td className="px-4 py-3">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#b6790a]/10 text-amber-500">
                               {a.status}
                             </span>
                           </td>
@@ -839,7 +839,7 @@ function ReportsContent() {
                             <button
                               type="button"
                               onClick={() => setHistoryTarget({ type: "invoice", id: a.invoice_id || a.dispatch_id })}
-                              className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded text-[10px] font-mono transition cursor-pointer"
+                              className="px-2 py-1 bg-[#b3312c]/10 hover:bg-[#b3312c]/20 text-indigo-400 border border-indigo-500/20 rounded text-[10px] font-mono transition cursor-pointer"
                             >
                               History
                             </button>
@@ -849,16 +849,16 @@ function ReportsContent() {
 
                     {reportType === "inuka" &&
                       (paginatedData as Anomaly[]).map((a, i) => (
-                        <tr key={i} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/40 transition-colors">
+                        <tr key={i} className="hover:bg-[#f1ede9]/50 dark:hover:bg-[#2a2725]/50 transition-colors">
                           <td className="px-4 py-3 font-mono font-semibold">{a.dispatch_id}</td>
                           <td className="px-4 py-3 font-mono text-zinc-500">{a.invoice_id ?? "—"}</td>
                           <td className="px-4 py-3 font-medium">{a.customer}</td>
                           <td className="px-4 py-3 font-mono">{formatKes(a.dispatched_kes)}</td>
                           <td className="px-4 py-3 font-mono">{formatKes(a.invoiced_kes || a.paid_kes)}</td>
-                          <td className="px-4 py-3 font-mono font-bold text-rose-600 dark:text-rose-400">{formatKes(a.leakage_kes)}</td>
+                          <td className="px-4 py-3 font-mono font-bold text-rose-600 dark:text-[#d03b3b]">{formatKes(a.leakage_kes)}</td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              a.break_type === "Ghost Payment" || a.break_type === "Duplicate Disbursement" ? "bg-rose-500/20 text-rose-400 border border-rose-500/30" : "bg-emerald-500/10 text-emerald-400"
+                              a.break_type === "Ghost Payment" || a.break_type === "Duplicate Disbursement" ? "bg-[#d03b3b]/20 text-[#d03b3b] border border-rose-500/30" : "bg-[#0ca30c]/10 text-[#ec835a]"
                             }`}>
                               {a.break_type}
                             </span>
@@ -867,7 +867,7 @@ function ReportsContent() {
                             <button
                               type="button"
                               onClick={() => setHistoryTarget({ type: "dispatch", id: a.dispatch_id })}
-                              className="px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 rounded text-[10px] font-mono transition cursor-pointer"
+                              className="px-2 py-1 bg-[#0ca30c]/10 hover:bg-[#0ca30c]/20 text-[#ec835a] border border-emerald-500/20 rounded text-[10px] font-mono transition cursor-pointer"
                             >
                               History
                             </button>
@@ -877,13 +877,13 @@ function ReportsContent() {
 
                     {reportType === "icms" &&
                       (paginatedData as EbillingLogEntry[]).map((log, i) => (
-                        <tr key={i} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/40 transition-colors">
+                        <tr key={i} className="hover:bg-[#f1ede9]/50 dark:hover:bg-[#2a2725]/50 transition-colors">
                           <td className="px-4 py-3 font-mono font-semibold">{log.invoice_id}</td>
                           <td className="px-4 py-3 font-medium">{log.customer_name ?? "—"}</td>
                           <td className="px-4 py-3 font-mono">{formatKes(log.value_kes ?? 0)}</td>
                           <td className="px-4 py-3">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              log.status === "synced" ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                              log.status === "synced" ? "bg-[#0ca30c]/10 text-emerald-500" : "bg-[#d03b3b]/10 text-rose-500"
                             }`}>
                               {log.status}
                             </span>
@@ -897,7 +897,7 @@ function ReportsContent() {
                             <button
                               type="button"
                               onClick={() => setHistoryTarget({ type: "invoice", id: log.invoice_id })}
-                              className="px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 rounded text-[10px] font-mono transition cursor-pointer"
+                              className="px-2 py-1 bg-[#b3312c]/10 hover:bg-[#b3312c]/20 text-indigo-400 border border-indigo-500/20 rounded text-[10px] font-mono transition cursor-pointer"
                             >
                               History
                             </button>
@@ -926,7 +926,7 @@ function ReportsContent() {
                   >
                     Previous
                   </button>
-                  <span className="px-3 py-1 text-xs font-bold font-mono border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 rounded">
+                  <span className="px-3 py-1 text-xs font-bold font-mono border border-[#b3312c]/30 bg-[#b3312c]/10 text-[#b3312c] dark:text-[#ec835a] rounded">
                     {currentPage} / {totalPages}
                   </span>
                   <button
