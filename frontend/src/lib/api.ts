@@ -262,6 +262,12 @@ export interface AnomalyFilters {
   breakType?: string;
   status?: string;
   search?: string;
+  /** Outbound only — see backend/app/routes/reconciliation/reconcile.py's
+   * pillar_id/officer_id query params (added for DimensionGroupGrid's
+   * scoped drill-down: /dashboard/outbound/anomalies/[groupId]). No-op
+   * against inbound rows, same as every other filter here. */
+  pillarId?: string;
+  officerId?: string;
 }
 
 export async function getAnomalies(
@@ -279,6 +285,8 @@ export async function getAnomalies(
   if (filters.breakType) url.searchParams.set("break_type", filters.breakType);
   if (filters.status) url.searchParams.set("status", filters.status);
   if (filters.search) url.searchParams.set("search", filters.search);
+  if (filters.pillarId) url.searchParams.set("pillar_id", filters.pillarId);
+  if (filters.officerId) url.searchParams.set("officer_id", filters.officerId);
   const res = await authFetch(url);
   return unwrap<AnomalyTableResult>(res);
 }
