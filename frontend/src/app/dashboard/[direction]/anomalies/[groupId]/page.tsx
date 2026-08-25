@@ -24,13 +24,24 @@ export default function AnomaliesGroupPage() {
 
   if (direction === "inbound") return null;
 
+  // groupId comes back from useParams() still percent-encoded (e.g.
+  // "Inuka%20Scholarship", not "Inuka Scholarship") — decode once here
+  // and reuse everywhere below. Previously only `title` did this; the
+  // undecoded value used to leak into scopeParams, which api.ts's
+  // getAnomalies() then encodes AGAIN via URLSearchParams.set() —
+  // "Inuka%20Scholarship" becomes "Inuka%2520Scholarship" on the wire,
+  // matches zero rows server-side, and the case queue always rendered
+  // empty for any pillar/officer whose id needs escaping (any name with
+  // a space).
+  const decodedGroupId = decodeURIComponent(groupId);
+
   return (
     <RequirePermission code="view_anomaly_table">
       <AnomaliesTable
         direction="outbound"
         config={anomaliesConfig.outbound}
-        scopeParams={by === "officer" ? { officerId: groupId } : { pillarId: groupId }}
-        title={`${decodeURIComponent(groupId)} cases`}
+        scopeParams={by === "officer" ? { officerId: decodedGroupId } : { pillarId: decodedGroupId }}
+        title={`${decodedGroupId} cases`}
         subtitle={`Scoped by ${by === "officer" ? "officer" : "pillar"}`}
       />
     </RequirePermission>
