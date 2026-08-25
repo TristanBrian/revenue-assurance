@@ -11,7 +11,10 @@ import ReportVerifierModal from "@/components/ReportVerifierModal";
 import RecordHistoryDrawer from "@/components/RecordHistoryDrawer";
 import type { Metrics, Anomaly, EbillingLogEntry } from "@/lib/types";
 
-type ReportType = "operational" | "financial" | "icms" | "inuka";
+type Domain = "oil" | "inuka";
+type OilReportType = "operational" | "financial" | "icms";
+type InukaReportType = "inuka_stipend" | "inuka_officer";
+type ReportType = OilReportType | InukaReportType;
 
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", {
@@ -22,19 +25,24 @@ function formatKes(value: number): string {
 }
 
 function formatKesCompact(value: number): string {
-  if (value >= 1e9) {
-    return `KES ${(value / 1e9).toFixed(2)}B`;
-  }
-  if (value >= 1e6) {
-    return `KES ${(value / 1e6).toFixed(2)}M`;
-  }
+  if (value >= 1e9) return `KES ${(value / 1e9).toFixed(2)}B`;
+  if (value >= 1e6) return `KES ${(value / 1e6).toFixed(2)}M`;
   return formatKes(value);
 }
 
 function ReportsContent() {
   const { materiality } = useMateriality();
-  const { direction } = useDirection();
-  const [reportType, setReportType] = useState<ReportType>("operational");
+  const { direction, setDirection } = useDirection();
+  
+  // Current active domain: "oil" or "inuka"
+  const [activeDomain, setActiveDomain] = useState<Domain>(() =>
+    direction === "outbound" ? "inuka" : "oil"
+  );
+
+  // Current active report focus
+  const [reportType, setReportType] = useState<ReportType>(() =>
+    direction === "outbound" ? "inuka_stipend" : "operational"
+  );
 
   // Data states
   const [metrics, setMetrics] = useState<Metrics | null>(null);
@@ -45,59 +53,49 @@ function ReportsContent() {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Governance Modals State
+  // Modals state
   const [isFieldSelectorOpen, setIsFieldSelectorOpen] = useState(false);
   const [isVerifierOpen, setIsVerifierOpen] = useState(false);
   const [isConsentOpen, setIsConsentOpen] = useState(false);
   const [historyTarget, setHistoryTarget] = useState<{ type: string; id: string } | null>(null);
 
-  // Interactive Funnel State
-  const [activeFunnelFilter, setActiveFunnelFilter] = useState<"all" | "dispatched" | "ghost" | "invoiced" | "unpaid" | "settled">("all");
-
-  // Pagination / Search for the preview table
+  // Search & Pagination
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  const handleFunnelStageClick = useCallback((stage: "all" | "dispatched" | "ghost" | "invoiced" | "unpaid" | "settled") => {
-    setActiveFunnelFilter(stage);
+  // Switch domain between Oil and Inuka
+  const handleDomainChange = (domain: Domain) => {
+    setActiveDomain(domain);
     setCurrentPage(1);
-    if (stage === "ghost") {
+    setSearchQuery("");
+    if (domain === "oil") {
+      setDirection("inbound");
       setReportType("operational");
-      setSearchQuery("Missing Invoice");
-    } else if (stage === "unpaid") {
-      setReportType("financial");
-      setSearchQuery("Missing Payment");
-    } else if (stage === "dispatched") {
-      setReportType("operational");
-      setSearchQuery("");
-    } else if (stage === "invoiced") {
-      setReportType("financial");
-      setSearchQuery("");
     } else {
-      setSearchQuery("");
+      setDirection("outbound");
+      setReportType("inuka_stipend");
     }
-  }, []);
+  };
 
-  // Reset page when search or report type changes
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    setCurrentPage(1);
-  }, []);
-
-  const handleReportTypeChange = useCallback((type: ReportType) => {
+  const handleReportTypeChange = (type: ReportType) => {
     setReportType(type);
     setCurrentPage(1);
-  }, []);
+  };
 
-  // Load metrics & anomalies
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    setCurrentPage(1);
+  };
+
+  // Load metrics & data
   useEffect(() => {
     let cancelled = false;
     async function loadData() {
       setLoading(true);
       setError(null);
       try {
-        const metricsRes = await getMetrics(materiality, direction);
+        const metricsRes = await getMetrics(materiality, activeDomain === "oil" ? "inbound" : "outbound");
         if (cancelled) return;
         setMetrics(metricsRes.metrics);
         const anomaliesData = (metricsRes as { anomalies?: Anomaly[] }).anomalies || [];
@@ -110,7 +108,7 @@ function ReportsContent() {
         }
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof ApiError ? err.message : "Failed to load operational & governance data.");
+        setError(err instanceof ApiError ? err.message : "Failed to load report data.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -119,31 +117,9 @@ function ReportsContent() {
     return () => {
       cancelled = true;
     };
-  }, [materiality, direction, reportType]);
+  }, [materiality, activeDomain, reportType]);
 
-  // Funnel calculations
-  const funnelData = useMemo(() => {
-    const disp = metrics?.total_dispatched_kes ?? 0;
-    const inv = metrics?.total_invoiced_kes ?? 0;
-    const pay = metrics?.total_paid_kes ?? 0;
-
-    const ghostLeak = metrics?.missing_invoice_leak ?? 0;
-    const unpaidLeak = metrics?.missing_payment_leak ?? 0;
-
-    return {
-      disp,
-      inv,
-      pay,
-      ghostLeak,
-      unpaidLeak,
-      invPercent: disp > 0 ? (inv / disp) * 100 : 0,
-      payPercent: disp > 0 ? (pay / disp) * 100 : 0,
-      ghostPercent: disp > 0 ? (ghostLeak / disp) * 100 : 0,
-      unpaidPercent: disp > 0 ? (unpaidLeak / disp) * 100 : 0,
-    };
-  }, [metrics]);
-
-  // Filtering table preview data
+  // Filter preview data
   const filteredPreviewData = useMemo(() => {
     const query = searchQuery.toLowerCase();
     if (reportType === "icms") {
@@ -169,7 +145,7 @@ function ReportsContent() {
         return a.break_type === "Missing Invoice" || a.break_type === "Underpayment";
       } else if (reportType === "financial") {
         return a.break_type === "Missing Payment" || a.break_type === "Underpayment" || a.break_type === "Overpayment";
-      } else if (reportType === "inuka") {
+      } else if (reportType === "inuka_stipend" || reportType === "inuka_officer") {
         return (
           a.flow_direction === "outbound" ||
           a.break_type === "Ghost Payment" ||
@@ -190,21 +166,20 @@ function ReportsContent() {
     return filteredPreviewData.slice(start, start + itemsPerPage);
   }, [filteredPreviewData, currentPage]);
 
-  // Trigger Data Minimization Modal before Excel Export
+  // Export handlers
   function handleExportExcel() {
     setIsFieldSelectorOpen(true);
   }
 
-  // Executed after user selects minimized fields
-  async function handleConfirmFilteredExport(fields: string[]) {
+  async function handleConfirmFilteredExport(fields: string[], maskSensitive = true) {
     setExporting(true);
     setError(null);
     try {
-      const blob = await downloadExportWithFields(materiality, fields, direction);
+      const blob = await downloadExportWithFields(materiality, fields, activeDomain === "oil" ? "inbound" : "outbound");
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `flowguard_revenue_governance_m${materiality}_${direction}.xlsx`;
+      a.download = `kpc_${activeDomain}_${reportType}_report_m${materiality}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -217,7 +192,6 @@ function ReportsContent() {
     }
   }
 
-  // Trigger Client-side CSV download
   function handleExportCsv() {
     if (filteredPreviewData.length === 0) {
       alert("No data available to export in the active report filter.");
@@ -226,10 +200,9 @@ function ReportsContent() {
 
     let csvHeaders: string[] = [];
     let csvRows: string[][] = [];
-    let filename = "";
+    let filename = `kpc_${activeDomain}_${reportType}_report.csv`;
 
     if (reportType === "icms") {
-      filename = `kpc_icms_sync_report_m${materiality}.csv`;
       csvHeaders = ["Invoice ID", "Customer Name", "Invoiced Value (KES)", "Sync Status", "Retries", "Sync Date", "Error Details"];
       csvRows = (filteredPreviewData as EbillingLogEntry[]).map((log) => [
         log.invoice_id,
@@ -240,53 +213,21 @@ function ReportsContent() {
         log.sync_date || log.last_attempt || "N/A",
         log.error_message || "None",
       ]);
-    } else if (reportType === "operational") {
-      filename = `kpc_operational_audit_m${materiality}_${direction}.csv`;
-      csvHeaders = ["Dispatch ID", "Invoice ID", "OMC / Beneficiary", "Product / Officer", "Dispatched / Authorized (KES)", "Invoiced / Paid (KES)", "Leakage Gap (KES)", "Category", "Status"];
-      csvRows = (filteredPreviewData as Anomaly[]).map((a) => [
-        a.dispatch_id,
-        a.invoice_id ?? "N/A",
-        a.customer,
-        a.product,
-        String(a.dispatched_kes),
-        String(a.invoiced_kes),
-        String(a.leakage_kes),
-        a.break_type,
-        a.status,
-      ]);
-    } else if (reportType === "inuka") {
-      filename = `inuka_stipend_governance_report_m${materiality}.csv`;
-      csvHeaders = ["Stipend / Dispatch ID", "Disbursement / Invoice ID", "Beneficiary Name", "Officer / Station", "Authorized Amount (KES)", "Disbursed Amount (KES)", "Stipend Exposure (KES)", "Anomaly Type", "Status"];
-      csvRows = (filteredPreviewData as Anomaly[]).map((a) => [
-        a.dispatch_id,
-        a.invoice_id ?? "N/A",
-        a.customer,
-        a.product,
-        String(a.dispatched_kes),
-        String(a.invoiced_kes),
-        String(a.leakage_kes),
-        a.break_type,
-        a.status,
-      ]);
     } else {
-      filename = `kpc_financial_settlement_m${materiality}_${direction}.csv`;
-      csvHeaders = ["Invoice ID", "Dispatch ID", "Customer OMC", "Invoiced Value (KES)", "Paid Amount (KES)", "Outstanding Gap (KES)", "Category", "Reconciliation Status"];
+      csvHeaders = ["Record ID", "Invoice ID", "OMC / Beneficiary", "Product / Category", "Dispatched / Baseline (KES)", "Invoiced / Paid (KES)", "Leakage Gap (KES)", "Status"];
       csvRows = (filteredPreviewData as Anomaly[]).map((a) => [
-        a.invoice_id ?? "N/A",
         a.dispatch_id,
+        a.invoice_id ?? "N/A",
         a.customer,
+        a.product,
+        String(a.dispatched_kes),
         String(a.invoiced_kes),
-        String(a.paid_kes),
         String(a.leakage_kes),
-        a.break_type,
         a.status,
       ]);
     }
 
-    const csvContent =
-      "data:text/csv;charset=utf-8,\uFEFF" +
-      [csvHeaders.join(",")].concat(csvRows.map((row) => row.map((val) => `"${val.replace(/"/g, '""')}"`).join(","))).join("\n");
-
+    const csvContent = "data:text/csv;charset=utf-8," + [csvHeaders.join(","), ...csvRows.map((r) => r.map((c) => `"${c}"`).join(","))].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -296,20 +237,24 @@ function ReportsContent() {
     document.body.removeChild(link);
   }
 
+  function handlePrintPdf() {
+    window.print();
+  }
+
   return (
-    <div className="flex flex-col gap-6 w-full max-w-[1700px] mx-auto px-2 sm:px-4 text-zinc-800 dark:text-zinc-100">
+    <div className="flex flex-col gap-6 w-full max-w-[1700px] mx-auto px-2 sm:px-4 text-[#26221f] dark:text-[#f5f2ef]">
       
       {/* Page Header */}
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 border-b border-[#e8e3de] dark:border-[#33302c]">
         <div>
-          <span className="text-[10px] font-bold text-[#b3312c] dark:text-[#ec835a] uppercase tracking-widest leading-none">
-            FlowGuard Audit & Governance Reporting Center
+          <span className="text-xs font-extrabold text-[#b3312c] dark:text-[#ec835a] uppercase tracking-wider">
+            FlowGuard Revenue Assurance & Governance Center
           </span>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white mt-1">
-            Revenue Assurance & Stipend Governance Reports
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#26221f] dark:text-[#f5f2ef] mt-1">
+            Reports & Audit Center
           </h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Audit operational drops, financial settlements, KRA iCMS tax syncs, and Inuka beneficiary stipends.
+          <p className="text-xs sm:text-sm text-[#736c67] dark:text-[#b2aeac] mt-1">
+            Inspect, filter, export, and verify authentic reports across Oil Revenue Assurance and Inuka Stipend Governance.
           </p>
         </div>
 
@@ -325,8 +270,357 @@ function ReportsContent() {
         </button>
       </header>
 
-      {/* Compliance & Governance Banner */}
-      <div className="bg-[#f1ede9]/90 dark:bg-[#2a2725]/90 border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm my-2">
+      {error && (
+        <div className="rounded-xl border border-[#d03b3b]/30 bg-[#fdecec] dark:bg-[#d03b3b]/20 p-4 text-xs text-[#d03b3b] dark:text-[#f87171]">
+          {error}
+        </div>
+      )}
+
+      {/* 1. TOP SECTION: REPORT FOCUS WITH DOMAIN DISTINCTION */}
+      <section className="bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-6 shadow-sm flex flex-col gap-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#e8e3de] dark:border-[#33302c] pb-4">
+          <div>
+            <h2 className="text-lg font-extrabold text-[#26221f] dark:text-[#f5f2ef] uppercase tracking-wide">
+              Report Focus
+            </h2>
+            <p className="text-xs sm:text-sm font-medium text-[#736c67] dark:text-[#b2aeac] mt-1">
+              Select the operational or governance view to inspect and export
+            </p>
+          </div>
+
+          {/* Domain Switcher Pills */}
+          <div className="flex items-center space-x-2 bg-[#f1ede9] dark:bg-[#2a2725] p-1.5 rounded-xl border border-[#e8e3de] dark:border-[#33302c]">
+            <button
+              type="button"
+              onClick={() => handleDomainChange("oil")}
+              className={`px-4 py-2 text-xs sm:text-sm font-extrabold rounded-lg transition-colors flex items-center space-x-2 ${
+                activeDomain === "oil"
+                  ? "bg-[#b3312c] text-white shadow-sm"
+                  : "text-[#736c67] dark:text-[#b2aeac] hover:text-[#26221f] dark:hover:text-[#f5f2ef]"
+              }`}
+            >
+              <span>🛢️ Oil Revenue Side</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDomainChange("inuka")}
+              className={`px-4 py-2 text-xs sm:text-sm font-extrabold rounded-lg transition-colors flex items-center space-x-2 ${
+                activeDomain === "inuka"
+                  ? "bg-[#b3312c] text-white shadow-sm"
+                  : "text-[#736c67] dark:text-[#b2aeac] hover:text-[#26221f] dark:hover:text-[#f5f2ef]"
+              }`}
+            >
+              <span>🎓 Inuka Side</span>
+            </button>
+          </div>
+        </div>
+
+        {/* DOMAIN SPECIFIC REPORT FOCUS CARDS */}
+        {activeDomain === "oil" ? (
+          /* OIL REVENUE SIDE REPORT FOCUS CARDS */
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Operational Audit */}
+            <div
+              onClick={() => handleReportTypeChange("operational")}
+              className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
+                reportType === "operational"
+                  ? "bg-[#b3312c]/10 dark:bg-[#b3312c]/20 border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] shadow-md ring-2 ring-[#b3312c]/30"
+                  : "bg-[#f1ede9]/50 dark:bg-[#2a2725]/50 border-[#e8e3de] dark:border-[#33302c] hover:border-[#b3312c]/40 text-[#26221f] dark:text-[#f5f2ef]"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold uppercase tracking-wider">Operational Audit</span>
+                {reportType === "operational" && <span className="w-2.5 h-2.5 rounded-full bg-[#b3312c]" />}
+              </div>
+              <p className="text-xs text-[#736c67] dark:text-[#b2aeac] leading-relaxed">
+                Audits fuel dispatch volume matching & ghost loads (KPC inbound).
+              </p>
+            </div>
+
+            {/* Financial Settlement */}
+            <div
+              onClick={() => handleReportTypeChange("financial")}
+              className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
+                reportType === "financial"
+                  ? "bg-[#b3312c]/10 dark:bg-[#b3312c]/20 border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] shadow-md ring-2 ring-[#b3312c]/30"
+                  : "bg-[#f1ede9]/50 dark:bg-[#2a2725]/50 border-[#e8e3de] dark:border-[#33302c] hover:border-[#b3312c]/40 text-[#26221f] dark:text-[#f5f2ef]"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold uppercase tracking-wider">Financial Settlement</span>
+                {reportType === "financial" && <span className="w-2.5 h-2.5 rounded-full bg-[#b3312c]" />}
+              </div>
+              <p className="text-xs text-[#736c67] dark:text-[#b2aeac] leading-relaxed">
+                Audits commercial invoiced values against bank cash deposits.
+              </p>
+            </div>
+
+            {/* iCMS Tax Sync */}
+            <div
+              onClick={() => handleReportTypeChange("icms")}
+              className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
+                reportType === "icms"
+                  ? "bg-[#b3312c]/10 dark:bg-[#b3312c]/20 border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] shadow-md ring-2 ring-[#b3312c]/30"
+                  : "bg-[#f1ede9]/50 dark:bg-[#2a2725]/50 border-[#e8e3de] dark:border-[#33302c] hover:border-[#b3312c]/40 text-[#26221f] dark:text-[#f5f2ef]"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold uppercase tracking-wider">iCMS Tax Declarations</span>
+                {reportType === "icms" && <span className="w-2.5 h-2.5 rounded-full bg-[#b3312c]" />}
+              </div>
+              <p className="text-xs text-[#736c67] dark:text-[#b2aeac] leading-relaxed">
+                Audits KRA electronic billing status, PIN validations & retry logs.
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* INUKA SIDE REPORT FOCUS CARDS */
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Inuka Stipend Governance */}
+            <div
+              onClick={() => handleReportTypeChange("inuka_stipend")}
+              className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
+                reportType === "inuka_stipend"
+                  ? "bg-[#b3312c]/10 dark:bg-[#b3312c]/20 border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] shadow-md ring-2 ring-[#b3312c]/30"
+                  : "bg-[#f1ede9]/50 dark:bg-[#2a2725]/50 border-[#e8e3de] dark:border-[#33302c] hover:border-[#b3312c]/40 text-[#26221f] dark:text-[#f5f2ef]"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold uppercase tracking-wider">Inuka Stipend Governance</span>
+                {reportType === "inuka_stipend" && <span className="w-2.5 h-2.5 rounded-full bg-[#b3312c]" />}
+              </div>
+              <p className="text-xs text-[#736c67] dark:text-[#b2aeac] leading-relaxed">
+                Audits beneficiary attendance, stipend authorizations & MPESA payments (Outbound).
+              </p>
+            </div>
+
+            {/* Officer Assurance */}
+            <div
+              onClick={() => handleReportTypeChange("inuka_officer")}
+              className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-3 ${
+                reportType === "inuka_officer"
+                  ? "bg-[#b3312c]/10 dark:bg-[#b3312c]/20 border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] shadow-md ring-2 ring-[#b3312c]/30"
+                  : "bg-[#f1ede9]/50 dark:bg-[#2a2725]/50 border-[#e8e3de] dark:border-[#33302c] hover:border-[#b3312c]/40 text-[#26221f] dark:text-[#f5f2ef]"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold uppercase tracking-wider">Officer Assurance Profile</span>
+                {reportType === "inuka_officer" && <span className="w-2.5 h-2.5 rounded-full bg-[#b3312c]" />}
+              </div>
+              <p className="text-xs text-[#736c67] dark:text-[#b2aeac] leading-relaxed">
+                Audits officer-attributed risk cases, review notes, and assurance escalations.
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* 2. SECOND SECTION: PREVIEW OF THE REPORT SELECTED */}
+      <section className="bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-6 shadow-sm flex flex-col gap-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[#e8e3de] dark:border-[#33302c] pb-4">
+          <div>
+            <h2 className="text-lg font-extrabold text-[#26221f] dark:text-[#f5f2ef] uppercase tracking-wide">
+              Report Preview ({reportType.toUpperCase()})
+            </h2>
+            <p className="text-xs sm:text-sm font-medium text-[#736c67] dark:text-[#b2aeac] mt-1">
+              Showing real-time records matching active filter options exceeding KES {materiality.toLocaleString()}
+            </p>
+          </div>
+
+          <div className="relative w-full sm:w-72">
+            <input
+              type="text"
+              placeholder="Search records, waybills, OMCs..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              className="w-full px-4 py-2 text-xs bg-[#f7f6f4] dark:bg-[#171310] border border-[#e8e3de] dark:border-[#33302c] rounded-xl text-[#26221f] dark:text-[#f5f2ef] focus:outline-none focus:border-[#b3312c]"
+            />
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <div className="w-8 h-8 rounded-full border-2 border-[#b3312c]/30 border-t-[#b3312c] animate-spin" />
+            <span className="text-xs text-[#736c67] dark:text-[#b2aeac]">Loading report records...</span>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto rounded-xl border border-[#e8e3de] dark:border-[#33302c]">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <thead className="bg-[#f1ede9] dark:bg-[#2a2725] text-[#26221f] dark:text-[#f5f2ef] font-bold uppercase text-[11px] tracking-wider border-b border-[#e8e3de] dark:border-[#33302c]">
+                  <tr>
+                    {reportType === "icms" ? (
+                      <>
+                        <th className="px-4 py-3">Invoice ID</th>
+                        <th className="px-4 py-3">Customer OMC</th>
+                        <th className="px-4 py-3">Value (KES)</th>
+                        <th className="px-4 py-3">KRA iCMS Status</th>
+                        <th className="px-4 py-3">Sync Date</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="px-4 py-3">Record / Waybill</th>
+                        <th className="px-4 py-3">OMC / Beneficiary</th>
+                        <th className="px-4 py-3">Category / Product</th>
+                        <th className="px-4 py-3">Dispatched / Baseline</th>
+                        <th className="px-4 py-3">Leakage / Gap</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-right">Provenance</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#e8e3de] dark:divide-[#33302c]">
+                  {paginatedData.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-12 text-center text-[#736c67] dark:text-[#b2aeac] italic">
+                        No records match the active search and materiality criteria.
+                      </td>
+                    </tr>
+                  ) : reportType === "icms" ? (
+                    (paginatedData as EbillingLogEntry[]).map((log) => (
+                      <tr key={log.id} className="hover:bg-[#f1ede9]/50 dark:hover:bg-[#2a2725]/50 transition-colors">
+                        <td className="px-4 py-3 font-mono font-bold">{log.invoice_id}</td>
+                        <td className="px-4 py-3 font-semibold">{log.customer_name ?? "N/A"}</td>
+                        <td className="px-4 py-3 font-mono">{formatKes(log.value_kes ?? 0)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            log.status === "SUCCESS"
+                              ? "bg-[#0ca30c]/10 text-[#0ca30c] dark:text-[#4ade80] border border-[#0ca30c]/20"
+                              : "bg-[#d03b3b]/10 text-[#d03b3b] dark:text-[#f87171] border border-[#d03b3b]/20"
+                          }`}>
+                            {log.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-[#736c67] dark:text-[#b2aeac]">{log.sync_date || log.last_attempt || "N/A"}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setHistoryTarget({ type: "Invoice", id: log.invoice_id })}
+                            className="px-2.5 py-1 bg-[#b3312c]/10 text-[#b3312c] dark:text-[#ec835a] rounded-lg text-xs font-bold border border-[#b3312c]/20"
+                          >
+                            History
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    (paginatedData as Anomaly[]).map((a) => (
+                      <tr key={a.dispatch_id} className="hover:bg-[#f1ede9]/50 dark:hover:bg-[#2a2725]/50 transition-colors">
+                        <td className="px-4 py-3 font-mono font-bold">{a.dispatch_id}</td>
+                        <td className="px-4 py-3 font-semibold">{a.customer}</td>
+                        <td className="px-4 py-3 text-xs text-[#736c67] dark:text-[#b2aeac]">{a.product}</td>
+                        <td className="px-4 py-3 font-mono">{formatKes(a.dispatched_kes)}</td>
+                        <td className="px-4 py-3 font-mono font-bold text-[#d03b3b] dark:text-[#f87171]">
+                          {formatKes(a.leakage_kes)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            a.status === "Critical"
+                              ? "bg-[#d03b3b]/10 text-[#d03b3b] dark:text-[#f87171] border border-[#d03b3b]/20"
+                              : a.status === "Resolved"
+                              ? "bg-[#0ca30c]/10 text-[#0ca30c] dark:text-[#4ade80] border border-[#0ca30c]/20"
+                              : "bg-[#b6790a]/10 text-[#b6790a] dark:text-[#fbbf24] border border-[#b6790a]/20"
+                          }`}>
+                            {a.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setHistoryTarget({ type: "Dispatch", id: a.dispatch_id })}
+                            className="px-2.5 py-1 bg-[#b3312c]/10 text-[#b3312c] dark:text-[#ec835a] rounded-lg text-xs font-bold border border-[#b3312c]/20"
+                          >
+                            SHA-256 Audit
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between text-xs text-[#736c67] dark:text-[#b2aeac] pt-2">
+              <span>Showing {paginatedData.length ? (currentPage - 1) * itemsPerPage + 1 : 0}–{Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} rows</span>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 bg-[#f1ede9] dark:bg-[#2a2725] text-[#26221f] dark:text-[#f5f2ef] rounded-lg disabled:opacity-40 font-bold border border-[#e8e3de] dark:border-[#33302c]"
+                >
+                  Previous
+                </button>
+                <span className="font-mono font-bold text-[#26221f] dark:text-[#f5f2ef]">Page {currentPage} of {totalPages}</span>
+                <button
+                  type="button"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="px-3 py-1.5 bg-[#f1ede9] dark:bg-[#2a2725] text-[#26221f] dark:text-[#f5f2ef] rounded-lg disabled:opacity-40 font-bold border border-[#e8e3de] dark:border-[#33302c]"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* 3. THIRD SECTION: EXPORT SECTION WITH MULTI-FORMAT PROVISION */}
+      <section className="bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div>
+          <h2 className="text-lg font-extrabold text-[#26221f] dark:text-[#f5f2ef] uppercase tracking-wide">
+            Export Report Data
+          </h2>
+          <p className="text-xs sm:text-sm font-medium text-[#736c67] dark:text-[#b2aeac] mt-1">
+            Download formatted audit files with KDPA data minimization and PII field selection.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          {/* Excel Format */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="px-5 py-3 bg-[#b3312c] hover:bg-[#962723] text-white font-bold text-sm rounded-xl transition shadow-md flex items-center space-x-2 cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Download Excel (.xlsx)</span>
+          </button>
+
+          {/* CSV Format */}
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="px-5 py-3 bg-[#f1ede9] dark:bg-[#2a2725] hover:bg-[#e8e3de] dark:hover:bg-[#33302c] text-[#26221f] dark:text-[#f5f2ef] border border-[#e8e3de] dark:border-[#33302c] font-bold text-sm rounded-xl transition flex items-center space-x-2 cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span>Download CSV (.csv)</span>
+          </button>
+
+          {/* PDF Format */}
+          <button
+            type="button"
+            onClick={handlePrintPdf}
+            className="px-5 py-3 bg-[#2a78d6]/10 hover:bg-[#2a78d6]/20 text-[#2a78d6] dark:text-[#60a5fa] border border-[#2a78d6]/30 font-bold text-sm rounded-xl transition flex items-center space-x-2 cursor-pointer"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            <span>Print PDF Summary (.pdf)</span>
+          </button>
+        </div>
+      </section>
+
+      {/* 4. FOURTH SECTION: GOVERNANCE HEALTH METRIC & CRYPTOGRAPHIC VERIFIER */}
+      <section className="bg-[#f1ede9]/90 dark:bg-[#2a2725]/90 border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 shadow-sm">
         <div className="flex items-center space-x-4">
           <div className="p-3.5 bg-[#b3312c]/10 dark:bg-[#b3312c]/20 rounded-xl text-[#b3312c] dark:text-[#ec835a] border border-[#b3312c]/20 shrink-0">
             <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -335,11 +629,11 @@ function ReportsContent() {
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm sm:text-base font-black text-emerald-950 dark:text-[#ec835a] uppercase tracking-wide">Governance Health Metric:</span>
+              <span className="text-sm sm:text-base font-black text-[#26221f] dark:text-[#f5f2ef] uppercase tracking-wide">Governance Health Metric:</span>
               <span className="text-sm sm:text-base font-extrabold text-[#b3312c] dark:text-[#ec835a]">98.4% Verified Active Consent & KRA PIN Coverage</span>
             </div>
             <p className="text-xs sm:text-sm font-medium text-[#736c67] dark:text-[#b2aeac] mt-1.5 leading-relaxed">
-              Order-to-Cash and Beneficiary Stipend exports are cryptographically signed with SHA-256 digests and audited under KDPA standards.
+              Order-to-Cash and Beneficiary Stipend exports are cryptographically signed with SHA-256 digests and audited under KDPA standards, for verifying authenticity of reports gotten from other people.
             </p>
           </div>
         </div>
@@ -347,451 +641,40 @@ function ReportsContent() {
         <button
           type="button"
           onClick={() => setIsVerifierOpen(true)}
-          className="px-5 py-3 bg-cyan-100 hover:bg-cyan-200 text-cyan-950 border border-cyan-300 dark:bg-cyan-600/20 dark:hover:bg-cyan-600/30 dark:text-cyan-300 dark:border-cyan-500/30 rounded-xl text-sm font-bold transition flex items-center space-x-2 shrink-0 shadow-sm cursor-pointer"
+          className="px-5 py-3 bg-[#2a78d6]/10 hover:bg-[#2a78d6]/20 text-[#2a78d6] dark:text-[#60a5fa] border border-[#2a78d6]/30 rounded-xl text-sm font-bold transition flex items-center space-x-2 shrink-0 shadow-sm cursor-pointer"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
-          <span>Verify Report File Signature</span>
+          <span>Verify Report File Signature (SHA-256 Check)</span>
         </button>
-      </div>
+      </section>
 
-      {error && (
-        <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/40 p-4 text-xs text-red-600 dark:text-red-300">
-          {error}
-        </div>
-      )}
-
-      {/* Main Dual-Domain Reporting Workspace */}
-      <div className="flex flex-col gap-6">
-        {/* Domain & Report Focus Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          
-          {/* KPC Operational Audit */}
-          <div
-            onClick={() => handleReportTypeChange("operational")}
-            className={`p-6 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-4 shadow-sm ${
-              reportType === "operational"
-                ? "bg-[#ffffff] dark:bg-[#221d1a] border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] ring-2 ring-[#b3312c]/30 shadow-md"
-                : "bg-[#ffffff] dark:bg-[#221d1a] border-[#e8e3de] dark:border-[#33302c] hover:border-[#b3312c]/40 text-[#26221f] dark:text-[#f5f2ef]"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="p-2.5 bg-[#b3312c]/10 text-[#b3312c] dark:text-[#ec835a] rounded-xl font-bold text-xs uppercase tracking-wider">
-                🛢️ KPC Oil Side
-              </span>
-              {reportType === "operational" && (
-                <span className="w-3 h-3 rounded-full bg-[#b3312c] animate-pulse" />
-              )}
-            </div>
-            <div>
-              <h3 className="text-base font-extrabold tracking-tight">Operational Dispatch Audit</h3>
-              <p className="text-xs text-[#736c67] dark:text-[#b2aeac] mt-1">
-                Gantry dispatches, physical volume metered, and SAP invoice match logs.
-              </p>
-            </div>
-            <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c] flex items-center justify-between text-xs font-bold text-[#b3312c] dark:text-[#ec835a]">
-              <span>Dispatches & Invoices</span>
-              <span>Select Focus &rarr;</span>
-            </div>
-          </div>
-
-          {/* KPC Financial Settlement */}
-          <div
-            onClick={() => handleReportTypeChange("financial")}
-            className={`p-6 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-4 shadow-sm ${
-              reportType === "financial"
-                ? "bg-[#ffffff] dark:bg-[#221d1a] border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] ring-2 ring-[#b3312c]/30 shadow-md"
-                : "bg-[#ffffff] dark:bg-[#221d1a] border-[#e8e3de] dark:border-[#33302c] hover:border-[#b3312c]/40 text-[#26221f] dark:text-[#f5f2ef]"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="p-2.5 bg-[#0ca30c]/10 text-[#0ca30c] dark:text-[#4ade80] rounded-xl font-bold text-xs uppercase tracking-wider">
-                💳 Cash Settlement
-              </span>
-              {reportType === "financial" && (
-                <span className="w-3 h-3 rounded-full bg-[#0ca30c] animate-pulse" />
-              )}
-            </div>
-            <div>
-              <h3 className="text-base font-extrabold tracking-tight">Financial Settlement Audit</h3>
-              <p className="text-xs text-[#736c67] dark:text-[#b2aeac] mt-1">
-                Bank payment remittances, OMC credit limits, overpayments, and balances.
-              </p>
-            </div>
-            <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c] flex items-center justify-between text-xs font-bold text-[#0ca30c] dark:text-[#4ade80]">
-              <span>Payments & Remittances</span>
-              <span>Select Focus &rarr;</span>
-            </div>
-          </div>
-
-          {/* KPC iCMS Tax Sync */}
-          <div
-            onClick={() => handleReportTypeChange("icms")}
-            className={`p-6 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-4 shadow-sm ${
-              reportType === "icms"
-                ? "bg-[#ffffff] dark:bg-[#221d1a] border-[#2a78d6] text-[#2a78d6] dark:text-[#60a5fa] ring-2 ring-[#2a78d6]/30 shadow-md"
-                : "bg-[#ffffff] dark:bg-[#221d1a] border-[#e8e3de] dark:border-[#33302c] hover:border-[#2a78d6]/40 text-[#26221f] dark:text-[#f5f2ef]"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="p-2.5 bg-[#2a78d6]/10 text-[#2a78d6] dark:text-[#60a5fa] rounded-xl font-bold text-xs uppercase tracking-wider">
-                📑 KRA iCMS Tax
-              </span>
-              {reportType === "icms" && (
-                <span className="w-3 h-3 rounded-full bg-[#2a78d6] animate-pulse" />
-              )}
-            </div>
-            <div>
-              <h3 className="text-base font-extrabold tracking-tight">iCMS Tax Declaration Sync</h3>
-              <p className="text-xs text-[#736c67] dark:text-[#b2aeac] mt-1">
-                KRA electronic billing declarations, PIN validations, and payload logs.
-              </p>
-            </div>
-            <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c] flex items-center justify-between text-xs font-bold text-[#2a78d6] dark:text-[#60a5fa]">
-              <span>Tax Declarations</span>
-              <span>Select Focus &rarr;</span>
-            </div>
-          </div>
-
-          {/* Inuka Fellowship Governance */}
-          <div
-            onClick={() => handleReportTypeChange("inuka")}
-            className={`p-6 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-4 shadow-sm ${
-              reportType === "inuka"
-                ? "bg-[#ffffff] dark:bg-[#221d1a] border-[#b6790a] text-[#b6790a] dark:text-[#fbbf24] ring-2 ring-[#b6790a]/30 shadow-md"
-                : "bg-[#ffffff] dark:bg-[#221d1a] border-[#e8e3de] dark:border-[#33302c] hover:border-[#b6790a]/40 text-[#26221f] dark:text-[#f5f2ef]"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="p-2.5 bg-[#b6790a]/10 text-[#b6790a] dark:text-[#fbbf24] rounded-xl font-bold text-xs uppercase tracking-wider">
-                🎓 Inuka Side
-              </span>
-              {reportType === "inuka" && (
-                <span className="w-3 h-3 rounded-full bg-[#b6790a] animate-pulse" />
-              )}
-            </div>
-            <div>
-              <h3 className="text-base font-extrabold tracking-tight">Inuka Stipend Governance</h3>
-              <p className="text-xs text-[#736c67] dark:text-[#b2aeac] mt-1">
-                Fellowship attendance, calculated stipends, and MPESA/Bank disbursements.
-              </p>
-            </div>
-            <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c] flex items-center justify-between text-xs font-bold text-[#b6790a] dark:text-[#fbbf24]">
-              <span>Stipends & Officers</span>
-              <span>Select Focus &rarr;</span>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Action Controls & Export Bar */}
-        <div className="p-6 rounded-2xl bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
-            <span className="text-sm font-bold uppercase tracking-wider text-[#b3312c] dark:text-[#ec835a]">
-              Report Export Actions:
-            </span>
-            <span className="text-xs font-medium text-[#736c67] dark:text-[#b2aeac]">
-              Active Focus: <strong className="text-[#26221f] dark:text-[#f5f2ef] capitalize">{reportType} Report</strong>
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              className="px-5 py-3 bg-[#b3312c] hover:bg-[#962723] text-white font-bold text-sm rounded-xl transition shadow-md flex items-center space-x-2 cursor-pointer"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span>Download Filtered Excel (.xlsx)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="px-5 py-3 bg-[#f1ede9] dark:bg-[#2a2725] hover:bg-[#e8e3de] dark:hover:bg-[#33302c] text-[#26221f] dark:text-[#f5f2ef] border border-[#e8e3de] dark:border-[#33302c] font-bold text-sm rounded-xl transition flex items-center space-x-2 cursor-pointer"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              <span>Download Active CSV (.csv)</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* BOTTOM WORKSPACE SECTION: Report Data Preview Table Grid */}
-      <div className="bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-6 shadow-md flex flex-col gap-5">
-        
-        {/* Toolbar Header for Table Preview */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#e8e3de] dark:border-[#33302c] pb-4">
-          <div>
-            <h3 className="text-sm font-bold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">
-              {reportType === "operational" ? "Operational Audit Log Preview" : 
-               reportType === "financial" ? "Financial Settlement Match Preview" : 
-               reportType === "inuka" ? "Inuka Stipend Governance Log Preview" :
-               "iCMS Tax Declaration logs"}
-            </h3>
-            <p className="text-xs text-zinc-500 dark:text-slate-400 mt-0.5">
-              Showing active rows exceeding KES {materiality.toLocaleString()} materiality ({direction.toUpperCase()} direction).
-            </p>
-          </div>
-
-          {/* Search bar inside preview header */}
-          <div className="w-full md:w-64 relative">
-            <input
-              type="text"
-              placeholder="Search active table..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-              className="w-full bg-zinc-50 dark:bg-slate-955/80 border border-[#e8e3de] dark:border-[#33302c] hover:border-zinc-300 dark:hover:border-slate-700 focus:border-indigo-500 focus:bg-white rounded-xl px-3.5 py-2 text-xs text-zinc-800 dark:text-slate-200 placeholder-zinc-400 focus:outline-none transition-all shadow-inner font-medium"
-            />
-          </div>
-        </div>
-
-        {/* Loading Preview */}
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <div className="w-6 h-6 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            
-            {/* Table wrapper */}
-            <div className="overflow-x-auto rounded-xl border border-[#e8e3de] dark:border-[#33302c] bg-[#ffffff] dark:bg-[#221d1a]">
-
-              {totalItems === 0 ? (
-                <div className="py-12 text-center text-xs text-zinc-500 italic">
-                  No active logs match the search query or selected materiality.
-                </div>
-              ) : (
-                <table className="w-full min-w-[700px] text-left text-xs">
-                  
-                  {/* Table Headers */}
-                  <thead className="border-b border-[#e8e3de] dark:border-[#33302c] bg-[#f1ede9] dark:bg-[#2a2725] text-[#26221f] dark:text-[#f5f2ef] font-bold uppercase tracking-wider text-[11px]">
-                    {reportType === "operational" ? (
-                      <tr>
-                        <th className="px-4 py-3">Dispatch ID</th>
-                        <th className="px-4 py-3">Customer OMC</th>
-                        <th className="px-4 py-3">Product</th>
-                        <th className="px-4 py-3">Dispatched Value</th>
-                        <th className="px-4 py-3">Invoiced Value</th>
-                        <th className="px-4 py-3">Gap Leakage</th>
-                        <th className="px-4 py-3">Error Category</th>
-                        <th className="px-4 py-3">Audit Log</th>
-                      </tr>
-                    ) : reportType === "financial" ? (
-                      <tr>
-                        <th className="px-4 py-3">Invoice ID</th>
-                        <th className="px-4 py-3">Dispatch ID</th>
-                        <th className="px-4 py-3">Customer OMC</th>
-                        <th className="px-4 py-3">Invoiced Value</th>
-                        <th className="px-4 py-3">Paid Amount</th>
-                        <th className="px-4 py-3">Outstanding Gap</th>
-                        <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3">Audit Log</th>
-                      </tr>
-                    ) : reportType === "inuka" ? (
-                      <tr>
-                        <th className="px-4 py-3">Stipend / Dispatch ID</th>
-                        <th className="px-4 py-3">Disbursement ID</th>
-                        <th className="px-4 py-3">Beneficiary / Customer</th>
-                        <th className="px-4 py-3">Authorized Amount</th>
-                        <th className="px-4 py-3">Disbursed Amount</th>
-                        <th className="px-4 py-3">Stipend Exposure</th>
-                        <th className="px-4 py-3">Governance Alert</th>
-                        <th className="px-4 py-3">Audit Log</th>
-                      </tr>
-                    ) : (
-                      <tr>
-                        <th className="px-4 py-3">Invoice ID</th>
-                        <th className="px-4 py-3">Customer OMC</th>
-                        <th className="px-4 py-3">Invoiced Value</th>
-                        <th className="px-4 py-3">Sync Status</th>
-                        <th className="px-4 py-3">Retries</th>
-                        <th className="px-4 py-3">Last Sync Date</th>
-                        <th className="px-4 py-3">iCMS Error Log</th>
-                        <th className="px-4 py-3">Audit Log</th>
-                      </tr>
-                    )}
-                  </thead>
-
-                  {/* Table Body Content */}
-                  <tbody className="divide-y divide-[#e8e3de] dark:divide-[#33302c] text-zinc-700 dark:text-zinc-355">
-                    
-                    {reportType === "operational" &&
-                      (paginatedData as Anomaly[]).map((a, i) => (
-                        <tr key={i} className="hover:bg-[#f1ede9]/50 dark:hover:bg-[#2a2725]/50 transition-colors">
-                          <td className="px-4 py-3 font-mono font-semibold">{a.dispatch_id}</td>
-                          <td className="px-4 py-3 font-medium">{a.customer}</td>
-                          <td className="px-4 py-3 font-mono">{a.product}</td>
-                          <td className="px-4 py-3 font-mono">{formatKes(a.dispatched_kes)}</td>
-                          <td className="px-4 py-3 font-mono">{a.invoice_id ? formatKes(a.invoiced_kes) : "—"}</td>
-                          <td className="px-4 py-3 font-mono font-bold text-rose-600 dark:text-[#d03b3b]">{formatKes(a.leakage_kes)}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              a.break_type === "Missing Invoice" ? "bg-[#d03b3b]/10 text-rose-500" : "bg-[#b6790a]/10 text-amber-500"
-                            }`}>
-                              {a.break_type}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              onClick={() => setHistoryTarget({ type: "dispatch", id: a.dispatch_id })}
-                              className="px-2 py-1 bg-[#b3312c]/10 hover:bg-[#b3312c]/20 text-indigo-400 border border-indigo-500/20 rounded text-[10px] font-mono transition cursor-pointer"
-                            >
-                              History
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-
-                    {reportType === "financial" &&
-                      (paginatedData as Anomaly[]).map((a, i) => (
-                        <tr key={i} className="hover:bg-[#f1ede9]/50 dark:hover:bg-[#2a2725]/50 transition-colors">
-                          <td className="px-4 py-3 font-mono font-semibold">{a.invoice_id ?? "—"}</td>
-                          <td className="px-4 py-3 font-mono text-zinc-500">{a.dispatch_id}</td>
-                          <td className="px-4 py-3 font-medium">{a.customer}</td>
-                          <td className="px-4 py-3 font-mono">{formatKes(a.invoiced_kes)}</td>
-                          <td className="px-4 py-3 font-mono">{formatKes(a.paid_kes)}</td>
-                          <td className="px-4 py-3 font-mono font-bold text-rose-600 dark:text-[#d03b3b]">{formatKes(a.leakage_kes)}</td>
-                          <td className="px-4 py-3">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#b6790a]/10 text-amber-500">
-                              {a.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              onClick={() => setHistoryTarget({ type: "invoice", id: a.invoice_id || a.dispatch_id })}
-                              className="px-2 py-1 bg-[#b3312c]/10 hover:bg-[#b3312c]/20 text-indigo-400 border border-indigo-500/20 rounded text-[10px] font-mono transition cursor-pointer"
-                            >
-                              History
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-
-                    {reportType === "inuka" &&
-                      (paginatedData as Anomaly[]).map((a, i) => (
-                        <tr key={i} className="hover:bg-[#f1ede9]/50 dark:hover:bg-[#2a2725]/50 transition-colors">
-                          <td className="px-4 py-3 font-mono font-semibold">{a.dispatch_id}</td>
-                          <td className="px-4 py-3 font-mono text-zinc-500">{a.invoice_id ?? "—"}</td>
-                          <td className="px-4 py-3 font-medium">{a.customer}</td>
-                          <td className="px-4 py-3 font-mono">{formatKes(a.dispatched_kes)}</td>
-                          <td className="px-4 py-3 font-mono">{formatKes(a.invoiced_kes || a.paid_kes)}</td>
-                          <td className="px-4 py-3 font-mono font-bold text-rose-600 dark:text-[#d03b3b]">{formatKes(a.leakage_kes)}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              a.break_type === "Ghost Payment" || a.break_type === "Duplicate Disbursement" ? "bg-[#d03b3b]/20 text-[#d03b3b] border border-rose-500/30" : "bg-[#0ca30c]/10 text-[#ec835a]"
-                            }`}>
-                              {a.break_type}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              onClick={() => setHistoryTarget({ type: "dispatch", id: a.dispatch_id })}
-                              className="px-2 py-1 bg-[#0ca30c]/10 hover:bg-[#0ca30c]/20 text-[#ec835a] border border-emerald-500/20 rounded text-[10px] font-mono transition cursor-pointer"
-                            >
-                              History
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-
-                    {reportType === "icms" &&
-                      (paginatedData as EbillingLogEntry[]).map((log, i) => (
-                        <tr key={i} className="hover:bg-[#f1ede9]/50 dark:hover:bg-[#2a2725]/50 transition-colors">
-                          <td className="px-4 py-3 font-mono font-semibold">{log.invoice_id}</td>
-                          <td className="px-4 py-3 font-medium">{log.customer_name ?? "—"}</td>
-                          <td className="px-4 py-3 font-mono">{formatKes(log.value_kes ?? 0)}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              log.status === "synced" ? "bg-[#0ca30c]/10 text-emerald-500" : "bg-[#d03b3b]/10 text-rose-500"
-                            }`}>
-                              {log.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 font-mono">{log.retry_count}</td>
-                          <td className="px-4 py-3 font-mono text-zinc-500">{log.last_attempt || "—"}</td>
-                          <td className="px-4 py-3 max-w-[200px] truncate text-zinc-500" title={log.error_message ?? ""}>
-                            {log.error_message || "—"}
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              onClick={() => setHistoryTarget({ type: "invoice", id: log.invoice_id })}
-                              className="px-2 py-1 bg-[#b3312c]/10 hover:bg-[#b3312c]/20 text-indigo-400 border border-indigo-500/20 rounded text-[10px] font-mono transition cursor-pointer"
-                            >
-                              History
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-
-                  </tbody>
-                </table>
-              )}
-            </div>
-
-            {/* Pagination Controls */}
-            {totalItems > itemsPerPage && (
-              <div className="flex items-center justify-between border-t border-zinc-150 dark:border-zinc-800/80 pt-4">
-                <span className="text-[10px] text-zinc-500">
-                  Showing {Math.min(totalItems, (currentPage - 1) * itemsPerPage + 1)} to{" "}
-                  {Math.min(totalItems, currentPage * itemsPerPage)} of {totalItems} items
-                </span>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1 text-xs font-semibold rounded border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-40 transition-all cursor-pointer bg-white dark:bg-zinc-950"
-                  >
-                    Previous
-                  </button>
-                  <span className="px-3 py-1 text-xs font-bold font-mono border border-[#b3312c]/30 bg-[#b3312c]/10 text-[#b3312c] dark:text-[#ec835a] rounded">
-                    {currentPage} / {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1 text-xs font-semibold rounded border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 disabled:opacity-40 transition-all cursor-pointer bg-white dark:bg-zinc-950"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-
-          </div>
-        )}
-
-      </div>
-
-      {/* Compliance & Governance Modals */}
-      <ConsentModal forceShow={isConsentOpen} onAccept={() => setIsConsentOpen(false)} />
+      {/* Governance Modals */}
       <FieldSelectorModal
         isOpen={isFieldSelectorOpen}
         onClose={() => setIsFieldSelectorOpen(false)}
         onConfirmExport={handleConfirmFilteredExport}
         exporting={exporting}
+        domain={activeDomain}
       />
+
       <ReportVerifierModal
         isOpen={isVerifierOpen}
         onClose={() => setIsVerifierOpen(false)}
       />
-      <RecordHistoryDrawer
-        isOpen={!!historyTarget}
-        onClose={() => setHistoryTarget(null)}
-        targetType={historyTarget?.type || ""}
-        targetId={historyTarget?.id || ""}
+
+      <ConsentModal
+        forceShow={isConsentOpen}
+        onAccept={() => setIsConsentOpen(false)}
       />
 
+      {historyTarget && (
+        <RecordHistoryDrawer
+          target={historyTarget}
+          onClose={() => setHistoryTarget(null)}
+        />
+      )}
     </div>
   );
 }
