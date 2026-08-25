@@ -1,7 +1,6 @@
 {
   "cli": {
-    "version": ">= 16.0.0",
-    "appVersionSource": "remote"
+    "version": ">= 16.0.0"
   },
   "build": {
     "development": {
@@ -9,17 +8,10 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
+      "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true,
-      "env": {
-        "NEXT_PUBLIC_API_URL": "https://revenue-assurance.fly.dev",
-        "EXPO_PUBLIC_API_URL": "https://revenue-assurance.fly.dev"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {

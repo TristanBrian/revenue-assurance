@@ -3,19 +3,21 @@
 Heatmap Service – Aggregates leakage by OMC and Product.
 """
 import pandas as pd
+# import sqlite3  # unused – this module delegates to run_reconciliation()
+# import os
 from app.services.reconciliation.reconciliation import run_reconciliation
-from app.utils.masking import mask_beneficiary_id
+
+# DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'kpc.db')
 
 
 def get_heatmap_data(materiality: float = 0) -> dict:
     """
     Returns a pivot table of leakage (KSh) by customer (OMC) and product.
-    Customer names are masked for privacy.
     """
-    # Run reconciliation to get all anomalies
+    # Run reconciliation to get all anomalies (materiality=0 to include everything)
     result = run_reconciliation(materiality=materiality)
     anomalies = result.get('anomalies', [])
-
+    
     if not anomalies:
         return {
             'data': [],
@@ -23,10 +25,10 @@ def get_heatmap_data(materiality: float = 0) -> dict:
             'products': [],
             'total_leakage': 0
         }
-
+    
     # Convert to DataFrame
     df = pd.DataFrame(anomalies)
-
+    
     # If no leakage data, return empty
     if df.empty or 'leakage_kes' not in df.columns:
         return {
@@ -35,10 +37,7 @@ def get_heatmap_data(materiality: float = 0) -> dict:
             'products': [],
             'total_leakage': 0
         }
-
-    # MASK CUSTOMER NAMES BEFORE PIVOTING
-    df['customer'] = df['customer'].apply(mask_beneficiary_id)
-
+    
     # Pivot table: rows = customer, columns = product, values = leakage_kes
     pivot = df.pivot_table(
         index='customer',
