@@ -78,17 +78,17 @@ export default function CsvUploadPanel({
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-foreground">{f.label}</span>
+                <span className="text-base font-extrabold text-foreground">{f.label}</span>
                 <button
                   type="button"
                   onClick={() => handleTemplateDownload(f.key)}
-                  className="text-[10px] font-medium text-muted-foreground underline hover:text-foreground"
+                  className="text-xs font-bold text-[#b3312c] dark:text-[#ec835a] underline hover:text-primary"
                 >
                   template
                 </button>
               </div>
-              <p className="text-[10px] text-muted-foreground leading-snug">{f.hint}</p>
-              <label className="mt-1 flex items-center justify-center rounded-md border border-dashed border-border bg-card py-2 text-[11px] font-medium text-muted-foreground hover:border-ring cursor-pointer transition-colors">
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">{f.hint}</p>
+              <label className="mt-1 flex items-center justify-center rounded-md border border-dashed border-border bg-card py-3 px-4 text-xs sm:text-sm font-bold text-foreground bg-background hover:border-primary cursor-pointer transition-colors">
                 <input
                   type="file"
                   accept=".csv"
@@ -109,7 +109,7 @@ export default function CsvUploadPanel({
       <button
         type="submit"
         disabled={!allSelected || submitting}
-        className="self-start rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40 transition-opacity hover:opacity-90"
+        className="self-start rounded-md bg-primary px-4 py-2 text-base font-bold text-primary-foreground disabled:opacity-40 transition-all hover:bg-primary/90 shadow-md py-3 px-6 rounded-xl"
       >
         {phase === "uploading"
           ? `Uploading… ${uploadPercent}%`
