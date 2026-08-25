@@ -14,7 +14,7 @@ import { riskConfig } from "@/config/direction-config";
 // the outer ring as circles; Depot/Beneficiary are the inner ring as
 // squares — same visual grammar reused for both directions rather than a
 // second graph component.
-const OUTER_TYPES = new Set(["omc", "officer"]);
+const INBOUND_OUTER_TYPES = new Set(["omc"]);
 const NODE_TYPE_LABEL: Record<string, string> = {
   omc: "OMC",
   depot: "Depot",
@@ -87,7 +87,8 @@ interface FraudGraphProps {
 }
 
 export default function FraudGraph({ direction }: FraudGraphProps) {
-  const { materiality } = useMateriality(); // ✅ Get from context
+  const { materiality } = useMateriality();
+  const outerNodeTypes = useMemo(() => (direction === "outbound" ? new Set(["beneficiary"]) : INBOUND_OUTER_TYPES), [direction]);
   const [graph, setGraph] = useState<FraudGraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,14 +129,14 @@ export default function FraudGraph({ direction }: FraudGraphProps) {
     const omcRadius = Math.min(WIDTH, HEIGHT) / 2 - 70;
 
     const omcNodes = [...graph.nodes]
-      .filter((n) => OUTER_TYPES.has(n.type))
+      .filter((n) => outerNodeTypes.has(n.type))
       .sort(
         (a, b) =>
           RISK_RANK[b.risk_level] - RISK_RANK[a.risk_level] ||
           b.leakage_kes - a.leakage_kes,
       );
     const depotNodes = [...graph.nodes]
-      .filter((n) => !OUTER_TYPES.has(n.type))
+      .filter((n) => !outerNodeTypes.has(n.type))
       .sort((a, b) => b.leakage_kes - a.leakage_kes);
     const depotRadius =
       depotNodes.length > 1 ? Math.min(60, 16 + depotNodes.length * 6) : 0;
@@ -163,7 +164,7 @@ export default function FraudGraph({ direction }: FraudGraphProps) {
 
     return graph.nodes.map((n) => {
       const pos = positions.get(n.id) ?? { x: centerX, y: centerY };
-      const isDepot = !OUTER_TYPES.has(n.type);
+      const isDepot = !outerNodeTypes.has(n.type);
       const base = isDepot ? 9 : 6;
       const extra = isDepot ? 9 : 13;
       const maxLeakage = isDepot ? maxDepotLeakage : maxOmcLeakage;
@@ -175,7 +176,7 @@ export default function FraudGraph({ direction }: FraudGraphProps) {
         r: base + extra * t,
       };
     });
-  }, [graph]);
+  }, [graph, outerNodeTypes]);
 
   const nodeById = useMemo(() => {
     const map = new Map<string, (typeof laidOutNodes)[0]>();
@@ -260,16 +261,12 @@ export default function FraudGraph({ direction }: FraudGraphProps) {
         <>
           <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3">
             <span className="flex items-center gap-1.5 font-medium">
-              <svg width="10" height="10">
-                <circle cx="5" cy="5" r="5" className="fill-zinc-500 dark:fill-zinc-400" />
-              </svg>
-              OMC (Circle)
+              <svg width="10" height="10"><circle cx="5" cy="5" r="5" className="fill-zinc-500 dark:fill-zinc-400" /></svg>
+              {direction === "outbound" ? "Beneficiary (Circle)" : "OMC (Circle)"}
             </span>
             <span className="flex items-center gap-1.5 font-medium">
-              <svg width="10" height="10">
-                <rect width="10" height="10" rx="2" className="fill-zinc-500 dark:fill-zinc-400" />
-              </svg>
-              Depot (Square)
+              <svg width="10" height="10"><rect width="10" height="10" rx="2" className="fill-zinc-500 dark:fill-zinc-400" /></svg>
+              {direction === "outbound" ? "Officer (Square)" : "Depot (Square)"}
             </span>
             <span className="flex items-center gap-1.5 font-medium">
               <svg width="10" height="10">
@@ -375,7 +372,7 @@ export default function FraudGraph({ direction }: FraudGraphProps) {
                         />
                       )}
 
-                      {OUTER_TYPES.has(node.type) ? (
+                      {outerNodeTypes.has(node.type) ? (
                         <circle
                           cx={node.x}
                           cy={node.y}
