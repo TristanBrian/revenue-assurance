@@ -83,6 +83,10 @@ export type Anomaly = {
   fraud_score?: number | null;
 };
 export type Alert = { id: string; title: string; message: string; severity: string; created_at: string; is_read: boolean };
+export type RiskLevel = "Low" | "Medium" | "High" | "Critical";
+export type GraphNode = { id: string; label: string; type: "omc" | "depot" | "officer" | "beneficiary"; leakage_kes: number; risk_level: RiskLevel; community_id?: number | null };
+export type GraphEdge = { source: string; target: string; weight: number; anomaly_count: number; shared_account?: boolean };
+export type FraudGraph = { nodes: GraphNode[]; edges: GraphEdge[]; communities: { id: number; node_ids: string[]; member_count: number; total_leakage_kes: number; risk_level: RiskLevel }[]; summary: { node_count: number; edge_count: number; community_count: number; top_risk_entities: GraphNode[] } };
 
 async function req<T>(path: string, init: RequestInit = {}, auth = true): Promise<T> {
   const h = new Headers(init.headers);
@@ -120,6 +124,7 @@ export const session = async () => !!(await getItem(key));
 export const logout = () => deleteItem(key);
 
 export async function metrics(d: Direction) {
+  if (process.env.EXPO_PUBLIC_PREVIEW_MODE === "true") return { total_paid_kes: 1_204_780_000, total_leakage_kes: 218_030_000, reconciliation_rate: 82.1, anomaly_count: 726, critical_count: 726, pending_count: 41, review_count: 20 };
   return (await req<{ metrics: Metrics }>("/api/reconcile/metrics?materiality=100000&direction=" + d, { method: "POST" })).metrics;
 }
 
@@ -130,6 +135,16 @@ export async function anomalies(d: Direction) {
 export async function alerts() {
   const x = await req<{ alerts?: Alert[]; items?: Alert[] }>("/api/alerts?page=1&page_size=30");
   return x.alerts ?? x.items ?? [];
+}
+
+export async function fraudGraph(direction: "inbound" | "outbound") {
+  if (process.env.EXPO_PUBLIC_PREVIEW_MODE === "true") {
+    const inbound: GraphNode[] = [{id:"OMC-17",label:"Petro Kenya",type:"omc",leakage_kes:42_800_000,risk_level:"Critical",community_id:1},{id:"DEP-NBI",label:"Nairobi Depot",type:"depot",leakage_kes:38_200_000,risk_level:"High",community_id:1},{id:"OMC-04",label:"Lake Oil",type:"omc",leakage_kes:27_400_000,risk_level:"High",community_id:1},{id:"DEP-ELD",label:"Eldoret Depot",type:"depot",leakage_kes:19_700_000,risk_level:"Medium",community_id:2},{id:"OMC-11",label:"Rift Energy",type:"omc",leakage_kes:16_900_000,risk_level:"High",community_id:2}];
+    const outbound: GraphNode[] = [{id:"OFF-09",label:"A. Mwangi",type:"officer",leakage_kes:12_600_000,risk_level:"Critical",community_id:1},{id:"BEN-221",label:"Beneficiary 221",type:"beneficiary",leakage_kes:8_900_000,risk_level:"High",community_id:1},{id:"BEN-145",label:"Beneficiary 145",type:"beneficiary",leakage_kes:7_400_000,risk_level:"High",community_id:1},{id:"OFF-14",label:"J. Otieno",type:"officer",leakage_kes:5_800_000,risk_level:"Medium",community_id:2},{id:"BEN-307",label:"Beneficiary 307",type:"beneficiary",leakage_kes:4_300_000,risk_level:"High",community_id:2}];
+    const nodes=direction==="inbound"?inbound:outbound;const edges=nodes.slice(1).map((n,i)=>({source:i<2?nodes[0].id:nodes[3].id,target:n.id,weight:n.leakage_kes,anomaly_count:9-i,shared_account:direction==="outbound"&&i===1}));
+    return {nodes,edges,communities:[{id:1,node_ids:nodes.slice(0,3).map(n=>n.id),member_count:3,total_leakage_kes:nodes.slice(0,3).reduce((a,n)=>a+n.leakage_kes,0),risk_level:"Critical" as RiskLevel},{id:2,node_ids:nodes.slice(3).map(n=>n.id),member_count:2,total_leakage_kes:nodes.slice(3).reduce((a,n)=>a+n.leakage_kes,0),risk_level:"High" as RiskLevel}],summary:{node_count:nodes.length,edge_count:edges.length,community_count:2,top_risk_entities:nodes.slice(0,3)}};
+  }
+  return req<{status:string;data:FraudGraph}>(`/api/graph?materiality=100000&direction=${direction}`).then(x=>x.data);
 }
 
 export const readAlert = (id: string) => req("/api/alerts/" + encodeURIComponent(id) + "/read", { method: "POST" });
