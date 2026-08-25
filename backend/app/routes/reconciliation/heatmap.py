@@ -65,6 +65,14 @@ def heatmap(
 
         df = pd.DataFrame(anomalies)
 
+        # Outbound rows are beneficiary assurance records. Keep the explorer ID-based; names remain limited to detail screens.
+        if direction == "outbound" and "beneficiary_id" in df.columns:
+            df["customer"] = df["beneficiary_id"].fillna("Unknown beneficiary ID")
+
+        # Outbound rows are beneficiary assurance records. Keep the explorer ID-based; names remain limited to detail screens.
+        if direction == "outbound" and "beneficiary_id" in df.columns:
+            df["customer"] = df["beneficiary_id"].fillna("Unknown beneficiary ID")
+
         # Ensure required columns exist
         if 'customer' not in df.columns or 'product' not in df.columns:
             return {

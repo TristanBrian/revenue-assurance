@@ -78,7 +78,7 @@ def _case(case_id: str, risk_type: str, title: str, reason: str, *, beneficiary_
     }
 
 
-def build_inuka_cases(materiality: float = 0) -> dict[str, Any]:
+def build_inuka_cases(materiality: float = 0, *, include_sensitive: bool = False) -> dict[str, Any]:
     """Build an explainable, stable case list from the outbound source data."""
     result = run_outbound_reconciliation(materiality=materiality)
     cases: list[dict[str, Any]] = []
@@ -171,22 +171,17 @@ def build_inuka_cases(materiality: float = 0) -> dict[str, Any]:
                 attendance_id = _text(getattr(row, "attendance_id", None)) or "unknown"
                 cases.append(_case(f"EVIDENCE-STATUS-{attendance_id}", "weak_participation_evidence", "Participation evidence not verified", f"Attendance status is {status}; an independent verification is required before payout.", beneficiary_id=_text(getattr(row, "beneficiary_id", None)), officer_id=_text(getattr(row, "officer_id", None)), pillar_id=_text(getattr(row, "pillar_id", None)), period=_text(getattr(row, "period", None)), risk_score=65, severity="Review Required", source_records=[attendance_id], confidence="low"))
 
-    # Deduplicate generated cases by id while preserving highest exposure.
-    unique: dict[str, dict[str, Any]] = {}
-    for item in cases:
-        prior = unique.get(item["case_id"])
-        if prior is None or item["risk_score"] > prior["risk_score"]:
-            unique[item["case_id"]] = item
-    ordered = sorted(unique.values(), key=lambda x: (x["risk_score"], x["amount_at_risk"]), reverse=True)
-    for item in ordered:
-        beneficiary_id = item.get("beneficiary_id")
-        officer_id = item.get("officer_id")
-        item["beneficiary_name"] = beneficiary_names.get(str(beneficiary_id)) if beneficiary_id else None
-        item["identity_status"] = "verified" if item["beneficiary_name"] else ("missing_master_record" if beneficiary_id else "not_applicable")
-        item["officer_name"] = officer_names.get(str(officer_id)) if officer_id else None
+    ordered = _group_cases(cases, disbursements, authorizations, attendance)
+    if include_sensitive:
+        for item in ordered:
+            beneficiary_id = item.get("beneficiary_id")
+            officer_id = item.get("officer_id")
+            item["beneficiary_name"] = beneficiary_names.get(str(beneficiary_id)) if beneficiary_id else None
+            item["identity_status"] = "verified" if item["beneficiary_name"] else ("missing_master_record" if beneficiary_id else "not_applicable")
     by_type = defaultdict(int)
     for item in ordered:
-        by_type[item["risk_type"]] += 1
+        for signal in item["signals"]:
+            by_type[signal["label"]] += 1
 
     return {
         "cases": ordered,
@@ -231,3 +226,130 @@ def dimension_summary(dimension: str) -> list[dict[str, Any]]:
         row["critical_count"] += item["severity"] == "Critical"
         row["amount_at_risk"] += item["amount_at_risk"]
     return sorted(grouped.values(), key=lambda x: x["amount_at_risk"], reverse=True)
+_SIGNAL_WEIGHTS = {
+    "ghost_beneficiary": 98,
+    "ghost_payment": 95,
+    "duplicate_payment": 92,
+    "overpayment": 90,
+    "inactive_beneficiary": 88,
+    "missing_authorization": 82,
+    "missing_disbursement": 78,
+    "underpayment": 72,
+    "shared_payment_account": 70,
+    "weak_participation_evidence": 62,
+}
+_CONFIDENCE_RANK = {"low": 1, "medium": 2, "high": 3}
+
+
+def _signal_score(signal: dict[str, Any]) -> int:
+    return _SIGNAL_WEIGHTS.get(signal.get("risk_type", ""), 50)
+
+
+def _case_group_key(case: dict[str, Any], disbursements: pd.DataFrame,
+                    authorizations: pd.DataFrame, attendance: pd.DataFrame) -> tuple[str, str | None]:
+    source_ids = {str(value) for value in case.get("source_records", []) if value}
+    disb_ids = set(disbursements.get("disbursement_id", pd.Series(dtype=str)).dropna().astype(str))
+    direct = sorted(source_ids & disb_ids)
+    if direct:
+        return f"DISB:{direct[0]}", direct[0]
+
+    attendance_ids = set(attendance.get("attendance_id", pd.Series(dtype=str)).dropna().astype(str))
+    attendance_id = next(iter(source_ids & attendance_ids), None)
+    auth_ids = set(authorizations.get("authorization_id", pd.Series(dtype=str)).dropna().astype(str))
+    auth_id = next((str(value) for value in source_ids if str(value) in auth_ids), None)
+    if attendance_id and "attendance_id" in authorizations.columns:
+        rows = authorizations[authorizations["attendance_id"].astype(str) == attendance_id]
+        if not rows.empty and "authorization_id" in rows.columns:
+            auth_id = _text(rows.iloc[0].get("authorization_id"))
+    if auth_id and "authorization_id" in disbursements.columns:
+        rows = disbursements[disbursements["authorization_id"].astype(str) == auth_id]
+        if not rows.empty and "disbursement_id" in rows.columns:
+            primary = _text(rows.iloc[0].get("disbursement_id"))
+            if primary:
+                return f"DISB:{primary}", primary
+
+    beneficiary_id = case.get("beneficiary_id")
+    period = case.get("period")
+    if attendance_id and (not beneficiary_id or not period) and "attendance_id" in attendance.columns:
+        attendance_rows = attendance[attendance["attendance_id"].astype(str) == attendance_id]
+        if not attendance_rows.empty:
+            beneficiary_id = beneficiary_id or _text(attendance_rows.iloc[0].get("beneficiary_id"))
+            period = period or _text(attendance_rows.iloc[0].get("period"))
+    if beneficiary_id and period and {"beneficiary_id", "period", "disbursement_id"}.issubset(disbursements.columns):
+        rows = disbursements[
+            (disbursements["beneficiary_id"].astype(str) == str(beneficiary_id))
+            & (disbursements["period"].astype(str) == str(period))
+        ]
+        if not rows.empty:
+            primary = _text(rows.iloc[0].get("disbursement_id"))
+            if primary:
+                return f"DISB:{primary}", primary
+
+    if attendance_id:
+        return f"ATT:{attendance_id}", attendance_id
+    if beneficiary_id:
+        return f"BEN:{beneficiary_id}:{period or 'unknown'}", None
+    return f"SIGNAL:{case['case_id']}", None
+
+
+def _group_cases(cases: list[dict[str, Any]], disbursements: pd.DataFrame,
+                 authorizations: pd.DataFrame, attendance: pd.DataFrame) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for signal in cases:
+        key, primary_record_id = _case_group_key(signal, disbursements, authorizations, attendance)
+        case_reference = primary_record_id or key.replace(":", "-")
+        group = grouped.setdefault(key, {
+            "case_id": f"INUKA-{case_reference}",
+            "primary_record_id": primary_record_id,
+            "signals": [],
+            "source_records": [],
+            "beneficiary_id": signal.get("beneficiary_id"),
+            "officer_id": signal.get("officer_id"),
+            "pillar_id": signal.get("pillar_id"),
+            "program_id": signal.get("program_id"),
+            "period": signal.get("period"),
+            "status": "Open",
+            "review_status": "Open",
+        })
+        group["signals"].append({
+            "risk_type": signal["risk_type"],
+            "label": signal["title"],
+            "reason": signal["reason"],
+            "amount_at_risk": signal["amount_at_risk"],
+            "severity": signal["severity"],
+            "confidence": signal["confidence"],
+            "source_records": signal["source_records"],
+        })
+        group["source_records"] = sorted(set(group["source_records"]) | set(signal.get("source_records", [])))
+        for field in ("beneficiary_id", "officer_id", "pillar_id", "program_id", "period"):
+            if not group.get(field) and signal.get(field):
+                group[field] = signal[field]
+
+    result: list[dict[str, Any]] = []
+    severity_rank = {"Critical": 3, "Review Required": 2, "Pending": 1}
+    for group in grouped.values():
+        signals = group.pop("signals")
+        signals.sort(key=lambda item: (_signal_score(item), item["amount_at_risk"]), reverse=True)
+        max_score = max((_signal_score(item) for item in signals), default=50)
+        score = min(100, max_score + min(10, max(0, (len(signals) - 1) * 3)))
+        confidence = max((item["confidence"] for item in signals), key=lambda value: _CONFIDENCE_RANK.get(value, 0), default="low")
+        severity = max((item["severity"] for item in signals), key=lambda value: severity_rank.get(value, 0), default="Review Required")
+        group.update({
+            "risk_type": "grouped_outbound_case",
+            "title": "Outbound payment case",
+            "reason": f"{len(signals)} control signal{'s' if len(signals) != 1 else ''} require review.",
+            "signal_types": [item["label"] for item in signals],
+            "amount_at_risk": max((item["amount_at_risk"] for item in signals), default=0),
+            "risk_score": score,
+            "fraud_score": score,
+            "fraud_tier": "Likely Fraud" if score >= 90 else ("Suspicious" if score >= 70 else "Likely Benign"),
+            "score_basis": [item["label"] for item in signals],
+            "severity": severity,
+            "confidence": confidence,
+            "identity_status": "unresolved" if group.get("beneficiary_id") else "not_applicable",
+            "beneficiary_name": None,
+            "officer_name": None,
+            "signals": signals,
+        })
+        result.append(group)
+    return sorted(result, key=lambda item: (item["risk_score"], item["amount_at_risk"]), reverse=True)

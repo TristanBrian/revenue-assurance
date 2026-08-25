@@ -125,6 +125,23 @@ def _recipient_emails(
     return [u.email for u in users if u.id != exclude_user_id]
 
 
+def alert_workspace(alert: Alert) -> str:
+    """Return the assurance workspace an alert belongs to.
+
+    Legacy alerts predate the workspace split and are treated as inbound/Oil
+    unless their stable identifier explicitly marks them as Inuka. New
+    outbound graph alerts use the ``cluster_outbound`` related type.
+    """
+    related_type = (alert.related_type or "").lower()
+    related_id = str(alert.related_id or "").upper()
+    category = (alert.category or "").lower()
+    if related_type in {"inuka_case", "inuka_disbursement", "inuka_cluster", "cluster_outbound"}:
+        return "outbound"
+    if related_id.startswith("INUKA-") or category.startswith("inuka_"):
+        return "outbound"
+    return "inbound"
+
+
 def _user_can_see(alert: Alert, perm_codes: set, role_names: set, user_id) -> bool:
     if alert.exclude_user_id is not None and alert.exclude_user_id == user_id:
         return False
@@ -567,7 +584,7 @@ def _cluster_identity(node_ids: list[str]) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
 
 
-def notify_fraud_clusters(db: Session, communities: list[dict]) -> list[Alert]:
+def notify_fraud_clusters(db: Session, communities: list[dict], workspace: str = "inbound") -> list[Alert]:
     """
     One Alert row per newly-seen High-risk cluster (identity = hash of its
     sorted OMC-id set — see alert_types.REGISTRY's notes), one digest email
@@ -606,7 +623,7 @@ def notify_fraud_clusters(db: Session, communities: list[dict]) -> list[Alert]:
             category=AlertType.FRAUD_CLUSTER_NEW.value,
             target_permissions=list(meta.target_permissions) or None,
             target_roles=list(meta.target_roles) or None,
-            related_type="cluster",
+            related_type="cluster_outbound" if workspace == "outbound" else "cluster",
             related_id=cluster_id,
         )
         db.add(alert)
@@ -800,12 +817,13 @@ def list_alerts_for_user(
     unread_only: bool = False,
     page: int = 1,
     page_size: int = 50,
+    workspace: str | None = None,
 ) -> tuple[list[Alert], int, int]:
     perm_codes = set(user.permission_codes())
     role_names = {r.name for r in user.roles}
     read_ids = {row[0] for row in db.query(AlertRead.alert_id).filter(AlertRead.user_id == user.id).all()}
 
-    visible = [a for a in _recent_alerts(db) if _user_can_see(a, perm_codes, role_names, user.id)]
+    visible = [a for a in _recent_alerts(db) if _user_can_see(a, perm_codes, role_names, user.id) and (workspace is None or alert_workspace(a) == workspace)]
     unread_count = sum(1 for a in visible if a.id not in read_ids)
 
     if unread_only:
@@ -842,14 +860,14 @@ def mark_alert_read(db: Session, alert_id: str, user_id) -> bool:
     return True
 
 
-def mark_all_read(db: Session, user: User) -> int:
+def mark_all_read(db: Session, user: User, workspace: str | None = None) -> int:
     perm_codes = set(user.permission_codes())
     role_names = {r.name for r in user.roles}
     read_ids = {row[0] for row in db.query(AlertRead.alert_id).filter(AlertRead.user_id == user.id).all()}
     unread = [
         a
         for a in _recent_alerts(db)
-        if _user_can_see(a, perm_codes, role_names, user.id) and a.id not in read_ids
+        if _user_can_see(a, perm_codes, role_names, user.id) and (workspace is None or alert_workspace(a) == workspace) and a.id not in read_ids
     ]
     for a in unread:
         db.add(AlertRead(alert_id=a.id, user_id=user.id))

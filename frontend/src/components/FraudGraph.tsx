@@ -124,59 +124,58 @@ export default function FraudGraph({ direction }: FraudGraphProps) {
   const laidOutNodes = useMemo(() => {
     if (!graph) return [];
 
+    const positions = new Map<string, { x: number; y: number }>();
+    const sortNodes = (nodes: GraphNode[]) => [...nodes].sort(
+      (a, b) => RISK_RANK[b.risk_level] - RISK_RANK[a.risk_level] || b.leakage_kes - a.leakage_kes,
+    );
+
+    if (direction === "outbound") {
+      // A fixed bipartite layout is much easier to investigate than a
+      // force/circle layout: officers are the inner control actors on the
+      // left, beneficiaries are the outer recipients on the right, and
+      // edges can be followed without the graph rearranging itself.
+      const beneficiaries = sortNodes(graph.nodes.filter((node) => node.type === "beneficiary")).slice(0, 24);
+      const officers = sortNodes(graph.nodes.filter((node) => node.type === "officer")).slice(0, 14);
+      const placeColumn = (nodes: GraphNode[], x: number) => nodes.forEach((node, index) => {
+        const step = HEIGHT / (nodes.length + 1);
+        positions.set(node.id, { x, y: step * (index + 1) });
+      });
+      placeColumn(officers, 105);
+      placeColumn(beneficiaries, WIDTH - 125);
+
+      const visibleIds = new Set(positions.keys());
+      const visibleNodes = graph.nodes.filter((node) => visibleIds.has(node.id));
+      const maxLeakage = Math.max(1, ...visibleNodes.map((node) => node.leakage_kes));
+      return visibleNodes.map((node) => {
+        const pos = positions.get(node.id) ?? { x: WIDTH / 2, y: HEIGHT / 2 };
+        const t = Math.sqrt(Math.max(0, node.leakage_kes) / maxLeakage);
+        return { ...node, x: pos.x, y: pos.y, r: (node.type === "beneficiary" ? 8 : 9) + 10 * t };
+      });
+    }
+
     const centerX = WIDTH / 2;
     const centerY = HEIGHT / 2;
-    const omcRadius = Math.min(WIDTH, HEIGHT) / 2 - 70;
-
-    const omcNodes = [...graph.nodes]
-      .filter((n) => outerNodeTypes.has(n.type))
-      .sort(
-        (a, b) =>
-          RISK_RANK[b.risk_level] - RISK_RANK[a.risk_level] ||
-          b.leakage_kes - a.leakage_kes,
-      );
-    const depotNodes = [...graph.nodes]
-      .filter((n) => !outerNodeTypes.has(n.type))
-      .sort((a, b) => b.leakage_kes - a.leakage_kes);
-    const depotRadius =
-      depotNodes.length > 1 ? Math.min(60, 16 + depotNodes.length * 6) : 0;
-
-    const positions = new Map<string, { x: number; y: number }>();
-
-    omcNodes.forEach((n, i) => {
-      const angle = (i / Math.max(omcNodes.length, 1)) * 2 * Math.PI;
-      positions.set(n.id, {
-        x: centerX + omcRadius * Math.cos(angle),
-        y: centerY + omcRadius * Math.sin(angle),
-      });
+    const outerRadius = Math.min(WIDTH, HEIGHT) / 2 - 70;
+    const outerNodes = sortNodes(graph.nodes.filter((node) => outerNodeTypes.has(node.type)));
+    const innerNodes = sortNodes(graph.nodes.filter((node) => !outerNodeTypes.has(node.type)));
+    const innerRadius = innerNodes.length > 1 ? Math.min(60, 16 + innerNodes.length * 6) : 0;
+    outerNodes.forEach((node, index) => {
+      const angle = (index / Math.max(outerNodes.length, 1)) * 2 * Math.PI;
+      positions.set(node.id, { x: centerX + outerRadius * Math.cos(angle), y: centerY + outerRadius * Math.sin(angle) });
     });
-
-    depotNodes.forEach((n, i) => {
-      const angle = (i / Math.max(depotNodes.length, 1)) * 2 * Math.PI;
-      positions.set(n.id, {
-        x: centerX + depotRadius * Math.cos(angle),
-        y: centerY + depotRadius * Math.sin(angle),
-      });
+    innerNodes.forEach((node, index) => {
+      const angle = (index / Math.max(innerNodes.length, 1)) * 2 * Math.PI;
+      positions.set(node.id, { x: centerX + innerRadius * Math.cos(angle), y: centerY + innerRadius * Math.sin(angle) });
     });
-
-    const maxOmcLeakage = Math.max(1, ...omcNodes.map((n) => n.leakage_kes));
-    const maxDepotLeakage = Math.max(1, ...depotNodes.map((n) => n.leakage_kes));
-
-    return graph.nodes.map((n) => {
-      const pos = positions.get(n.id) ?? { x: centerX, y: centerY };
-      const isDepot = !outerNodeTypes.has(n.type);
-      const base = isDepot ? 9 : 6;
-      const extra = isDepot ? 9 : 13;
-      const maxLeakage = isDepot ? maxDepotLeakage : maxOmcLeakage;
-      const t = Math.sqrt(Math.max(0, n.leakage_kes) / maxLeakage);
-      return {
-        ...n,
-        x: pos.x,
-        y: pos.y,
-        r: base + extra * t,
-      };
+    const maxOuter = Math.max(1, ...outerNodes.map((node) => node.leakage_kes));
+    const maxInner = Math.max(1, ...innerNodes.map((node) => node.leakage_kes));
+    return graph.nodes.map((node) => {
+      const pos = positions.get(node.id) ?? { x: centerX, y: centerY };
+      const isInner = !outerNodeTypes.has(node.type);
+      const t = Math.sqrt(Math.max(0, node.leakage_kes) / (isInner ? maxInner : maxOuter));
+      return { ...node, x: pos.x, y: pos.y, r: (isInner ? 9 : 6) + (isInner ? 9 : 13) * t };
     });
-  }, [graph, outerNodeTypes]);
+  }, [graph, outerNodeTypes, direction]);
 
   const nodeById = useMemo(() => {
     const map = new Map<string, (typeof laidOutNodes)[0]>();
@@ -262,7 +261,7 @@ export default function FraudGraph({ direction }: FraudGraphProps) {
           <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-950/40 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3">
             <span className="flex items-center gap-1.5 font-medium">
               <svg width="10" height="10"><circle cx="5" cy="5" r="5" className="fill-zinc-500 dark:fill-zinc-400" /></svg>
-              {direction === "outbound" ? "Beneficiary (Circle)" : "OMC (Circle)"}
+              {direction === "outbound" ? "Beneficiary ID (Circle)" : "OMC (Circle)"}
             </span>
             <span className="flex items-center gap-1.5 font-medium">
               <svg width="10" height="10"><rect width="10" height="10" rx="2" className="fill-zinc-500 dark:fill-zinc-400" /></svg>
@@ -287,7 +286,7 @@ export default function FraudGraph({ direction }: FraudGraphProps) {
               High Risk
             </span>
             <span className="flex items-center gap-1.5 font-medium text-zinc-400 dark:text-zinc-500">
-              Size = leakage value
+              Size = leakage value · dashed links = shared account signal
             </span>
           </div>
 
@@ -324,7 +323,8 @@ export default function FraudGraph({ direction }: FraudGraphProps) {
                       y2={target.y}
                       stroke={isHighlighted ? color : "currentColor"}
                       strokeWidth={strokeWidthFor(edge.weight)}
-                      strokeOpacity={isHighlighted ? 0.7 : 0.15}
+                      strokeOpacity={isHighlighted ? (source.type === target.type ? 0.28 : 0.7) : 0.15}
+                      strokeDasharray={source.type === target.type ? "4 4" : undefined}
                       className={`transition-all duration-300 ${
                         isHighlighted ? "" : "text-zinc-200 dark:text-zinc-800"
                       }`}

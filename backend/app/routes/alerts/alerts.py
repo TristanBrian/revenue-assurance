@@ -26,6 +26,7 @@ def list_my_alerts(
     unread_only: bool = Query(False),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
+    workspace: str | None = Query(None, pattern="^(inbound|outbound)$"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -34,8 +35,21 @@ def list_my_alerts(
     beyond being logged in, since visibility is already scoped per-alert by
     target_user_id/target_permissions/target_roles (see alert_service._user_can_see).
     """
+    # The portal boundary is enforced here as well as in the page URL. An
+    # Inuka manager can never ask this endpoint for the Oil inbox, and a
+    # depot supervisor can never ask for the Inuka inbox.
+    role_names = {role.name for role in user.roles}
+    if "inuka_manager" in role_names:
+        if workspace not in (None, "outbound"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inuka accounts are restricted to the outbound alert workspace")
+        workspace = "outbound"
+    elif "depot_supervisor" in role_names:
+        if workspace not in (None, "inbound"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Depot Supervisor accounts are restricted to the inbound alert workspace")
+        workspace = "inbound"
+
     items, total, unread_count = list_alerts_for_user(
-        db, user, unread_only=unread_only, page=page, page_size=page_size
+        db, user, unread_only=unread_only, page=page, page_size=page_size, workspace=workspace
     )
     return {"items": items, "total": total, "unread_count": unread_count, "page": page, "page_size": page_size}
 
@@ -57,7 +71,9 @@ def read_alert(alert_id: str, db: Session = Depends(get_db), user: User = Depend
 
 @router.post("/read-all", response_model=MarkReadResponse)
 def read_all_alerts(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    count = mark_all_read(db, user)
+    role_names = {role.name for role in user.roles}
+    workspace = "outbound" if "inuka_manager" in role_names else "inbound" if "depot_supervisor" in role_names else None
+    count = mark_all_read(db, user, workspace=workspace)
     db.commit()
     return {"status": "success", "marked_read": count}
 

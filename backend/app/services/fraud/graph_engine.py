@@ -243,7 +243,7 @@ def build_outbound_fraud_graph_from_dataframes(anomalies_df: pd.DataFrame, disbu
     beneficiary_labels: dict = {}
     for _, source_row in pair_source.iterrows():
         beneficiary_node = f"beneficiary:{source_row['beneficiary_id']}"
-        beneficiary_labels.setdefault(beneficiary_node, source_row.get('beneficiary_name') or source_row.get('customer') or f"Unknown beneficiary · {source_row['beneficiary_id']}")
+        beneficiary_labels.setdefault(beneficiary_node, str(source_row['beneficiary_id']))
 
     pair_stats = pair_source.groupby(['officer_id', 'beneficiary_id', 'customer']).agg(
         leakage_kes=('leakage_kes', 'sum'),
@@ -271,7 +271,7 @@ def build_outbound_fraud_graph_from_dataframes(anomalies_df: pd.DataFrame, disbu
     for _, row in pair_stats.iterrows():
         officer_node = f"officer:{row['officer_id']}"
         beneficiary_node = f"beneficiary:{row['beneficiary_id']}"
-        beneficiary_labels.setdefault(beneficiary_node, row['customer'] or f"Unknown beneficiary · {row['beneficiary_id']}")
+        beneficiary_labels.setdefault(beneficiary_node, str(row['beneficiary_id']))
         G.add_edge(
             officer_node, beneficiary_node,
             weight=float(row['leakage_kes']),
