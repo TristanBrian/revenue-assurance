@@ -62,7 +62,10 @@ def _case(case_id: str, risk_type: str, title: str, reason: str, *, beneficiary_
         "title": title,
         "reason": reason,
         "beneficiary_id": beneficiary_id,
+        "beneficiary_name": None,
+        "identity_status": "unresolved" if beneficiary_id else "not_applicable",
         "officer_id": officer_id,
+        "officer_name": None,
         "pillar_id": pillar_label(pillar_id),
         "program_id": None,
         "period": period,
@@ -82,6 +85,7 @@ def build_inuka_cases(materiality: float = 0) -> dict[str, Any]:
     seen: set[str] = set()
 
     beneficiaries = _records("beneficiaries")
+    officers = _records("officers")
     attendance = _records("attendance")
     authorizations = _records("stipend_authorizations")
     disbursements = _records("disbursements")
@@ -91,6 +95,17 @@ def build_inuka_cases(materiality: float = 0) -> dict[str, Any]:
         str(row.beneficiary_id): bool(row.is_active)
         for row in beneficiaries.itertuples()
         if hasattr(row, "beneficiary_id")
+    }
+
+    beneficiary_names = {
+        str(row.beneficiary_id): _text(getattr(row, "beneficiary_name", None))
+        for row in beneficiaries.itertuples()
+        if hasattr(row, "beneficiary_id")
+    }
+    officer_names = {
+        str(row.officer_id): _text(getattr(row, "officer_name", None))
+        for row in officers.itertuples()
+        if hasattr(row, "officer_id")
     }
 
     break_mapping = {
@@ -163,6 +178,12 @@ def build_inuka_cases(materiality: float = 0) -> dict[str, Any]:
         if prior is None or item["risk_score"] > prior["risk_score"]:
             unique[item["case_id"]] = item
     ordered = sorted(unique.values(), key=lambda x: (x["risk_score"], x["amount_at_risk"]), reverse=True)
+    for item in ordered:
+        beneficiary_id = item.get("beneficiary_id")
+        officer_id = item.get("officer_id")
+        item["beneficiary_name"] = beneficiary_names.get(str(beneficiary_id)) if beneficiary_id else None
+        item["identity_status"] = "verified" if item["beneficiary_name"] else ("missing_master_record" if beneficiary_id else "not_applicable")
+        item["officer_name"] = officer_names.get(str(officer_id)) if officer_id else None
     by_type = defaultdict(int)
     for item in ordered:
         by_type[item["risk_type"]] += 1

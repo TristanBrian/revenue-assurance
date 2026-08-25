@@ -293,7 +293,7 @@ export default function AnomaliesTable({ direction, config, scopeParams, title, 
                   <div className="grid grid-cols-2 gap-4 bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl text-sm">
                     <div>
                       <p className="text-[10px] text-zinc-500 font-semibold uppercase">{config.entityLabel}</p>
-                      <p className="text-zinc-700 dark:text-zinc-200 mt-0.5 font-medium">{selectedAnomaly.customer}</p>
+                      <p className="text-zinc-700 dark:text-zinc-200 mt-0.5 font-medium">{selectedAnomaly.customer}</p>{direction === "outbound" && (<><p className="mt-1 font-mono text-[11px] text-zinc-500">ID: {selectedAnomaly.beneficiary_id || "Unavailable"}</p><p className="mt-1 text-[11px] text-zinc-500">Officer: {selectedAnomaly.officer_id || "Unavailable"}</p></>)}
                     </div>
                     <div>
                       <p className="text-[10px] text-zinc-500 font-semibold uppercase">{config.productLabel}</p>

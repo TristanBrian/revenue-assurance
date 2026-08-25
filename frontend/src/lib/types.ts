@@ -50,6 +50,7 @@ export interface Anomaly {
   dispatch_id: string;
   invoice_id: string | null;
   customer: string;
+  beneficiary_name?: string | null;
   product: string;
   depot: string | null;
   dispatched_kes: number;
@@ -466,7 +467,10 @@ export interface InukaRiskCase {
   title: string;
   reason: string;
   beneficiary_id: string | null;
+  beneficiary_name: string | null;
+  identity_status: "verified" | "missing_master_record" | "unresolved" | "not_applicable";
   officer_id: string | null;
+  officer_name: string | null;
   pillar_id: string | null;
   program_id: string | null;
   period: string | null;

@@ -4,7 +4,6 @@ import { useParams } from "next/navigation";
 import { anomaliesConfig } from "@/config/direction-config";
 import type { WorkspaceDirection } from "@/lib/workspace";
 import AnomaliesTable from "@/components/AnomaliesTable";
-import DimensionGroupGrid from "@/components/DimensionGroupGrid";
 import RequirePermission from "@/components/RequirePermission";
 
 export default function AnomaliesPage() {
@@ -15,7 +14,12 @@ export default function AnomaliesPage() {
       {direction === "inbound" ? (
         <AnomaliesTable direction="inbound" config={anomaliesConfig.inbound} />
       ) : (
-        <DimensionGroupGrid />
+        <AnomaliesTable
+          direction="outbound"
+          config={anomaliesConfig.outbound}
+          title="Inuka assurance cases"
+          subtitle="Review individual beneficiaries, officers, and stipend exceptions."
+        />
       )}
     </RequirePermission>
   );

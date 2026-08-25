@@ -664,6 +664,7 @@ def _build_outbound_anomaly(row: dict, resolutions: dict) -> dict:
         'dispatch_id': record_id,
         'invoice_id': row.get('authorization_id'),
         'customer': row.get('beneficiary_name') or row.get('beneficiary_id'),
+        'beneficiary_name': row.get('beneficiary_name'),
         'product': row.get('pillar_id'),
         'dispatched_kes': int(row.get('eligible_kes', 0) or 0),
         'invoiced_kes': int(row.get('authorized_kes', 0) or 0),
