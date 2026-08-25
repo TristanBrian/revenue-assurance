@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { ApiError, downloadExportWithFields, getEbillingLogs, getMetrics } from "@/lib/api";
+import { ApiError, downloadExportWithFields, getAnomalies, getEbillingLogs, getMetrics } from "@/lib/api";
 import { useMateriality } from "@/context/MaterialityContext";
 import { reportsConfig, anomaliesConfig } from "@/config/direction-config";
 import type { WorkspaceDirection } from "@/lib/workspace";
@@ -65,13 +65,25 @@ function ReportsContent({ direction }: { direction: WorkspaceDirection }) {
       setLoading(true);
       setError(null);
       try {
-        const [metricsResult, logs] = await Promise.all([
+        // getMetrics() (POST /api/reconcile/metrics) deliberately has no
+        // `anomalies` field — see MetricsResponse's own docstring:
+        // "Everything from ReconciliationData except the anomaly table...
+        // which are gated separately and live in their own endpoints."
+        // The actual rows live at getAnomalies() (GET
+        // /api/reconcile/anomalies) — reading them off metricsResult
+        // instead left this table permanently empty regardless of
+        // report type or direction. page_size capped at the server's
+        // max (100, `le=100` on that route) — same "good enough for a
+        // demo-scale set" tradeoff BeneficiaryList.tsx already makes,
+        // not a full unpaginated fetch.
+        const [metricsResult, anomaliesResult, logs] = await Promise.all([
           getMetrics(materiality, direction),
+          getAnomalies(materiality, 1, 100, {}, direction),
           reportType === "icms" ? getEbillingLogs(200) : Promise.resolve([] as EbillingLogEntry[]),
         ]);
         if (cancelled) return;
         setMetrics(metricsResult.metrics);
-        setAnomalies(((metricsResult as { anomalies?: Anomaly[] }).anomalies ?? []));
+        setAnomalies(anomaliesResult.anomalies);
         setIcmsLogs(logs);
       } catch (err: unknown) {
         if (!cancelled) setError(err instanceof ApiError ? err.message : "Could not load report data.");
