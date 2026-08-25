@@ -87,6 +87,7 @@ export type RiskLevel = "Low" | "Medium" | "High" | "Critical";
 export type GraphNode = { id: string; label: string; type: "omc" | "depot" | "officer" | "beneficiary"; leakage_kes: number; risk_level: RiskLevel; community_id?: number | null };
 export type GraphEdge = { source: string; target: string; weight: number; anomaly_count: number; shared_account?: boolean };
 export type FraudGraph = { nodes: GraphNode[]; edges: GraphEdge[]; communities: { id: number; node_ids: string[]; member_count: number; total_leakage_kes: number; risk_level: RiskLevel }[]; summary: { node_count: number; edge_count: number; community_count: number; top_risk_entities: GraphNode[] } };
+export type FieldVerificationPayload = { verification_id: string; beneficiary_id: string; pillar: "Scholarship" | "Plus" | "Vocational" | "Tech"; participation_status: "verified" | "not_verified" | "needs_review"; notes: string; latitude: number | null; longitude: number | null; captured_at: string; photo_uri: string | null; updated_at: string };
 
 async function req<T>(path: string, init: RequestInit = {}, auth = true): Promise<T> {
   const h = new Headers(init.headers);
@@ -148,6 +149,10 @@ export async function fraudGraph(direction: "inbound" | "outbound") {
 }
 
 export const readAlert = (id: string) => req("/api/alerts/" + encodeURIComponent(id) + "/read", { method: "POST" });
+
+export async function submitFieldVerification(payload: FieldVerificationPayload): Promise<void> {
+  await req("/api/inuka/stream/events", { method: "POST", body: JSON.stringify({ event_type: "verification.captured", pillar: payload.pillar, beneficiary_id: payload.beneficiary_id, source_system: "flowguard-mobile-field-app", occurred_at: payload.captured_at, payload }) });
+}
 
 export async function ask(message: string) {
   return (await req<{ reply: string }>("/api/fraud/chat", { method: "POST", body: JSON.stringify({ message, anomaly_id: null }) })).reply;
