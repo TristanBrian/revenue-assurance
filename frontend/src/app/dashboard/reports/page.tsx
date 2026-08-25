@@ -362,347 +362,163 @@ function ReportsContent() {
         </div>
       )}
 
-      {/* Main Reporting Workspace Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* LEFT COLUMN: Visual Funnel Chart Card (Spans 2 columns) */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
-          <div className="bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-7 shadow-md flex flex-col gap-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#e8e3de] dark:border-[#33302c] pb-5">
-              <div>
-                <h2 className="text-lg sm:text-xl font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">
-                  Revenue & Stipend Lifecycle State ({direction.toUpperCase()})
-                </h2>
-
-                <p className="text-sm font-medium text-zinc-600 dark:text-slate-400 mt-1.5">
-                  Click any stage or leakage card below to filter the audit preview table in real time.
-                </p>
-              </div>
-
-              {activeFunnelFilter !== "all" && (
-                <button
-                  onClick={() => handleFunnelStageClick("all")}
-                  className="px-4 py-2 text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-700 transition flex items-center space-x-2 shadow-sm cursor-pointer shrink-0"
-                >
-                  <span>Reset Filter</span>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+      {/* Main Dual-Domain Reporting Workspace */}
+      <div className="flex flex-col gap-6">
+        {/* Domain & Report Focus Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          {/* KPC Operational Audit */}
+          <div
+            onClick={() => handleReportTypeChange("operational")}
+            className={`p-6 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-4 shadow-sm ${
+              reportType === "operational"
+                ? "bg-[#ffffff] dark:bg-[#221d1a] border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] ring-2 ring-[#b3312c]/30 shadow-md"
+                : "bg-[#ffffff] dark:bg-[#221d1a] border-[#e8e3de] dark:border-[#33302c] hover:border-[#b3312c]/40 text-[#26221f] dark:text-[#f5f2ef]"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="p-2.5 bg-[#b3312c]/10 text-[#b3312c] dark:text-[#ec835a] rounded-xl font-bold text-xs uppercase tracking-wider">
+                🛢️ KPC Oil Side
+              </span>
+              {reportType === "operational" && (
+                <span className="w-3 h-3 rounded-full bg-[#b3312c] animate-pulse" />
               )}
             </div>
-
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-3">
-                <div className="w-8 h-8 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin"></div>
-                <span className="text-xs text-zinc-500">Loading live aggregates...</span>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-6">
-                
-                {/* 1. HERO RECOVERY STAT BANNER */}
-                <div className="bg-gradient-to-r from-[#3f201e] via-[#1f1b19] to-[#1f1b19] border border-[#b3312c]/40 p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-14 h-14 rounded-2xl bg-[#b3312c]/20 border border-[#b3312c]/40 flex items-center justify-center text-[#ec835a] shrink-0 shadow-inner">
-                      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs font-black uppercase tracking-widest text-[#ec835a]">HERO VALUE RECOVERY</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#0ca30c]/20 text-[#0ca30c] dark:text-[#4ade80] border border-[#0ca30c]/30">
-                          {funnelData.payPercent.toFixed(1)}% Settled Cash
-                        </span>
-                      </div>
-                      <h3 className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight mt-0.5">
-                        {formatKesCompact(funnelData.pay)} <span className="text-sm font-sans font-bold text-slate-300">Settled & Verified</span>
-                      </h3>
-                      <p className="text-xs font-medium text-slate-400 mt-1">
-                        Total metered pipeline baseline: <span className="font-mono text-white font-bold">{formatKesCompact(funnelData.disp)}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-start sm:items-end gap-1.5 shrink-0 bg-slate-955/80 border border-slate-800 p-3.5 rounded-xl">
-                    <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">Identified Risk Exposure</span>
-                    <span className="text-lg font-black font-mono text-[#d03b3b]">
-                      {formatKesCompact(funnelData.ghostLeak + funnelData.unpaidLeak)}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400">Ghost Loads / Payments + Unpaid Invoices</span>
-                  </div>
-                </div>
-
-                {/* 2. SINGLE LEFT-TO-RIGHT VALUE FLOW & CONNECTED LIFECYCLE CHECKPOINTS */}
-                <div className="relative pt-2">
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
-                    
-                    {/* STAGE 1: Dispatched Baseline */}
-                    <div
-                      onClick={() => handleFunnelStageClick("dispatched")}
-                      className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-4 shadow-sm relative ${
-                        activeFunnelFilter === "dispatched"
-                          ? "bg-slate-900 border-[#2a78d6] shadow-xl shadow-[#2a78d6]/10 ring-2 ring-[#2a78d6]/40"
-                          : "bg-white dark:bg-slate-950/80 border-[#e8e3de] dark:border-[#33302c] hover:border-[#2a78d6]/50"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <span className="text-xs font-black uppercase tracking-wider text-[#2a78d6]">STAGE 1 CHECKPOINT</span>
-                          <h3 className="text-lg font-extrabold text-zinc-900 dark:text-slate-100">Dispatched / Attendance</h3>
-                        </div>
-                        <div className="w-11 h-11 rounded-xl border-2 border-[#2a78d6]/40 flex items-center justify-center text-sm font-black font-mono text-[#2a78d6] dark:text-[#60a5fa] bg-[#2a78d6]/10 shrink-0">
-                          100%
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-3xl font-black font-mono text-zinc-900 dark:text-white tracking-tight">{formatKesCompact(funnelData.disp)}</div>
-                        <p className="text-xs font-medium text-zinc-600 dark:text-slate-400 mt-1.5 leading-relaxed">
-                          Metered fuel volume (KPC) & verified attendance baseline (Inuka).
-                        </p>
-                      </div>
-
-                      <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c]/80 flex items-center justify-between text-xs font-extrabold text-[#2a78d6]">
-                        <span>Physical Meter Baseline</span>
-                        <span>Filter Stage &rarr;</span>
-                      </div>
-                    </div>
-
-                    {/* STAGE 2: Commercial Billing */}
-                    <div className="flex flex-col gap-3">
-                      <div
-                        onClick={() => handleFunnelStageClick("invoiced")}
-                        className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-4 shadow-sm relative ${
-                          activeFunnelFilter === "invoiced" || activeFunnelFilter === "ghost"
-                            ? "bg-slate-900 border-[#b3312c] shadow-xl shadow-[#b3312c]/10 ring-2 ring-[#b3312c]/40"
-                            : "bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] hover:border-[#b3312c]/50"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-1">
-                            <span className="text-xs font-black uppercase tracking-wider text-[#b3312c] dark:text-[#ec835a]">STAGE 2 CHECKPOINT</span>
-                            <h3 className="text-lg font-extrabold text-zinc-900 dark:text-slate-100">Invoices / Authorisations</h3>
-                          </div>
-                          <div className="w-11 h-11 rounded-xl border-2 border-[#b3312c]/40 flex items-center justify-center text-sm font-black font-mono text-[#b3312c] dark:text-[#ec835a] bg-[#b3312c]/10 shrink-0">
-                            {funnelData.invPercent.toFixed(0)}%
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="text-3xl font-black font-mono text-zinc-900 dark:text-white tracking-tight">{formatKesCompact(funnelData.inv)}</div>
-                          <p className="text-xs font-medium text-zinc-600 dark:text-slate-400 mt-1.5 leading-relaxed">
-                            Official commercial invoices generated & authorized stipends.
-                          </p>
-                        </div>
-
-                        <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c]/80 flex items-center justify-between text-xs font-extrabold text-[#b3312c] dark:text-[#ec835a]">
-                          <span>Declared SAP Invoices</span>
-                          <span>Filter Stage &rarr;</span>
-                        </div>
-                      </div>
-
-                      {/* EXCEPTION SIGNAL */}
-                      <div
-                        onClick={() => handleFunnelStageClick("ghost")}
-                        className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between shadow-xs ${
-                          activeFunnelFilter === "ghost"
-                            ? "bg-[#fdecec] dark:bg-[#d03b3b]/20 border-[#d03b3b] text-[#d03b3b] dark:text-[#f87171] ring-2 ring-[#d03b3b]/40"
-                            : "bg-[#fdecec]/60 dark:bg-[#d03b3b]/10 border-[#d03b3b]/30 hover:border-[#d03b3b] text-[#d03b3b] dark:text-[#f87171]"
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-3.5 h-3.5 rounded-full bg-[#d03b3b] shrink-0 animate-pulse" />
-                          <div>
-                            <span className="text-[11px] font-black uppercase tracking-wider block text-rose-700 dark:text-[#d03b3b]">LEAKAGE EXCEPTION SIGNAL</span>
-                            <span className="text-xs font-extrabold">Ghost Loads / Unbilled Exposure: </span>
-                            <span className="text-xs font-black font-mono text-[#d03b3b]">{formatKesCompact(funnelData.ghostLeak)}</span>
-                          </div>
-                        </div>
-                        <span className="text-xs font-black text-rose-600 dark:text-[#d03b3b]">&rarr;</span>
-                      </div>
-                    </div>
-
-                    {/* STAGE 3: Settled Cash */}
-                    <div className="flex flex-col gap-3">
-                      <div
-                        onClick={() => handleFunnelStageClick("settled")}
-                        className={`p-6 rounded-2xl border cursor-pointer transition-all duration-300 flex flex-col justify-between space-y-4 shadow-sm relative ${
-                          activeFunnelFilter === "settled" || activeFunnelFilter === "unpaid"
-                            ? "bg-slate-900 border-[#0ca30c] shadow-xl shadow-[#0ca30c]/10 ring-2 ring-[#0ca30c]/40"
-                            : "bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] hover:border-[#0ca30c]/50"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-1">
-                            <span className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-[#ec835a]">STAGE 3 CHECKPOINT</span>
-                            <h3 className="text-lg font-extrabold text-zinc-900 dark:text-slate-100">Settled Cash / Disbursements</h3>
-                          </div>
-                          <div className="w-11 h-11 rounded-xl border-2 border-[#0ca30c]/40 flex items-center justify-center text-sm font-black font-mono text-[#0ca30c] dark:text-[#4ade80] bg-[#0ca30c]/10 shrink-0">
-                            {funnelData.payPercent.toFixed(0)}%
-                          </div>
-                        </div>
-
-                        <div>
-                          <div className="text-3xl font-black font-mono text-emerald-600 dark:text-[#ec835a] tracking-tight">{formatKesCompact(funnelData.pay)}</div>
-                          <p className="text-xs font-medium text-zinc-600 dark:text-slate-400 mt-1.5 leading-relaxed">
-                            Bank remittances verified & stipend payments disbursed.
-                          </p>
-                        </div>
-
-                        <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c]/80 flex items-center justify-between text-xs font-extrabold text-emerald-700 dark:text-[#ec835a]">
-                          <span>Bank Remittances Verified</span>
-                          <span>Filter Stage &rarr;</span>
-                        </div>
-                      </div>
-
-                      {/* OVERDUE EXCEPTION SIGNAL */}
-                      <div
-                        onClick={() => handleFunnelStageClick("unpaid")}
-                        className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between shadow-xs ${
-                          activeFunnelFilter === "unpaid"
-                            ? "bg-[#fdf3de] dark:bg-[#b6790a]/20 border-[#b6790a] text-[#b6790a] dark:text-[#fbbf24] ring-2 ring-[#b6790a]/40"
-                            : "bg-[#fdf3de]/60 dark:bg-[#b6790a]/10 border-[#b6790a]/30 hover:border-[#b6790a] text-[#b6790a] dark:text-[#fbbf24]"
-                        }`}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-3.5 h-3.5 rounded-full bg-[#b6790a] shrink-0" />
-                          <div>
-                            <span className="text-[11px] font-black uppercase tracking-wider block text-[#b6790a]">OVERDUE EXCEPTION SIGNAL</span>
-                            <span className="text-xs font-extrabold">Unpaid Invoice Exposure: </span>
-                            <span className="text-xs font-black font-mono text-[#b6790a]">{formatKesCompact(funnelData.unpaidLeak)}</span>
-                          </div>
-                        </div>
-                        <span className="text-xs font-black text-[#b6790a]">&rarr;</span>
-                      </div>
-                    </div>
-
-                  </div>
-                </div>
-
-              </div>
-            )}
-
+            <div>
+              <h3 className="text-base font-extrabold tracking-tight">Operational Dispatch Audit</h3>
+              <p className="text-xs text-[#736c67] dark:text-[#b2aeac] mt-1">
+                Gantry dispatches, physical volume metered, and SAP invoice match logs.
+              </p>
+            </div>
+            <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c] flex items-center justify-between text-xs font-bold text-[#b3312c] dark:text-[#ec835a]">
+              <span>Dispatches & Invoices</span>
+              <span>Select Focus &rarr;</span>
+            </div>
           </div>
+
+          {/* KPC Financial Settlement */}
+          <div
+            onClick={() => handleReportTypeChange("financial")}
+            className={`p-6 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-4 shadow-sm ${
+              reportType === "financial"
+                ? "bg-[#ffffff] dark:bg-[#221d1a] border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] ring-2 ring-[#b3312c]/30 shadow-md"
+                : "bg-[#ffffff] dark:bg-[#221d1a] border-[#e8e3de] dark:border-[#33302c] hover:border-[#b3312c]/40 text-[#26221f] dark:text-[#f5f2ef]"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="p-2.5 bg-[#0ca30c]/10 text-[#0ca30c] dark:text-[#4ade80] rounded-xl font-bold text-xs uppercase tracking-wider">
+                💳 Cash Settlement
+              </span>
+              {reportType === "financial" && (
+                <span className="w-3 h-3 rounded-full bg-[#0ca30c] animate-pulse" />
+              )}
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold tracking-tight">Financial Settlement Audit</h3>
+              <p className="text-xs text-[#736c67] dark:text-[#b2aeac] mt-1">
+                Bank payment remittances, OMC credit limits, overpayments, and balances.
+              </p>
+            </div>
+            <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c] flex items-center justify-between text-xs font-bold text-[#0ca30c] dark:text-[#4ade80]">
+              <span>Payments & Remittances</span>
+              <span>Select Focus &rarr;</span>
+            </div>
+          </div>
+
+          {/* KPC iCMS Tax Sync */}
+          <div
+            onClick={() => handleReportTypeChange("icms")}
+            className={`p-6 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-4 shadow-sm ${
+              reportType === "icms"
+                ? "bg-[#ffffff] dark:bg-[#221d1a] border-[#2a78d6] text-[#2a78d6] dark:text-[#60a5fa] ring-2 ring-[#2a78d6]/30 shadow-md"
+                : "bg-[#ffffff] dark:bg-[#221d1a] border-[#e8e3de] dark:border-[#33302c] hover:border-[#2a78d6]/40 text-[#26221f] dark:text-[#f5f2ef]"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="p-2.5 bg-[#2a78d6]/10 text-[#2a78d6] dark:text-[#60a5fa] rounded-xl font-bold text-xs uppercase tracking-wider">
+                📑 KRA iCMS Tax
+              </span>
+              {reportType === "icms" && (
+                <span className="w-3 h-3 rounded-full bg-[#2a78d6] animate-pulse" />
+              )}
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold tracking-tight">iCMS Tax Declaration Sync</h3>
+              <p className="text-xs text-[#736c67] dark:text-[#b2aeac] mt-1">
+                KRA electronic billing declarations, PIN validations, and payload logs.
+              </p>
+            </div>
+            <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c] flex items-center justify-between text-xs font-bold text-[#2a78d6] dark:text-[#60a5fa]">
+              <span>Tax Declarations</span>
+              <span>Select Focus &rarr;</span>
+            </div>
+          </div>
+
+          {/* Inuka Fellowship Governance */}
+          <div
+            onClick={() => handleReportTypeChange("inuka")}
+            className={`p-6 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between space-y-4 shadow-sm ${
+              reportType === "inuka"
+                ? "bg-[#ffffff] dark:bg-[#221d1a] border-[#b6790a] text-[#b6790a] dark:text-[#fbbf24] ring-2 ring-[#b6790a]/30 shadow-md"
+                : "bg-[#ffffff] dark:bg-[#221d1a] border-[#e8e3de] dark:border-[#33302c] hover:border-[#b6790a]/40 text-[#26221f] dark:text-[#f5f2ef]"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="p-2.5 bg-[#b6790a]/10 text-[#b6790a] dark:text-[#fbbf24] rounded-xl font-bold text-xs uppercase tracking-wider">
+                🎓 Inuka Side
+              </span>
+              {reportType === "inuka" && (
+                <span className="w-3 h-3 rounded-full bg-[#b6790a] animate-pulse" />
+              )}
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold tracking-tight">Inuka Stipend Governance</h3>
+              <p className="text-xs text-[#736c67] dark:text-[#b2aeac] mt-1">
+                Fellowship attendance, calculated stipends, and MPESA/Bank disbursements.
+              </p>
+            </div>
+            <div className="pt-3 border-t border-[#e8e3de] dark:border-[#33302c] flex items-center justify-between text-xs font-bold text-[#b6790a] dark:text-[#fbbf24]">
+              <span>Stipends & Officers</span>
+              <span>Select Focus &rarr;</span>
+            </div>
+          </div>
+
         </div>
 
-        {/* RIGHT COLUMN: Filter & Export Option Cards */}
-        <div className="flex flex-col gap-6">
-          
-          {/* Card A: Report Focus Selector */}
-          <div className="bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-6 sm:p-7 shadow-md flex flex-col gap-5">
-            <div>
-              <h3 className="text-base font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">Report Focus</h3>
-              <p className="text-sm font-medium text-zinc-500 dark:text-slate-400 mt-1">Select the operational or governance view to inspect and export.</p>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <button
-                type="button"
-                onClick={() => handleReportTypeChange("operational")}
-                className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
-                  reportType === "operational"
-                    ? "bg-[#b3312c]/10 dark:bg-[#b3312c]/20 border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] font-bold shadow-xs"
-                    : "bg-white dark:bg-slate-955/60 border-[#e8e3de] dark:border-[#33302c] hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
-                }`}
-              >
-                <div className="flex items-center justify-between font-bold text-sm sm:text-base">
-                  <span>Operational Audit Report</span>
-                  {reportType === "operational" && <span className="w-2.5 h-2.5 rounded-full bg-[#b3312c]"></span>}
-                </div>
-                <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
-                  Audits fuel dispatch volume matching & ghost loads (KPC inbound).
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleReportTypeChange("financial")}
-                className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
-                  reportType === "financial"
-                    ? "bg-[#b3312c]/10 dark:bg-[#b3312c]/20 border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] font-bold shadow-xs"
-                    : "bg-white dark:bg-slate-955/60 border-[#e8e3de] dark:border-[#33302c] hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
-                }`}
-              >
-                <div className="flex items-center justify-between font-bold text-sm sm:text-base">
-                  <span>Financial Settlement Report</span>
-                  {reportType === "financial" && <span className="w-2.5 h-2.5 rounded-full bg-[#b3312c]"></span>}
-                </div>
-                <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
-                  Audits invoiced value vs banking cash deposits.
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleReportTypeChange("icms")}
-                className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
-                  reportType === "icms"
-                    ? "bg-[#b3312c]/10 dark:bg-[#b3312c]/20 border-[#b3312c] text-[#b3312c] dark:text-[#ec835a] font-bold shadow-xs"
-                    : "bg-white dark:bg-slate-955/60 border-[#e8e3de] dark:border-[#33302c] hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
-                }`}
-              >
-                <div className="flex items-center justify-between font-bold text-sm sm:text-base">
-                  <span>iCMS Tax Sync Report</span>
-                  {reportType === "icms" && <span className="w-2.5 h-2.5 rounded-full bg-[#b3312c]"></span>}
-                </div>
-                <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
-                  Audits KRA e-billing status, retries, and failed queues.
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleReportTypeChange("inuka")}
-                className={`w-full text-left p-4 rounded-xl border text-sm transition-all flex flex-col gap-1.5 cursor-pointer ${
-                  reportType === "inuka"
-                    ? "bg-[#0ca30c]/10 dark:bg-[#0ca30c]/20 border-[#0ca30c] text-[#0ca30c] dark:text-[#4ade80] font-bold shadow-xs"
-                    : "bg-white dark:bg-slate-955/60 border-[#e8e3de] dark:border-[#33302c] hover:border-zinc-300 dark:hover:border-slate-700 text-zinc-700 dark:text-slate-300"
-                }`}
-              >
-                <div className="flex items-center justify-between font-bold text-sm sm:text-base">
-                  <span>Inuka Stipend Governance Report</span>
-                  {reportType === "inuka" && <span className="w-2.5 h-2.5 rounded-full bg-[#0ca30c]"></span>}
-                </div>
-                <span className="text-xs sm:text-sm text-zinc-500 dark:text-slate-400 font-medium leading-relaxed">
-                  Audits beneficiary stipend authorizations & ghost payments (Outbound).
-                </span>
-              </button>
-            </div>
+        {/* Action Controls & Export Bar */}
+        <div className="p-6 rounded-2xl bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3">
+            <span className="text-sm font-bold uppercase tracking-wider text-[#b3312c] dark:text-[#ec835a]">
+              Report Export Actions:
+            </span>
+            <span className="text-xs font-medium text-[#736c67] dark:text-[#b2aeac]">
+              Active Focus: <strong className="text-[#26221f] dark:text-[#f5f2ef] capitalize">{reportType} Report</strong>
+            </span>
           </div>
 
-          {/* Card B: Download & Export Trigger */}
-          <div className="bg-[#ffffff] dark:bg-[#221d1a] border border-[#e8e3de] dark:border-[#33302c] rounded-2xl p-6 sm:p-7 shadow-md flex flex-col gap-5">
-            <div>
-              <h3 className="text-base font-extrabold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">Export Settings</h3>
-              <p className="text-sm font-medium text-zinc-500 dark:text-slate-400 mt-1">Download formatted files with KDPA data minimization.</p>
-            </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="px-5 py-3 bg-[#b3312c] hover:bg-[#962723] text-white font-bold text-sm rounded-xl transition shadow-md flex items-center space-x-2 cursor-pointer"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Download Filtered Excel (.xlsx)</span>
+            </button>
 
-            <div className="flex flex-col gap-3.5">
-              <button
-                type="button"
-                onClick={handleExportExcel}
-                className="w-full py-3.5 px-5 bg-emerald-600 hover:bg-[#0ca30c] text-white font-bold text-sm sm:text-base rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center space-x-2.5 cursor-pointer"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span>Export Full Workbook (Excel)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleExportCsv}
-                disabled={exporting}
-                className="w-full py-3.5 px-5 bg-[#f1ede9] dark:bg-[#2a2725] hover:bg-[#e8e3de] dark:hover:bg-[#33302c] text-[#26221f] dark:text-[#f5f2ef] font-bold text-sm sm:text-base rounded-xl transition border border-[#e8e3de] dark:border-[#33302c] flex items-center justify-center space-x-2.5 cursor-pointer"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                <span>{exporting ? "Exporting..." : "Export Active View (CSV)"}</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="px-5 py-3 bg-[#f1ede9] dark:bg-[#2a2725] hover:bg-[#e8e3de] dark:hover:bg-[#33302c] text-[#26221f] dark:text-[#f5f2ef] border border-[#e8e3de] dark:border-[#33302c] font-bold text-sm rounded-xl transition flex items-center space-x-2 cursor-pointer"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span>Download Active CSV (.csv)</span>
+            </button>
           </div>
-
         </div>
       </div>
 
