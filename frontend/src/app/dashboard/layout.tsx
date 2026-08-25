@@ -82,6 +82,15 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [depotAlerts, setDepotAlerts] = useState<{ depotId: string; criticalCount: number; items: Anomaly[] } | null>(null);
   const [depotAlertsOpen, setDepotAlertsOpen] = useState(false);
+  // Drives the sidebar both below lg (fixed overlay drawer, toggled by the
+  // hamburger button) and at lg+ (always docked — see the aside's own
+  // classes, which force it open there regardless of this state). One
+  // piece of state, no separate "mobile menu" flag.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!user) return;
@@ -157,8 +166,30 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <aside className="flex h-full w-60 shrink-0 flex-col overflow-y-auto bg-sidebar border-r border-sidebar-border p-3">
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-[35] bg-black/40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex h-full w-60 shrink-0 flex-col overflow-y-auto bg-sidebar border-r border-sidebar-border p-3 transition-transform duration-200 ease-in-out lg:static lg:z-auto lg:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div className="flex items-center gap-2.5 px-2 py-3 mb-2">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close menu"
+            className="lg:hidden shrink-0 -ml-1 p-1.5 rounded-md text-sidebar-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+          >
+            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
           {BRAND_CONFIG.logoUrl ? (
             <div className="w-8 h-8 shrink-0 relative">
               <Image
@@ -271,19 +302,32 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        <header className="flex h-14 items-center justify-between gap-4 px-6 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30">
-          {showSearch ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground max-w-md w-full">
-              <div className="flex items-center gap-2 w-full rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs">
-                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z" />
-                </svg>
-                <span className="truncate">{isInukaWorkspace ? "Search beneficiaries, officers, payouts…" : "Search anomalies, OMCs, invoices…"}</span>
+        <header className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
+              className="lg:hidden shrink-0 -ml-1.5 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+
+            {showSearch ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground max-w-md w-full">
+                <div className="flex items-center gap-2 w-full rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z" />
+                  </svg>
+                  <span className="truncate">{isInukaWorkspace ? "Search beneficiaries, officers, payouts…" : "Search anomalies, OMCs, invoices…"}</span>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div />
-          )}
+            ) : (
+              <div />
+            )}
+          </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
             {canSeeAllAlerts && (
@@ -386,7 +430,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {routeDirection && (
-          <div className={`border-b px-6 py-2.5 ${isInukaWorkspace ? "border-status-info/20 bg-status-info-bg/50" : "border-primary/15 bg-primary/5"}`}>
+          <div className={`border-b px-4 sm:px-6 py-2.5 ${isInukaWorkspace ? "border-status-info/20 bg-status-info-bg/50" : "border-primary/15 bg-primary/5"}`}>
             <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-2.5">
                 <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[9px] font-bold ${isInukaWorkspace ? "bg-status-info-bg text-status-info" : "bg-primary/10 text-primary"}`}>
@@ -411,7 +455,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-auto p-6 bg-background">{children}</main>
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-auto p-4 md:p-6 bg-background">{children}</main>
       </div>
     </div>
   );
