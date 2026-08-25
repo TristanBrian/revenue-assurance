@@ -1,6 +1,8 @@
 import type {
   AcceptTermsResponse,
   AdminUser,
+  AlertListResult,
+  BeneficiaryConsentResult,
   AnomalyAction,
   AdminSecurityEvent,
   PasswordPolicy,
@@ -21,8 +23,10 @@ import type {
   LoginResponse,
   MetricsResult,
   InukaCasesResult,
+  InukaRiskCase,
   InukaCaseSummary,
   InukaDimensionSummary,
+  InukaStreamStatus,
   InukaBeneficiaryDetail,
   OmcRiskProfile,
   OmcRiskProfileResult,
@@ -284,6 +288,25 @@ export async function getDepotAlerts(): Promise<DepotAlertsResult> {
   return unwrap<DepotAlertsResult>(res);
 }
 
+export async function getAlerts(params: { page?: number; pageSize?: number; unreadOnly?: boolean; workspace?: "inbound" | "outbound" } = {}): Promise<AlertListResult> {
+  const url = new URL("/api/alerts", API_URL);
+  url.searchParams.set("page", String(params.page ?? 1));
+  url.searchParams.set("page_size", String(params.pageSize ?? 25));
+  if (params.unreadOnly) url.searchParams.set("unread_only", "true");
+  if (params.workspace) url.searchParams.set("workspace", params.workspace);
+  return unwrap<AlertListResult>(await authFetch(url));
+}
+
+export async function markAlertRead(alertId: string): Promise<void> {
+  const url = new URL("/api/alerts/" + encodeURIComponent(alertId) + "/read", API_URL);
+  await unwrap<{ status: string; marked_read: number }>(await authFetch(url, { method: "POST" }));
+}
+
+export async function markAllAlertsRead(): Promise<void> {
+  const url = new URL("/api/alerts/read-all", API_URL);
+  await unwrap<{ status: string; marked_read: number }>(await authFetch(url, { method: "POST" }));
+}
+
 export async function getDepotRisk(): Promise<DepotRiskResult> {
   const res = await authFetch(new URL("/api/reconcile/depot-risk", API_URL));
   return unwrap<DepotRiskResult>(res);
@@ -344,6 +367,20 @@ export async function getAnomalies(
   return result;
 }
 
+export async function getInukaStreamStatus(): Promise<InukaStreamStatus> {
+  return unwrap<InukaStreamStatus>(await authFetch("/api/inuka/stream/status"));
+}
+
+export async function getBeneficiaryConsents(params: { page?: number; pageSize?: number; status?: string; consentType?: string; search?: string } = {}): Promise<BeneficiaryConsentResult> {
+  const url = new URL("/api/inuka/consents", API_URL);
+  url.searchParams.set("page", String(params.page ?? 1));
+  url.searchParams.set("page_size", String(params.pageSize ?? 25));
+  if (params.status) url.searchParams.set("status", params.status);
+  if (params.consentType) url.searchParams.set("consent_type", params.consentType);
+  if (params.search) url.searchParams.set("search", params.search);
+  return unwrap<BeneficiaryConsentResult>(await authFetch(url));
+}
+
 export async function getInukaSummary(): Promise<InukaCaseSummary> {
   const res = await authFetch(new URL("/api/inuka/summary", API_URL));
   return unwrap<InukaCaseSummary>(res);
@@ -372,6 +409,11 @@ export async function getInukaCases(params: {
   if (params.search) url.searchParams.set("search", params.search);
   const res = await authFetch(url);
   return unwrap<InukaCasesResult>(res);
+}
+
+export async function getInukaCase(caseId: string): Promise<InukaRiskCase> {
+  const res = await authFetch(new URL(`/api/inuka/cases/${encodeURIComponent(caseId)}`, API_URL));
+  return unwrap<InukaRiskCase>(res);
 }
 
 export interface InukaCaseAction {

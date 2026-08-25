@@ -20,6 +20,7 @@ from app.utils.db_connection import get_engine
 from app.services.audit.anchor_service import run_periodic_anchor_check
 from app.services.fraud.graph_snapshot_service import run_periodic_graph_snapshot_refresh
 from app.services.fraud.fraud_scoring_service import run_periodic_retrain_check
+from app.services.inuka_stream import run_inuka_stream
 from contextlib import asynccontextmanager
 import asyncio
 import contextlib
@@ -50,8 +51,9 @@ async def lifespan(app: FastAPI):
 
     graph_snapshot_task = asyncio.create_task(run_periodic_graph_snapshot_refresh())
     retrain_check_task = asyncio.create_task(run_periodic_retrain_check())
+    inuka_stream_task = asyncio.create_task(run_inuka_stream())
 
-    background_tasks = [anchor_task, graph_snapshot_task, retrain_check_task]
+    background_tasks = [anchor_task, graph_snapshot_task, retrain_check_task, inuka_stream_task]
     yield
     for task in background_tasks:
         task.cancel()

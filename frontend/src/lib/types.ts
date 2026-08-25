@@ -172,6 +172,28 @@ export interface DepotAlertsResult {
   items: Anomaly[];
 }
 
+export interface AlertItem {
+  id: string;
+  title: string;
+  message: string;
+  severity: "info" | "warning" | "critical" | string;
+  tier: string;
+  category: string;
+  related_type?: string | null;
+  related_id?: string | null;
+  email_sent: boolean;
+  created_at: string;
+  is_read: boolean;
+}
+
+export interface AlertListResult {
+  items: AlertItem[];
+  total: number;
+  unread_count: number;
+  page: number;
+  page_size: number;
+}
+
 // GET /api/reconcile/depot-risk — the Heatmap page's Map view (view_heatmap).
 export interface DepotRiskEntry {
   depot_id: string;
@@ -463,6 +485,7 @@ export type RoleName = (typeof ROLE_NAMES)[number];
 
 export interface InukaRiskCase {
   case_id: string;
+  primary_record_id: string | null;
   risk_type: string;
   title: string;
   reason: string;
@@ -476,10 +499,44 @@ export interface InukaRiskCase {
   period: string | null;
   amount_at_risk: number;
   risk_score: number;
+  fraud_score: number;
+  fraud_tier: FraudTier;
+  score_basis: string[];
+  signal_types: string[];
+  signals: Array<{
+    risk_type: string;
+    label: string;
+    reason: string;
+    amount_at_risk: number;
+    severity: string;
+    confidence: string;
+    source_records: string[];
+  }>;
   severity: string;
   status: string;
+  review_status: string;
   confidence: string;
   source_records: string[];
+}
+
+export interface BeneficiaryConsent {
+  consent_id: string | null;
+  beneficiary_id: string | null;
+  consent_type: string | null;
+  status: string;
+  captured_at: string | null;
+  captured_by: string | null;
+  can_withdraw: boolean;
+  can_renew: boolean;
+  anonymised_export_allowed: boolean;
+}
+
+export interface BeneficiaryConsentResult {
+  items: BeneficiaryConsent[];
+  total: number;
+  page: number;
+  page_size: number;
+  source: string;
 }
 
 export interface InukaCaseSummary {
@@ -541,3 +598,5 @@ export interface HeatmapData {
   products: string[];
   total_leakage: number;
 }
+
+export interface InukaStreamStatus { mode: string; pillars: string[]; events_received: number; last_event_at: string | null; source_contract: string; }
