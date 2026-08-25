@@ -58,6 +58,13 @@ htmlcov/
 .tox/
 *.cover
 
+# Playwright (frontend/e2e) — output dir follows whatever cwd `npx
+# playwright test` was run from, not always frontend/, so ignore it at
+# the root too.
+test-results/
+playwright-report/
+blob-report/
+
 # Misc
 get-docker.sh
 *.tmp
