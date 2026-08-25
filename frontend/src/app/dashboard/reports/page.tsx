@@ -48,6 +48,7 @@ function ReportsContent() {
   // Governance Modals State
   const [isFieldSelectorOpen, setIsFieldSelectorOpen] = useState(false);
   const [isVerifierOpen, setIsVerifierOpen] = useState(false);
+  const [isConsentOpen, setIsConsentOpen] = useState(false);
   const [historyTarget, setHistoryTarget] = useState<{ type: string; id: string } | null>(null);
 
   // Interactive Funnel State
@@ -311,6 +312,17 @@ function ReportsContent() {
             Audit operational drops, financial settlements, KRA iCMS tax syncs, and Inuka beneficiary stipends.
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setIsConsentOpen(true)}
+          className="px-3.5 py-2 text-xs font-bold bg-[#f1ede9] dark:bg-[#2a2725] hover:bg-[#e8e3de] dark:hover:bg-[#33302c] text-[#26221f] dark:text-[#f5f2ef] border border-[#e8e3de] dark:border-[#33302c] rounded-xl transition flex items-center space-x-1.5 cursor-pointer shrink-0"
+        >
+          <svg className="w-4 h-4 text-[#b3312c]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          <span>Data Privacy Notice</span>
+        </button>
       </header>
 
       {/* Compliance & Governance Banner */}
@@ -946,7 +958,7 @@ function ReportsContent() {
       </div>
 
       {/* Compliance & Governance Modals */}
-      <ConsentModal onAccept={() => {}} />
+      <ConsentModal forceShow={isConsentOpen} onAccept={() => setIsConsentOpen(false)} />
       <FieldSelectorModal
         isOpen={isFieldSelectorOpen}
         onClose={() => setIsFieldSelectorOpen(false)}
