@@ -326,8 +326,8 @@ export async function getAnomalies(
   const result = await unwrap<AnomalyTableResult>(res);
 
   // MASK CUSTOMER NAMES IN ANOMALIES
-  if (result && result.anomalies && Array.isArray(result.anomalies)) {
-    result.anomalies = result.anomalies.map((anomaly: any) => ({
+  if (result?.anomalies && Array.isArray(result.anomalies)) {
+    result.anomalies = result.anomalies.map((anomaly) => ({
       ...anomaly,
       customer: maskBeneficiaryId(anomaly.customer),
     }));
