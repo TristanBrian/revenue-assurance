@@ -40,25 +40,40 @@ interface Column {
   label: string;
 }
 
-const columns: Column[] = [
-  { key: "customer", label: "Customer OMC" },
-  { key: "break_type", label: "Anomaly Type" },
-  { key: "leakage_kes", label: "Leakage" },
-  { key: "age_days", label: "Age" },
-  { key: "fraud_score", label: "Fraud Score" },
-];
+const DEFAULT_COLUMN_LABELS: Record<"customer" | "break_type" | "leakage_kes" | "age_days" | "fraud_score", string> = {
+  customer: "Customer OMC",
+  break_type: "Anomaly Type",
+  leakage_kes: "Leakage",
+  age_days: "Age",
+  fraud_score: "Fraud Score",
+};
 
 interface AnomalyTableProps {
   anomalies: Anomaly[];
   selectedAnomalyId?: string;
   onSelectAnomaly?: (anomaly: Anomaly) => void;
+  /** Overrides the default (inbound-worded) column labels — e.g. outbound
+   * passes { customer: "Beneficiary" }. Only `customer` and `break_type`
+   * meaningfully differ by direction today; unlisted keys keep the
+   * default. See config/direction-config.tsx's AnomaliesConfig.columns. */
+  columnLabels?: Partial<Record<keyof Anomaly, string>>;
+  idLabel?: string;
 }
 
 export default function AnomalyTable({
   anomalies,
   selectedAnomalyId,
   onSelectAnomaly,
+  columnLabels,
+  idLabel = "Dispatch ID",
 }: AnomalyTableProps) {
+  const columns: Column[] = [
+    { key: "customer", label: columnLabels?.customer ?? DEFAULT_COLUMN_LABELS.customer },
+    { key: "break_type", label: columnLabels?.break_type ?? DEFAULT_COLUMN_LABELS.break_type },
+    { key: "leakage_kes", label: columnLabels?.leakage_kes ?? DEFAULT_COLUMN_LABELS.leakage_kes },
+    { key: "age_days", label: columnLabels?.age_days ?? DEFAULT_COLUMN_LABELS.age_days },
+    { key: "fraud_score", label: columnLabels?.fraud_score ?? DEFAULT_COLUMN_LABELS.fraud_score },
+  ];
   const [sortKey, setSortKey] = useState<keyof Anomaly>("leakage_kes");
   const [sortDesc, setSortDesc] = useState<boolean>(true);
 
@@ -107,7 +122,7 @@ export default function AnomalyTable({
         <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 text-zinc-500 dark:text-zinc-400 font-medium">
           <tr>
             <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">
-              Dispatch ID
+              {idLabel}
             </th>
             {columns.map((col) => (
               <th

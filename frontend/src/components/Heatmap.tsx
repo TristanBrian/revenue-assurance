@@ -3,8 +3,9 @@
 import { useEffect, useState, useMemo } from "react";
 import { ApiError, getHeatmap } from "@/lib/api";
 import { useMateriality } from "@/context/MaterialityContext";
-import { useDirection } from "@/context/DirectionContext";
 import type { HeatmapData } from "@/lib/types";
+import type { HeatmapConfig } from "@/config/direction-config";
+import type { WorkspaceDirection } from "@/lib/workspace";
 import DepotMap from "./DepotMap";
 
 function formatKes(value: number): string {
@@ -34,9 +35,13 @@ interface HoveredCell {
   y: number;
 }
 
-export default function Heatmap() {
+interface HeatmapProps {
+  direction: WorkspaceDirection;
+  config: HeatmapConfig;
+}
+
+export default function Heatmap({ direction, config }: HeatmapProps) {
   const { materiality } = useMateriality(); // ✅ Get from context
-  const { direction } = useDirection();
   const [heatmap, setHeatmap] = useState<HeatmapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,8 +126,8 @@ export default function Heatmap() {
             {viewMode === "map"
               ? "Geographic exposure across KPC's depot network and pipeline corridor"
               : viewMode === "bar"
-                ? "Total leakage by Oil Marketing Company, ranked highest to lowest"
-                : "Every OMC × product leakage combination, sorted by value"}
+                ? config.barDescription
+                : config.description}
           </p>
         </div>
 
@@ -153,19 +158,21 @@ export default function Heatmap() {
             </svg>
             <span>List View</span>
           </button>
-          <button
-            onClick={() => setViewMode("map")}
-            className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-              viewMode === "map"
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-            </svg>
-            <span>Map View</span>
-          </button>
+          {config.showMapView && (
+            <button
+              onClick={() => setViewMode("map")}
+              className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                viewMode === "map"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+              <span>Map View</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -249,8 +256,8 @@ export default function Heatmap() {
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-border bg-muted/50 font-medium text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">OMC Customer</th>
-                    <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">Product Group</th>
+                    <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">{config.rowLabel}</th>
+                    <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">{config.columnLabel}</th>
                     <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">Leakage (KSh)</th>
                   </tr>
                 </thead>
