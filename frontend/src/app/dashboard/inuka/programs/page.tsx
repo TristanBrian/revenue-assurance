@@ -1,3 +1,6 @@
-import InukaDimensionTable from "@/components/InukaDimensionTable";
+import { redirect } from "next/navigation";
 
-export default function InukaProgramsPage() { return <InukaDimensionTable dimension="pillars" />; }
+/** Superseded by /dashboard/outbound/anomalies (pillar grouping). */
+export default function InukaProgramsRedirect() {
+  redirect("/dashboard/outbound/anomalies");
+}

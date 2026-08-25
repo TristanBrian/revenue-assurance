@@ -1,12 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import Heatmap from "@/components/Heatmap";
-import RequirePermission from "@/components/RequirePermission";
-
-export default function HeatmapPage() {
-  return (
-    <RequirePermission code="view_heatmap">
-      <Heatmap />
-    </RequirePermission>
-  );
+/** Superseded by /dashboard/[direction]/leakage. */
+export default function HeatmapPageRedirect() {
+  redirect("/dashboard/inbound/leakage");
 }
