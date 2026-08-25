@@ -59,6 +59,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.services.fraud import feature_builder, graph_snapshot_service  # noqa: E402
 from app.services.fraud.feature_builder import FEATURE_COLUMNS, actor_key  # noqa: E402
+from app.services.fraud.fraud_scoring_service import (  # noqa: E402
+    _patch_shap_xgboost_base_score,
+)
 from app.services.reconciliation.reconciliation import (  # noqa: E402
     run_outbound_reconciliation,
     run_reconciliation,
@@ -396,6 +399,11 @@ def main():
     print("🔍 Computing SHAP values...")
     import shap
 
+    # xgboost>=2 serializes base_score as a bracketed-array string that
+    # shap==0.49.1 can't parse on its own — same fix the serving path
+    # applies in _get_shap_explainer(); without it this crashes right
+    # after training with "could not convert string to float: '[...]'".
+    _patch_shap_xgboost_base_score()
     explainer = shap.TreeExplainer(xgb_model)
     shap_values = explainer.shap_values(X_test)
     mean_abs_shap = np.abs(shap_values).mean(axis=0)
