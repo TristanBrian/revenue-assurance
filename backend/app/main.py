@@ -2,6 +2,7 @@ from fastapi import FastAPI, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
 from app.middleware.audit import AuditMiddleware
+# from app.middleware.masking import BeneficiaryMaskingMiddleware  # <-- REMOVE THIS
 from app.routes.reconciliation import reconcile, heatmap
 from app.routes.ebilling import e_billing
 from app.routes.feed import feed
@@ -47,13 +48,6 @@ async def lifespan(app: FastAPI):
 
     anchor_task = asyncio.create_task(run_periodic_anchor_check())
 
-    # Fraud scoring layer: graph snapshot refresh (Louvain community
-    # membership, feeding graph_community_size — recomputing per anomaly
-    # would be too slow, see graph_snapshot_service.py) and the retrain
-    # threshold check (fires an actual retrain only once enough
-    # investigator feedback has accumulated — see fraud_scoring_service.
-    # maybe_retrain()). Both always started, both no-op cheaply until a
-    # trained model/enough feedback exists.
     graph_snapshot_task = asyncio.create_task(run_periodic_graph_snapshot_refresh())
     retrain_check_task = asyncio.create_task(run_periodic_retrain_check())
 
@@ -75,8 +69,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS is explicit by default. Wildcard origins make browser access wider than
-# the deployment requires. Configure the frontend origins through the environment.
+# CORS configuration
 _raw_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001")
 _cors_origins = [origin.strip() for origin in _raw_cors_origins.split(",") if origin.strip()]
 if not _cors_origins:
@@ -89,25 +82,29 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
+# ============================================================================
+# MIDDLEWARE REGISTRATION
+# ============================================================================
+
+# Envelope and audit middlewares ONLY
+app.add_middleware(ResponseEnvelopeMiddleware)
+# app.add_middleware(BeneficiaryMaskingMiddleware)  # <-- REMOVED - causes Content-Length error
+app.add_middleware(AuditMiddleware)
+
 # Include Routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(feed.router, prefix="/api", tags=["Live Feed"])
 app.include_router(reconcile.router, prefix="/api", tags=["Reconciliation"])
 app.include_router(heatmap.router, prefix="/api", tags=["Heatmap"])
 app.include_router(e_billing.router, prefix="/api", tags=["E-Billing"])
-app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])  # <-- NEW
-app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])  # <-- NEW
+app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
+app.include_router(detective.router, prefix="/api/detective", tags=["Detective"])
 app.include_router(scoring.router, prefix="/api/fraud", tags=["Fraud Scoring"])
-app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])  # <-- NEW
-app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])  # <-- NEW
-app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])  # <-- NEW
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
+app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(inuka.router, prefix="/api/inuka", tags=["Inuka Assurance"])
 app.include_router(report_verify.router, prefix="/api/reports", tags=["Report Verification"])
-# app.include_router(chatbot.router, prefix="/api", tags=["Chatbot"])
-
-# Envelope and audit middlewares
-app.add_middleware(ResponseEnvelopeMiddleware)
-app.add_middleware(AuditMiddleware)
 
 # ============================================================================
 # ROOT AND HEALTH ENDPOINTS

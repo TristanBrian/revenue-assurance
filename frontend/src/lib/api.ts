@@ -149,6 +149,49 @@ async function authFetch(input: string | URL, init: RequestInit = {}): Promise<R
   return fetch(input, { ...init, headers });
 }
 
+/**
+ * Unified beneficiary masking – "bank statement" style.
+ * - BEN-0158 → BEN-****0158
+ * - Audrey Anderson → BEN-****5837 (consistent hash-based)
+ * - Company names (e.g., Vivo Energy) remain unchanged
+ */
+function maskBeneficiaryId(id: string | undefined | null): string {
+  if (!id) return "Beneficiary";
+
+  // If it's already a BEN-XXXX format, mask it
+  if (id.startsWith("BEN-")) {
+    const clean = id.replace(/^BEN-/, "");
+    if (clean.includes('****')) return id;
+    const suffix = clean.length >= 4 ? clean.slice(-4) : clean.padStart(4, '0');
+    return `BEN-****${suffix}`;
+  }
+
+  // If it contains a space (likely a person's name like "Audrey Anderson")
+  if (id.includes(' ')) {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = ((hash << 5) - hash) + id.charCodeAt(i);
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    const suffix = String(Math.abs(hash) % 10000).padStart(4, '0');
+    return `BEN-****${suffix}`;
+  }
+
+  // If it looks like a name pattern (First Last without space)
+  if (id.length > 8 && id !== id.toUpperCase() && !id.includes('ENERGY') && !id.includes('OIL')) {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) {
+      hash = ((hash << 5) - hash) + id.charCodeAt(i);
+      hash = hash & hash;
+    }
+    const suffix = String(Math.abs(hash) % 10000).padStart(4, '0');
+    return `BEN-****${suffix}`;
+  }
+
+  // Company names remain unchanged (e.g., "Vivo Energy", "Dalbit Petroleum")
+  return id;
+}
+
 /** Returns the full envelope rather than just the token — callers must
  * check reset_required before treating this as a normal session (see
  * auth-context.tsx's login()). */
@@ -179,10 +222,10 @@ export async function getTermsBundle(): Promise<TermsBundle> {
  * backend's single combined validation. On success returns a normal
  * access token, same as a successful login(). */
 export async function resetPassword(
-  resetToken: string,
-  newPassword: string,
-  confirmPassword: string,
-  checkboxAccepted: boolean,
+    resetToken: string,
+    newPassword: string,
+    confirmPassword: string,
+    checkboxAccepted: boolean,
 ): Promise<ResetPasswordResponse> {
   const res = await fetch(new URL("/api/auth/reset-password", API_URL), {
     method: "POST",
@@ -201,8 +244,8 @@ export async function resetPassword(
  * redeems the short-lived consent_token from a terms_required login
  * response. */
 export async function acceptTerms(
-  consentToken: string,
-  checkboxAccepted: boolean,
+    consentToken: string,
+    checkboxAccepted: boolean,
 ): Promise<AcceptTermsResponse> {
   const res = await fetch(new URL("/api/auth/accept-terms", API_URL), {
     method: "POST",
@@ -271,11 +314,11 @@ export interface AnomalyFilters {
 }
 
 export async function getAnomalies(
-  materiality = 100000,
-  page = 1,
-  pageSize = 20,
-  filters: AnomalyFilters = {},
-  direction: Direction = "all",
+    materiality = 100000,
+    page = 1,
+    pageSize = 20,
+    filters: AnomalyFilters = {},
+    direction: Direction = "all",
 ): Promise<AnomalyTableResult> {
   const url = new URL("/api/reconcile/anomalies", API_URL);
   url.searchParams.set("materiality", String(materiality));
@@ -288,7 +331,17 @@ export async function getAnomalies(
   if (filters.pillarId) url.searchParams.set("pillar_id", filters.pillarId);
   if (filters.officerId) url.searchParams.set("officer_id", filters.officerId);
   const res = await authFetch(url);
-  return unwrap<AnomalyTableResult>(res);
+  const result = await unwrap<AnomalyTableResult>(res);
+
+  // MASK CUSTOMER NAMES IN ANOMALIES
+  if (result?.anomalies && Array.isArray(result.anomalies)) {
+    result.anomalies = result.anomalies.map((anomaly) => ({
+      ...anomaly,
+      customer: maskBeneficiaryId(anomaly.customer),
+    }));
+  }
+
+  return result;
 }
 
 export async function getInukaSummary(): Promise<InukaCaseSummary> {
@@ -460,8 +513,8 @@ interface ReconcileUploadFiles {
 }
 
 export async function reconcileUpload(
-  files: ReconcileUploadFiles,
-  materiality = 100000,
+    files: ReconcileUploadFiles,
+    materiality = 100000,
 ): Promise<ReconcileResult> {
   const url = new URL("/api/reconcile/upload", API_URL);
   url.searchParams.set("materiality", String(materiality));
@@ -487,9 +540,9 @@ export async function reconcileUpload(
  * callers should treat "upload progress hit 100" as "now reconciling" with
  * no further percentage rather than inventing one. */
 export function reconcileUploadWithProgress(
-  files: ReconcileUploadFiles,
-  materiality: number,
-  onProgress: (percent: number) => void,
+    files: ReconcileUploadFiles,
+    materiality: number,
+    onProgress: (percent: number) => void,
 ): Promise<ReconcileResult> {
   const url = new URL("/api/reconcile/upload", API_URL);
   url.searchParams.set("materiality", String(materiality));
@@ -560,9 +613,9 @@ export async function downloadExport(materiality = 100000, direction: Direction 
 }
 
 export async function downloadExportWithFields(
-  materiality = 100000,
-  fields?: string[],
-  direction: Direction = "all",
+    materiality = 100000,
+    fields?: string[],
+    direction: Direction = "all",
 ): Promise<Blob> {
   const url = new URL("/api/reconcile/export", API_URL);
   url.searchParams.set("materiality", String(materiality));
@@ -662,6 +715,12 @@ export async function getHeatmap(materiality = 0, direction: Direction = "all"):
   if (body.status === "error") {
     throw new ApiError(body.message ?? "Heatmap request failed", 500);
   }
+
+  // MASK THE OMC NAMES IN HEATMAP
+  if (body.data && body.data.omcs && Array.isArray(body.data.omcs)) {
+    body.data.omcs = body.data.omcs.map((name: string) => maskBeneficiaryId(name));
+  }
+
   return body.data;
 }
 
@@ -672,10 +731,10 @@ export async function getHeatmap(materiality = 0, direction: Direction = "all"):
 export type FraudFeedbackLabel = "confirmed_fraud" | "false_positive" | "resolved_benign";
 
 export async function updateAnomalyStatus(
-  dispatchId: string,
-  status: string,
-  notes = "",
-  fraudFeedbackLabel?: FraudFeedbackLabel,
+    dispatchId: string,
+    status: string,
+    notes = "",
+    fraudFeedbackLabel?: FraudFeedbackLabel,
 ): Promise<UpdateAnomalyResponse> {
   const url = new URL("/api/reconcile/update", API_URL);
   url.searchParams.set("dispatch_id", dispatchId);
