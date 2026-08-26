@@ -189,11 +189,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex h-full w-60 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar p-3 transition-[transform,width] duration-300 ease-in-out lg:static lg:z-auto lg:translate-x-0 ${sidebarCollapsed ? "lg:w-20" : "lg:w-1/4"} ${
+        className={`fixed inset-y-0 left-0 z-40 flex h-full w-60 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar p-3 transition-[transform,width] duration-300 ease-in-out lg:static lg:z-auto lg:translate-x-0 ${sidebarCollapsed ? "lg:w-[4.5rem] lg:p-2" : "lg:w-64"} ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center gap-2.5 px-2 py-3 mb-2">
+        <div className={`mb-2 flex items-center gap-2.5 px-2 py-3 ${sidebarCollapsed ? "lg:justify-center lg:px-0" : ""}`}>
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
@@ -205,7 +205,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </svg>
           </button>
           {BRAND_CONFIG.logoUrl ? (
-            <div className="w-8 h-8 shrink-0 relative">
+            <div className={`relative h-8 w-8 shrink-0 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
               <Image
                 src={BRAND_CONFIG.logoUrl}
                 alt={`${BRAND_CONFIG.companyName} logo`}
@@ -216,7 +216,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           ) : (
             <div
-              className="w-8 h-8 shrink-0 rounded-md flex items-center justify-center font-black text-white text-xs"
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-xs font-black text-white ${sidebarCollapsed ? "lg:hidden" : ""}`}
               style={{ backgroundColor: BRAND_CONFIG.primaryColor }}
             >
               {BRAND_CONFIG.shortName.slice(0, 2).toUpperCase()}
@@ -235,7 +235,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             onClick={toggleSidebar}
             aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="ml-auto hidden shrink-0 rounded-md p-1.5 text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground lg:block"
+            className={`ml-auto hidden shrink-0 rounded-md p-2 text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground lg:block ${sidebarCollapsed ? "lg:mx-auto" : ""}`}
           >
             <svg className={`h-4 w-4 transition-transform ${sidebarCollapsed ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -246,8 +246,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         <p className={`px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground ${sidebarCollapsed ? "lg:hidden" : ""}`}>
           Workspace
         </p>
-        {canSwitchWorkspace && !sidebarCollapsed && (
-          <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-sidebar-accent/50 p-1">
+        {canSwitchWorkspace && (
+          <div className={`mb-3 grid grid-cols-2 gap-1 rounded-lg bg-sidebar-accent/50 p-1 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
             {(["inbound", "outbound"] as const).map((d) => (
               <button
                 key={d}
@@ -268,14 +268,15 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           {isAdmin && (
             <Link
               href="/dashboard/admin"
-              className={`group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors ${pathname === "/dashboard/admin" ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"}`}
+              title={sidebarCollapsed ? "User Administration" : undefined}
+              className={`group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""} ${pathname === "/dashboard/admin" ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"}`}
             >
               <span className={pathname === "/dashboard/admin" ? "text-sidebar-primary" : ""}>
                 <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m7-10a4 4 0 100-8 4 4 0 000 8zm10 10v-2a4 4 0 00-3-3.87m-1-12a4 4 0 010 7.75" />
                 </svg>
               </span>
-              User Administration
+              <span className={sidebarCollapsed ? "lg:hidden" : ""}>User Administration</span>
             </Link>
           )}
           {visibleItems.map((item) => {

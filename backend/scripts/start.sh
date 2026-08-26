@@ -69,21 +69,11 @@ python scripts/load_master_data.py || true
 # ------------------------------------------------------------------
 echo "🔄 Running Alembic migrations..."
 
-# --- FIX: handle multiple heads automatically ---
-# Run upgrade, capture stderr. If we see "Multiple head revisions", do a merge.
-UPGRADE_OUT=$(alembic upgrade head 2>&1) || true
-if echo "$UPGRADE_OUT" | grep -q "Multiple head revisions"; then
-    echo "⚠️ Multiple migration heads detected – merging automatically..."
-    alembic merge heads -m "Auto-merge deployment heads"
-    alembic upgrade head
-else
-    # If the upgrade succeeded, nothing else needed.
-    # But if it failed for another reason, we still want to exit (the trap will catch it).
-    if [ -n "$UPGRADE_OUT" ] && ! echo "$UPGRADE_OUT" | grep -q "INFO  \[alembic.runtime.migration\] Context impl"; then
-        echo "$UPGRADE_OUT"
-        exit 1
-    fi
-fi
+# Migration branches must be reconciled in source control. Generating a merge
+# revision during container startup makes the database reference a revision
+# that disappears with the ephemeral container and can break the next deploy.
+# `set -e` intentionally stops startup if the committed graph is invalid.
+alembic upgrade head
 
 echo "🔄 Seeding roles and platform bootstrap..."
 python scripts/seed_roles.py
