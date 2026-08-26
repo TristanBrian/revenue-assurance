@@ -249,8 +249,24 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [highRiskCount, setHighRiskCount] = useState<number>(0);
   const [failedSyncCount, setFailedSyncCount] = useState<number>(0);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [depotAlerts, setDepotAlerts] = useState<{ depotId: string; criticalCount: number; items: Anomaly[] } | null>(null);
   const [depotAlertsOpen, setDepotAlertsOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setSidebarCollapsed(window.localStorage.getItem("flowguard_sidebar_collapsed") === "true");
+  }, []);
+
+  function toggleSidebar() {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("flowguard_sidebar_collapsed", String(next));
+      }
+      return next;
+    });
+  }
 
   // Data-fetching effect – added isInukaManager to deps
   useEffect(() => {
@@ -325,9 +341,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <aside className="flex h-full w-60 shrink-0 flex-col overflow-y-auto bg-sidebar border-r border-sidebar-border p-3">
-        <div className="flex items-center gap-3 px-2 py-3 mb-2">
+    <div className="grid h-screen overflow-hidden bg-background text-foreground transition-[grid-template-columns] duration-300 ease-out" style={{ gridTemplateColumns: `${sidebarCollapsed ? "5rem" : "15rem"} minmax(0, 1fr)` }}>
+      <aside className="relative flex h-full min-h-0 w-full flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-300 ease-out">
+        <div className={`flex h-14 shrink-0 items-center border-b border-sidebar-border px-3 ${sidebarCollapsed ? "justify-center" : "gap-3"}`}>
           {BRAND_CONFIG.logoUrl ? (
             <div className="w-8 h-8 shrink-0 relative">
               <Image
@@ -346,7 +362,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               {BRAND_CONFIG.shortName.slice(0, 2).toUpperCase()}
             </div>
           )}
-          <div className="min-w-0">
+          <div className={`min-w-0 flex-1 transition-opacity duration-200 ${sidebarCollapsed ? "hidden opacity-0" : "opacity-100"}`}>
             <p className="text-base sm:text-lg font-extrabold text-sidebar-foreground leading-snug truncate">
               {BRAND_CONFIG.companyName}
             </p>
@@ -354,12 +370,25 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               {isInukaWorkspace ? "Inuka Program Assurance" : BRAND_CONFIG.systemName}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!sidebarCollapsed}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground ${sidebarCollapsed ? "absolute left-[4rem] z-40 translate-x-1/2 border border-sidebar-border bg-sidebar shadow-md" : ""}`}
+          >
+            <svg className={`h-4 w-4 transition-transform duration-300 ${sidebarCollapsed ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
         </div>
 
-        <p className="px-2 mb-1.5 text-xs font-extrabold uppercase tracking-wider text-sidebar-muted-foreground">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        {!sidebarCollapsed && <p className="px-2 mb-1.5 text-xs font-extrabold uppercase tracking-wider text-sidebar-muted-foreground">
           Workspace
-        </p>
-        {canUseDualWorkspace && (
+        </p>}
+        {canUseDualWorkspace && !sidebarCollapsed && (
           <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-sidebar-accent/50 p-1">
             {(["oil", "inuka"] as const).map((item) => (
               <button
@@ -389,32 +418,36 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group flex items-center justify-between rounded-md px-2.5 py-2 text-sm sm:text-base font-bold transition-colors py-2.5 px-3 ${
+                title={sidebarCollapsed ? item.label : undefined}
+                className={`group relative flex items-center justify-between rounded-md px-2.5 py-2 text-sm sm:text-base font-bold transition-colors py-2.5 px-3 ${
+                  sidebarCollapsed ? "justify-center px-2" : ""
+                } ${
                   active
                     ? "bg-sidebar-accent text-sidebar-foreground"
                     : "text-sidebar-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
                 }`}
               >
-                <span className="flex items-center gap-3">
+                <span className={`flex items-center ${sidebarCollapsed ? "justify-center" : "gap-3"}`}>
                   <span className={active ? "text-sidebar-primary" : ""}>{item.icon}</span>
-                  {item.label}
+                  {!sidebarCollapsed && item.label}
                 </span>
                 {count > 0 && (
-                  <span className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-sidebar-primary px-1 text-xs font-extrabold text-sidebar-primary-foreground">
-                    {count}
+                  <span className={`${sidebarCollapsed ? "absolute ml-7 -mt-6 h-3.5 min-w-3.5 text-[8px]" : "h-4.5 min-w-4.5 text-xs"} flex items-center justify-center rounded-full bg-sidebar-primary px-1 font-extrabold text-sidebar-primary-foreground`}>
+                    {count > 99 ? "99+" : count}
                   </span>
                 )}
               </Link>
             );
           })}
         </nav>
+        </div>
 
-        <div className="mt-auto flex flex-col gap-3">
-          <div className="border-t border-sidebar-border pt-3 flex items-center gap-3 px-1">
+        <div className="shrink-0 p-3">
+          <div className={`border-t border-sidebar-border pt-3 flex items-center ${sidebarCollapsed ? "flex-col gap-2" : "gap-3 px-1"}`}>
             <div className="w-7 h-7 shrink-0 rounded-full bg-sidebar-primary/20 text-sidebar-primary flex items-center justify-center text-[11px] font-bold">
               {user?.email?.[0]?.toUpperCase() ?? "?"}
             </div>
-            <div className="min-w-0 flex-1">
+            <div className={`min-w-0 flex-1 ${sidebarCollapsed ? "hidden" : ""}`}>
               {!authLoading && user && (
                 <>
                   <p className="truncate text-xs sm:text-sm font-bold text-sidebar-foreground">{user.email}</p>
@@ -438,7 +471,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+      <div className="min-h-0 min-w-0 flex flex-col overflow-hidden">
         <header className="flex h-14 items-center justify-between gap-4 px-6 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30">
           {showSearch ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground max-w-md w-full">

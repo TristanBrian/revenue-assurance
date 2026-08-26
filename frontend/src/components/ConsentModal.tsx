@@ -7,24 +7,16 @@ interface ConsentModalProps {
   forceShow?: boolean;
 }
 
-const STORAGE_KEY = "kpc_report_confidentiality_accepted";
-
 export default function ConsentModal({ onAccept, forceShow = false }: ConsentModalProps) {
   const [open, setOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (forceShow) {
       setOpen(true);
-      return;
-    }
-    const accepted = sessionStorage.getItem(STORAGE_KEY);
-    if (!accepted) {
-      setOpen(true);
     }
   }, [forceShow]);
 
   const handleAgree = () => {
-    sessionStorage.setItem(STORAGE_KEY, "true");
     setOpen(false);
     if (onAccept) onAccept();
   };
@@ -42,16 +34,18 @@ export default function ConsentModal({ onAccept, forceShow = false }: ConsentMod
           </div>
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-[#f5f2ef] tracking-tight">Confidentiality & Non-Disclosure Notice</h2>
-            <p className="text-xs sm:text-sm font-medium text-[#b2aeac] mt-1">Order-to-Cash Data Governance Requirement</p>
+            <p className="text-xs sm:text-sm font-medium text-[#b2aeac] mt-1">Oil Revenue & Inuka Programme Data Governance Requirement</p>
           </div>
         </div>
 
         <div className="p-5 rounded-2xl bg-[#2a2725] border border-[#33302c] text-sm sm:text-base text-[#f5f2ef] space-y-3.5 leading-relaxed">
           <p className="font-medium">
-            You are accessing sensitive KPC Revenue Assurance reports containing proprietary Oil Marketing Company (OMC) dispatch volumes, financial reconciliation figures, and e-billing audit trails.
+            You are accessing two strictly separated assurance domains: confidential KPC Oil revenue records and protected Inuka beneficiary programme records. Access does not authorize cross-domain disclosure.
           </p>
           <ul className="list-disc pl-5 space-y-2 text-xs sm:text-sm text-[#b2aeac]">
             <li>Do not disclose unmasked commercial figures to unauthorized third parties.</li>
+            <li>Inuka beneficiary and payment identifiers are masked in normal report views and exports by default.</li>
+            <li>Oil and Inuka records remain separated by role, server-side scope, report filters, and export direction.</li>
             <li>Exported files are cryptographically signed with SHA-256 digests and logged to your user session.</li>
             <li>All activities comply with the Kenya Data Protection Act (KDPA) and KPC Security Guidelines.</li>
           </ul>

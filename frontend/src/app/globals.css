@@ -171,8 +171,8 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
 
-  --font-sans: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
   --radius-card: 0.75rem;
   --animate-indeterminate: indeterminate 1.2s ease-in-out infinite;
 }
