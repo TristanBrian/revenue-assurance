@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+//import { redirect } from "next/navigation":
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { ApiError, downloadExportWithFields, getMetrics, getEbillingLogs } from "@/lib/api";
@@ -297,7 +297,7 @@ function ReportsContent() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-[1700px] mx-auto px-2 sm:px-4 text-zinc-800 dark:text-zinc-100">
-      
+
       {/* Page Header */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -386,7 +386,7 @@ function ReportsContent() {
               </div>
             ) : (
               <div className="flex flex-col gap-6">
-                
+
                 {/* 1. HERO RECOVERY STAT BANNER */}
                 <div className="bg-gradient-to-r from-emerald-900/90 via-slate-900 to-slate-900 border border-emerald-500/40 p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center space-x-4">
@@ -423,7 +423,7 @@ function ReportsContent() {
                 {/* 2. SINGLE LEFT-TO-RIGHT VALUE FLOW & CONNECTED LIFECYCLE CHECKPOINTS */}
                 <div className="relative pt-2">
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
-                    
+
                     {/* STAGE 1: Dispatched Baseline */}
                     <div
                       onClick={() => handleFunnelStageClick("dispatched")}
@@ -575,7 +575,7 @@ function ReportsContent() {
 
         {/* RIGHT COLUMN: Filter & Export Option Cards */}
         <div className="flex flex-col gap-6">
-          
+
           {/* Card A: Report Focus Selector */}
           <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-6 sm:p-7 shadow-md flex flex-col gap-5">
             <div>
@@ -696,13 +696,13 @@ function ReportsContent() {
 
       {/* BOTTOM WORKSPACE SECTION: Report Data Preview Table Grid */}
       <div className="bg-white dark:bg-slate-900/90 border border-zinc-200 dark:border-slate-700/80 rounded-2xl p-6 shadow-md flex flex-col gap-5">
-        
+
         {/* Toolbar Header for Table Preview */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-200 dark:border-slate-800 pb-4">
           <div>
             <h3 className="text-sm font-bold text-zinc-900 dark:text-slate-100 uppercase tracking-wider">
-              {reportType === "operational" ? "Operational Audit Log Preview" : 
-               reportType === "financial" ? "Financial Settlement Match Preview" : 
+              {reportType === "operational" ? "Operational Audit Log Preview" :
+               reportType === "financial" ? "Financial Settlement Match Preview" :
                reportType === "inuka" ? "Inuka Stipend Governance Log Preview" :
                "iCMS Tax Declaration logs"}
             </h3>
@@ -730,7 +730,7 @@ function ReportsContent() {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            
+
             {/* Table wrapper */}
             <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-slate-800 bg-white dark:bg-slate-955/90">
 
@@ -740,7 +740,7 @@ function ReportsContent() {
                 </div>
               ) : (
                 <table className="w-full min-w-[700px] text-left text-xs">
-                  
+
                   {/* Table Headers */}
                   <thead className="border-b border-zinc-200 dark:border-slate-800 bg-zinc-100 dark:bg-slate-900/90 text-zinc-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[11px]">
                     {reportType === "operational" ? (
@@ -792,7 +792,7 @@ function ReportsContent() {
 
                   {/* Table Body Content */}
                   <tbody className="divide-y divide-zinc-200 dark:divide-zinc-900 text-zinc-700 dark:text-zinc-355">
-                    
+
                     {reportType === "operational" &&
                       (paginatedData as Anomaly[]).map((a, i) => (
                         <tr key={i} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/40 transition-colors">
