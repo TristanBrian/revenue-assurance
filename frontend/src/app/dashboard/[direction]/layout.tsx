@@ -27,12 +27,16 @@ export default function DirectionLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (loading) return;
+    if (user?.roles.includes("system_admin")) {
+      router.replace("/dashboard/admin");
+      return;
+    }
     if (!isDirectionAllowed(user, direction)) {
       router.replace(`/dashboard/${getDefaultDirection(user)}/overview`);
     }
   }, [loading, user, direction, router]);
 
-  if (loading || !isDirectionAllowed(user, direction)) {
+  if (loading || user?.roles.includes("system_admin") || !isDirectionAllowed(user, direction)) {
     return (
       <div className="flex items-center justify-center p-12">
         <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
