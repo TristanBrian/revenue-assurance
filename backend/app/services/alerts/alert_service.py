@@ -25,6 +25,7 @@ registry at creation time, resolved against users_with_permission/
 users_with_role (ordinary relational joins, no JSON involved).
 """
 import hashlib
+import logging
 import uuid as uuid_lib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -39,6 +40,7 @@ from app.models.auth.role import Role
 from app.models.auth.user import User
 from app.services.alerts.alert_types import AlertTier, AlertType, get_meta
 
+logger = logging.getLogger(__name__)
 APP_NAME = "KPC Revenue Assurance"
 _VISIBILITY_SCAN_LIMIT = 5000
 
@@ -135,8 +137,14 @@ def alert_workspace(alert: Alert) -> str:
     related_type = (alert.related_type or "").lower()
     related_id = str(alert.related_id or "").upper()
     category = (alert.category or "").lower()
-    if related_type in {"inuka_case", "inuka_disbursement", "inuka_cluster", "cluster_outbound"}:
+    if related_type in {"inuka_case", "inuka_disbursement", "inuka_cluster"}:
         return "outbound"
+    if related_type == "cluster_outbound":
+        # Older graph runs could stamp an OMC community as outbound. Keep
+        # those Oil alerts out of the Inuka inbox even when their related_type
+        # was written incorrectly; valid outbound clusters never describe OMCs.
+        text = f"{alert.title or ''} {alert.message or ''}".lower()
+        return "inbound" if "omc" in text else "outbound"
     if related_id.startswith("INUKA-") or category.startswith("inuka_"):
         return "outbound"
     return "inbound"
@@ -598,8 +606,14 @@ def notify_fraud_clusters(db: Session, communities: list[dict], workspace: str =
 
     new_clusters = []
     for community in communities:
-        node_ids = community.get("node_ids", [])
+        node_ids = [str(node_id) for node_id in community.get("node_ids", [])]
         if community.get("risk_level") != "High" or not node_ids:
+            continue
+        if workspace == "outbound" and not any(node_id.upper().startswith(("OFF-", "BEN-")) for node_id in node_ids):
+            logger.warning("Skipping non-Inuka community from outbound alert generation: %s", node_ids[:4])
+            continue
+        if workspace == "inbound" and not any(node_id.upper().startswith(("OMC-", "DEP-", "OMC:", "DEPOT:")) for node_id in node_ids):
+            logger.warning("Skipping non-Oil community from inbound alert generation: %s", node_ids[:4])
             continue
         cluster_id = _cluster_identity(node_ids)
         if alert_exists(db, category=AlertType.FRAUD_CLUSTER_NEW.value, related_id=cluster_id):
@@ -612,7 +626,10 @@ def notify_fraud_clusters(db: Session, communities: list[dict], workspace: str =
     created = []
     for cluster_id, community in new_clusters:
         alert = Alert(
-            title=f"New high-risk cluster: {community.get('member_count', len(community.get('node_ids', [])))} OMCs",
+            title=(
+                f"New high-risk cluster: {community.get('member_count', len(node_ids))} "
+                f"{'beneficiary/officer entities' if workspace == 'outbound' else 'OMCs'}"
+            ),
             message=(
                 f"Louvain clustering found a new correlated-leakage community — "
                 f"KES {community.get('total_leakage_kes', 0):,} across "

@@ -33,6 +33,7 @@ from app.utils.db_connection import Base  # noqa: E402
 from app.services.alerts.alert_types import REGISTRY, AlertTier, AlertType  # noqa: E402
 from app.services.alerts.alert_service import (  # noqa: E402
     alert_exists,
+    alert_workspace,
     create_alert,
     get_unread_count,
     list_alerts_for_user,
@@ -300,6 +301,24 @@ def test_notify_fraud_clusters_new_high_risk_only(db):
     # Same cluster (same OMC set) doesn't re-alert.
     again = notify_fraud_clusters(db, communities)
     assert again == []
+
+
+def test_omc_cluster_stamped_outbound_is_kept_in_oil_workspace():
+    alert = Alert(
+        title="New high-risk cluster: 18 OMCs",
+        message="Correlated leakage across OMCs",
+        related_type="cluster_outbound",
+    )
+    assert alert_workspace(alert) == "inbound"
+
+
+def test_outbound_cluster_requires_beneficiary_or_officer_nodes(db):
+    created = notify_fraud_clusters(
+        db,
+        [{"node_ids": ["OMC-1", "OMC-2"], "risk_level": "High", "member_count": 2}],
+        workspace="outbound",
+    )
+    assert created == []
 
 
 # ============================================================================
