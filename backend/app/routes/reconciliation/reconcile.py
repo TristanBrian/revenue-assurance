@@ -667,6 +667,7 @@ def export_report(
     materiality: float = Query(100000),
     direction: str = Query("all", description="inbound | outbound | all — defaults to all"),
     fields: Optional[str] = Query(None, description="Comma-separated field names for data minimization"),
+    mask_sensitive: bool = Query(True, description="Mask identity and account fields in exported report data"),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("export_reports")),
 ):
@@ -681,6 +682,15 @@ def export_report(
             anomalies = result.get('anomalies', [])
             anomalies_df = pd.DataFrame(anomalies)
 
+            def mask_value(value):
+                if pd.isna(value):
+                    return value
+                text = str(value)
+                if len(text) <= 4:
+                    return f"{text[:1]}***"
+                return f"{text[:2]}{'*' * min(6, len(text) - 3)}{text[-1:]}"
+
+            selected_fields_list = []
             # Data Minimization: filter columns if specified
             # selected_fields_list always defined (even when fields is empty
             # or anomalies_df is empty) — it's read again below, outside this
@@ -697,6 +707,18 @@ def export_report(
                 if valid_cols:
                     anomalies_df = anomalies_df[valid_cols]
 
+            # Enforce the export dialog's privacy choice on the server. This is
+            # intentionally applied before sheets are split and before hashing.
+            if mask_sensitive and not anomalies_df.empty:
+                sensitive_columns = {
+                    "customer", "beneficiary_name", "beneficiary_id", "officer_id",
+                    "kra_pin", "contact_email", "phone", "id_number", "mpesa_phone",
+                    "mpesa_ref", "payment_account", "account_number",
+                }
+
+                for column in sensitive_columns.intersection(anomalies_df.columns):
+                    anomalies_df[column] = anomalies_df[column].map(mask_value)
+
             if direction == "all" and not anomalies_df.empty and "flow_direction" in anomalies_df.columns:
                 inbound_df = anomalies_df[anomalies_df['flow_direction'] != 'outbound']
                 outbound_df = anomalies_df[anomalies_df['flow_direction'] == 'outbound']
@@ -707,9 +729,15 @@ def export_report(
 
             pd.DataFrame([result['data_quality']]).to_excel(writer, sheet_name='Data Quality', index=False)
             if result.get('omc_risk_profile'):
-                pd.DataFrame(result['omc_risk_profile']).to_excel(writer, sheet_name='OMC Risk Profile', index=False)
+                omc_risk_df = pd.DataFrame(result['omc_risk_profile'])
+                if mask_sensitive and "customer" in omc_risk_df.columns:
+                    omc_risk_df["customer"] = omc_risk_df["customer"].map(mask_value)
+                omc_risk_df.to_excel(writer, sheet_name='OMC Risk Profile', index=False)
             if result.get('duplicate_anomalies'):
-                pd.DataFrame(result['duplicate_anomalies']).to_excel(writer, sheet_name='Duplicates', index=False)
+                duplicates_df = pd.DataFrame(result['duplicate_anomalies'])
+                if mask_sensitive and "details" in duplicates_df.columns:
+                    duplicates_df["details"] = "[record details masked — use authorized case view]"
+                duplicates_df.to_excel(writer, sheet_name='Duplicates', index=False)
 
         
         file_bytes = output.getvalue()
@@ -731,7 +759,8 @@ def export_report(
                     "file_hash": file_hash,
                     "signature": signature,
                     "included_fields": selected_fields_list,
-                    "contains_sensitive_omc_pii": "kra_pin" in (selected_fields_list or []),
+                    "sensitive_fields_masked": mask_sensitive,
+                    "contains_sensitive_omc_pii": not mask_sensitive and "kra_pin" in selected_fields_list,
                 }
             )
             db.commit()

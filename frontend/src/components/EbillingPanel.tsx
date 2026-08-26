@@ -168,7 +168,7 @@ export default function EbillingPanel() {
   const syncing = taskId !== null;
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6">
       <div className="flex flex-col items-start justify-between gap-4 border-b border-border pb-4 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-lg font-bold text-foreground">
