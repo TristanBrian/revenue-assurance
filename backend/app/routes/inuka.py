@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import enforce_reconciliation_scope, get_db, require_permission
 from app.models.auth.user import User
 from app.services.audit.audit_service import get_record_audit_history, log_action
+from app.services.alerts.alert_service import notify_inuka_cases
 from app.services.inuka_assurance import beneficiary_detail, build_inuka_cases, dimension_summary
 from app.services.inuka_stream import recent_events, record_event, stream_status
 
@@ -134,11 +135,18 @@ def inuka_cases(
     officer_id: str | None = Query(None),
     period: str | None = Query(None),
     search: str | None = Query(None),
+    db: Session = Depends(get_db),
     user: User = Depends(require_permission("view_anomaly_table")),
 ):
     _user(user)
     result = build_inuka_cases(materiality=0)
     cases = result["cases"]
+    try:
+        created_alerts = notify_inuka_cases(db, cases)
+        if created_alerts:
+            db.commit()
+    except Exception:
+        db.rollback()
     if status:
         cases = [x for x in cases if x["status"].lower() == status.lower() or x["severity"].lower() == status.lower()]
     if risk_type:

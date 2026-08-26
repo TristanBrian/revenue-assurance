@@ -388,6 +388,40 @@ def notify_critical_anomalies(db: Session, anomalies: list[dict]) -> list[Alert]
     return created
 
 
+def notify_inuka_cases(db: Session, cases: list[dict], limit: int = 25) -> list[Alert]:
+    """Create a bounded, deduplicated inbox from grouped Inuka cases.
+
+    Lists and notifications deliberately use beneficiary IDs only. Sensitive
+    names remain behind the case-detail endpoint and its permission check.
+    """
+    created: list[Alert] = []
+    candidates = sorted(
+        (case for case in cases if case.get("case_id") and case.get("severity") == "Critical"),
+        key=lambda case: float(case.get("amount_at_risk") or 0),
+        reverse=True,
+    )[:limit]
+    for case in candidates:
+        case_id = str(case["case_id"])
+        if alert_exists(db, category=AlertType.INUKA_CASE_CRITICAL.value, related_id=case_id):
+            continue
+        signal_labels = case.get("signal_types") or [signal.get("label") or signal.get("risk_type") for signal in case.get("signals", [])]
+        signal_text = ", ".join(str(value) for value in signal_labels[:3] if value) or "payment-control exception"
+        created.append(create_alert(
+            db,
+            alert_type=AlertType.INUKA_CASE_CRITICAL,
+            title=f"Inuka case requires review: {case_id}",
+            message=(
+                f"{case.get('beneficiary_id') or 'Beneficiary ID unavailable'} · "
+                f"{case.get('pillar_id') or 'Unassigned pillar'} · {signal_text} · "
+                f"KES {float(case.get('amount_at_risk') or 0):,.0f} at risk."
+            ),
+            related_type="inuka_case",
+            related_id=case_id,
+            notify_email=False,
+        ))
+    return created
+
+
 def notify_materiality_spike(db: Session, anomalies: list[dict], materiality: float) -> list[Alert]:
     """A single anomaly at >= MATERIALITY_SPIKE_MULTIPLIER x materiality is
     too large to wait for the digest — one immediate alert per such
