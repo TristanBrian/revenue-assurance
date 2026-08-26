@@ -582,7 +582,7 @@ def get_exposure_recovery_trend(days: int = 30) -> List[Dict]:
     dispatches = pd.read_sql('SELECT * FROM dispatches', engine)
     invoices = pd.read_sql('SELECT * FROM invoices', engine)
     payments = pd.read_sql('SELECT * FROM payments', engine)
-    dispatch_dates = pd.to_datetime(dispatches['date']) if 'date' in dispatches.columns else pd.Series(dtype='datetime64[ns]')
+    dispatch_dates = (pd.to_datetime(dispatches['date'], format='mixed', dayfirst=True, errors='coerce') if 'date' in dispatches.columns else pd.Series(dtype='datetime64[ns]')).dropna()
     reference_date = dispatch_dates.quantile(0.99) if not dispatch_dates.empty else pd.Timestamp.now()
     today = pd.Timestamp(reference_date).normalize()
     window_start = today - pd.Timedelta(days=days - 1)
@@ -591,14 +591,14 @@ def get_exposure_recovery_trend(days: int = 30) -> List[Dict]:
     result = run_reconciliation_on_dataframes(dispatches, invoices, payments, materiality=0)
     anomalies = pd.DataFrame(result.get('anomalies', []))
     if not anomalies.empty:
-        anomalies['bucket_date'] = pd.to_datetime(anomalies['created_at']).dt.normalize()
+        anomalies['bucket_date'] = pd.to_datetime(anomalies['created_at'], format='mixed', dayfirst=True, errors='coerce').dt.normalize()
         exposure_by_day = anomalies[anomalies['bucket_date'] >= window_start].groupby('bucket_date')['leakage_kes'].sum()
     else:
         exposure_by_day = pd.Series(dtype=float)
 
     if not payments.empty and 'date' in payments.columns and 'value_kes' in payments.columns:
         payments = payments.copy()
-        payments['bucket_date'] = pd.to_datetime(payments['date']).dt.normalize()
+        payments['bucket_date'] = pd.to_datetime(payments['date'], format='mixed', dayfirst=True, errors='coerce').dt.normalize()
         recovered_by_day = payments[payments['bucket_date'] >= window_start].groupby('bucket_date')['value_kes'].sum()
     else:
         recovered_by_day = pd.Series(dtype=float)
