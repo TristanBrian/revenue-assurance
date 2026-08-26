@@ -198,6 +198,10 @@ graph TD
 
 ---
 
+## 📹 Demo
+
+[![KPC Revenue Assurance Demo](https://img.youtube.com/vi/YOUR_VIDEO_ID/maxresdefault.jpg)](https://www.awesomescreenshot.com/video/55902957?key=799900bcdb9e7fce74dd2af6e027f787)
+
 ## 📊 Quantified Impact
 
 | Metric | KPC (Inbound) | Inuka (Outbound) |

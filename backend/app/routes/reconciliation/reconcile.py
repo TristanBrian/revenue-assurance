@@ -15,6 +15,7 @@ from app.services.reconciliation.reconciliation import (
     get_depot_risk_summary,
     get_omc_depot_map,
 )
+from app.services.inuka_assurance import pillar_label
 from app.services.feed.feed import update_feed
 from app.services.ebilling.e_billing import sync_anomalies_to_ebilling, update_anomaly_status
 from app.services.audit.audit_service import log_action, get_record_audit_history
@@ -249,6 +250,14 @@ def reconcile_anomalies(
     break_type: Optional[str] = Query(None, description="Filter by break type (e.g. Overpayment, Underpayment, Missing Invoice, Missing Payment)"),
     status: Optional[str] = Query(None, description="Filter by status (e.g. Critical, Pending, Review Required, Reconciled)"),
     search: Optional[str] = Query(None, description="Search across OMC, dispatch ID, product, invoice ID"),
+    # Outbound-only groupings (Stage 2 frontend's DimensionGroupGrid drill-down —
+    # see _build_outbound_anomaly()'s field mapping in reconciliation.py:
+    # product <- pillar_id, officer_id is its own real field on every
+    # outbound anomaly dict, always None on an inbound one). Both no-op
+    # (match nothing, by construction) against inbound anomalies rather
+    # than erroring, same as every other filter here.
+    pillar_id: Optional[str] = Query(None, description="Outbound only — filter to one Inuka pillar (pillar_label() display name, as returned by /api/inuka/pillars)"),
+    officer_id: Optional[str] = Query(None, description="Outbound only — filter to one field officer"),
     user: User = Depends(require_permission("view_anomaly_table")),
 ):
     """
@@ -295,6 +304,23 @@ def reconcile_anomalies(
                 all_anomalies = [a for a in all_anomalies if a.get('resolution_status') == 'Resolved']
             else:
                 all_anomalies = [a for a in all_anomalies if a.get('status') == status]
+        if pillar_id:
+            # a['product'] holds the raw pillar code (e.g. "Scholarship"),
+            # but /api/inuka/pillars — and therefore this query param —
+            # deals in pillar_label()'s display names (e.g. "Inuka
+            # Scholarship"). Label the raw side before comparing, and fall
+            # back to "Unassigned" the same way inuka_assurance.dimension_
+            # summary() does when grouping, or that card always matches
+            # zero rows too.
+            all_anomalies = [
+                a for a in all_anomalies
+                if (pillar_label(a.get('product')) or 'Unassigned') == pillar_id
+            ]
+        if officer_id:
+            all_anomalies = [
+                a for a in all_anomalies
+                if (a.get('officer_id') or 'Unassigned') == officer_id
+            ]
         if search:
             search_lower = search.lower()
             all_anomalies = [
@@ -666,6 +692,15 @@ def export_report(
 
             selected_fields_list = []
             # Data Minimization: filter columns if specified
+            # selected_fields_list always defined (even when fields is empty
+            # or anomalies_df is empty) — it's read again below, outside this
+            # block, when logging the report.export audit entry. Left
+            # unassigned in that branch, this raised UnboundLocalError,
+            # silently swallowed by the "non-fatal" try/except around that
+            # logging call — the export itself still succeeded, but the
+            # audit_match ReportVerifierModal depends on was never written,
+            # so a genuinely authentic export came back "UNKNOWN" on verify.
+            selected_fields_list: list[str] = []
             if fields and not anomalies_df.empty:
                 selected_fields_list = [f.strip() for f in fields.split(",") if f.strip()]
                 valid_cols = [col for col in selected_fields_list if col in anomalies_df.columns]

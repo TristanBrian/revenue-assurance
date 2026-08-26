@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { DirectionProvider } from "@/context/DirectionContext"; // <-- ADD THIS
 import "./globals.css";
 
 const THEME_INIT_SCRIPT = `(function(){try{var m=localStorage.getItem("kpc_theme_mode");var mode=(m==="light"||m==="dark"||m==="system")?m:"dark";var dark=mode==="dark"||(mode==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.classList.add("dark");}catch(e){}})();`;
@@ -41,7 +42,11 @@ export default function RootLayout({
           {CHATBASE_INIT_SCRIPT}
         </Script>
         <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <DirectionProvider>  {/* <-- ADD THIS */}
+              {children}
+            </DirectionProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

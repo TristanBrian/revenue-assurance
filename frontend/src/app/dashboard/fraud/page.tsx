@@ -1,12 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import FraudGraph from "@/components/FraudGraph";
-import RequirePermission from "@/components/RequirePermission";
-
-export default function FraudPage() {
-  return (
-    <RequirePermission code="view_fraud_graph">
-      <FraudGraph />
-    </RequirePermission>
-  );
+/** Superseded by /dashboard/[direction]/risk. */
+export default function FraudPageRedirect() {
+  redirect("/dashboard/inbound/risk");
 }

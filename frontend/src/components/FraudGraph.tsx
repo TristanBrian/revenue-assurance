@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import { ApiError, getFraudGraph } from "@/lib/api";
 import { useMateriality } from "@/context/MaterialityContext";
 import type { FraudGraphData, GraphNode } from "@/lib/types";
+import type { WorkspaceDirection } from "@/lib/workspace";
+import { riskConfig } from "@/config/direction-config";
 
 // Outbound (stipend/disbursement) — Stage 2. "officer"/"beneficiary" nodes
 // (graph_engine.build_outbound_fraud_graph_from_dataframes()) join the
@@ -71,6 +73,73 @@ function edgeRiskColor(a: GraphNode["risk_level"], b: GraphNode["risk_level"]): 
   return riskHex(RISK_RANK[a] >= RISK_RANK[b] ? a : b);
 }
 
+// --- Layout: deterministic, dependency-free cluster + collision avoidance
+// --- No d3-force or similar here — nothing else in this codebase pulls
+// one in (DepotMap.tsx is hand-rolled SVG too), and both graphs are small
+// enough (<= ~200 nodes) that a couple of O(n²) relax passes are
+// effectively free. Two-level phyllotaxis (sunflower-spiral) seed +
+// iterative pairwise separation: seed each Louvain community's members
+// around their own local origin, de-overlap that cluster, then seed+
+// de-overlap the clusters themselves against each other, compose, and
+// run one final global pass as a safety net before fitting to the
+// canvas. See laidOutNodes below for how these compose.
+
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~137.5° — the
+// standard sunflower-seed angle: successive items never land on the same
+// ray as a close neighbor, so the spiral starts from an already-decent
+// spacing instead of a fully-overlapping pile at the origin.
+
+function phyllotaxisSeed(
+  count: number,
+  spacing: number,
+): { x: number; y: number }[] {
+  return Array.from({ length: count }, (_, i) => {
+    const radius = spacing * Math.sqrt(i + 0.5);
+    const angle = i * GOLDEN_ANGLE;
+    return { x: radius * Math.cos(angle), y: radius * Math.sin(angle) };
+  });
+}
+
+// Pushes any pair of items closer than radiusOf(a) + radiusOf(b) + padding
+// apart until none overlap (or `iterations` runs out). This — not the seed
+// above — is what actually guarantees no-overlap; the seed just gives it a
+// starting layout close enough to converge in a handful of passes. Mutates
+// x/y on the items in place.
+function relaxOverlaps<T extends { x: number; y: number }>(
+  items: T[],
+  radiusOf: (item: T) => number,
+  iterations: number,
+  padding: number,
+): void {
+  for (let iter = 0; iter < iterations; iter++) {
+    let anyOverlap = false;
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const a = items[i];
+        const b = items[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const minDist = radiusOf(a) + radiusOf(b) + padding;
+        let dist = Math.hypot(dx, dy);
+        if (dist >= minDist) continue;
+        anyOverlap = true;
+        // Deterministic fallback direction if two items start on the
+        // exact same point (dist ~ 0) — derived from the pair's indices
+        // rather than random, so layout stays stable across re-renders.
+        const ux = dist > 0.01 ? dx / dist : Math.cos(i - j);
+        const uy = dist > 0.01 ? dy / dist : Math.sin(i - j);
+        if (dist < 0.01) dist = 0.01;
+        const push = (minDist - dist) / 2;
+        a.x -= ux * push;
+        a.y -= uy * push;
+        b.x += ux * push;
+        b.y += uy * push;
+      }
+    }
+    if (!anyOverlap) break;
+  }
+}
+
 interface HoverState {
   node: GraphNode;
   x: number;
@@ -80,7 +149,11 @@ interface HoverState {
 const WIDTH = 680;
 const HEIGHT = 460;
 
-export default function FraudGraph() {
+interface FraudGraphProps {
+  direction: WorkspaceDirection;
+}
+
+export default function FraudGraph({ direction }: FraudGraphProps) {
   const { materiality } = useMateriality(); // ✅ Get from context
   const [graph, setGraph] = useState<FraudGraphData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,9 +166,7 @@ export default function FraudGraph() {
   useEffect(() => {
     let cancelled = false;
 
-    // Risk Intelligence is the Oil graph. Do not inherit an outbound
-    // direction left behind by a previous Inuka workspace visit.
-    getFraudGraph(materiality, "inbound")
+    getFraudGraph(materiality, direction)
       .then((data) => {
         if (!cancelled) setGraph(data);
       })
@@ -114,61 +185,165 @@ export default function FraudGraph() {
     return () => {
       cancelled = true;
     };
-  }, [materiality]);
+  }, [materiality, direction]);
 
   const laidOutNodes = useMemo(() => {
     if (!graph) return [];
 
-    const centerX = WIDTH / 2;
-    const centerY = HEIGHT / 2;
-    const omcRadius = Math.min(WIDTH, HEIGHT) / 2 - 70;
+    // --- Radius: the existing sqrt(leakage) sizing, untouched — only
+    // where each node ends up changes below, never how big it is
+    // relative to its peers. ---
+    const hubNodes = graph.nodes.filter((n) => OUTER_TYPES.has(n.type));
+    const leafNodes = graph.nodes.filter((n) => !OUTER_TYPES.has(n.type));
+    const maxHubLeakage = Math.max(1, ...hubNodes.map((n) => n.leakage_kes));
+    const maxLeafLeakage = Math.max(1, ...leafNodes.map((n) => n.leakage_kes));
 
-    const omcNodes = [...graph.nodes]
-      .filter((n) => OUTER_TYPES.has(n.type))
-      .sort(
-        (a, b) =>
+    const radiusFor = (n: GraphNode): number => {
+      const isLeaf = !OUTER_TYPES.has(n.type);
+      const base = isLeaf ? 9 : 6;
+      const extra = isLeaf ? 9 : 13;
+      const maxLeakage = isLeaf ? maxLeafLeakage : maxHubLeakage;
+      const t = Math.sqrt(Math.max(0, n.leakage_kes) / maxLeakage);
+      return base + extra * t;
+    };
+
+    // Nodes that will actually draw a <text> label (see topLabelIds
+    // below — same top-5-by-leakage + all-High-risk selection) get extra
+    // clearance reserved around them during layout, so the label itself
+    // doesn't collide with a neighboring node.
+    const sortedByLeakage = [...graph.nodes].sort((a, b) => b.leakage_kes - a.leakage_kes);
+    const labeledIds = new Set(sortedByLeakage.slice(0, 5).map((n) => n.id));
+    graph.nodes.forEach((n) => {
+      if (n.risk_level === "High") labeledIds.add(n.id);
+    });
+    const LABEL_CLEARANCE = 16;
+
+    interface LayoutItem {
+      r: number;
+      effR: number;
+      x: number;
+      y: number;
+    }
+    const itemById = new Map<string, LayoutItem>();
+    graph.nodes.forEach((n) => {
+      const r = radiusFor(n);
+      itemById.set(n.id, {
+        r,
+        effR: r + (labeledIds.has(n.id) ? LABEL_CLEARANCE : 0),
+        x: 0,
+        y: 0,
+      });
+    });
+
+    // --- Cluster by Louvain community, laid out locally around its own
+    // origin (hub-role members ordered first so they land near that
+    // origin, leaves fanned out around them), then de-overlapped within
+    // the cluster only. ---
+    const byCommunity = new Map<number, GraphNode[]>();
+    graph.nodes.forEach((n) => {
+      const list = byCommunity.get(n.community) ?? [];
+      list.push(n);
+      byCommunity.set(n.community, list);
+    });
+
+    interface ClusterItem {
+      x: number;
+      y: number;
+      r: number;
+      members: LayoutItem[];
+    }
+    const clusters: ClusterItem[] = [];
+
+    byCommunity.forEach((members) => {
+      const ordered = [...members].sort((a, b) => {
+        const aHub = OUTER_TYPES.has(a.type) ? 0 : 1;
+        const bHub = OUTER_TYPES.has(b.type) ? 0 : 1;
+        if (aHub !== bHub) return aHub - bHub;
+        return (
           RISK_RANK[b.risk_level] - RISK_RANK[a.risk_level] ||
-          b.leakage_kes - a.leakage_kes,
-      );
-    const depotNodes = [...graph.nodes]
-      .filter((n) => !OUTER_TYPES.has(n.type))
-      .sort((a, b) => b.leakage_kes - a.leakage_kes);
-    const depotRadius =
-      depotNodes.length > 1 ? Math.min(60, 16 + depotNodes.length * 6) : 0;
+          b.leakage_kes - a.leakage_kes
+        );
+      });
+      const items = ordered.map((n) => itemById.get(n.id)!);
+      const avgEffR = items.reduce((sum, it) => sum + it.effR, 0) / Math.max(1, items.length);
+      // Tight multiplier — the relax pass right below is what actually
+      // guarantees no overlap, so this only needs to get the spiral seed
+      // in the right neighborhood, not already collision-free. Loosening
+      // it just inflates the natural (pre-fit) layout size, which the
+      // fit-to-canvas step below would then have to scale back down
+      // anyway — net effect is smaller rendered nodes for no benefit.
+      const spacing = avgEffR * 0.4 + 1;
 
-    const positions = new Map<string, { x: number; y: number }>();
+      const seed = phyllotaxisSeed(items.length, spacing);
+      items.forEach((it, i) => {
+        it.x = seed[i].x;
+        it.y = seed[i].y;
+      });
+      relaxOverlaps(items, (it) => it.effR, 60, 4);
 
-    omcNodes.forEach((n, i) => {
-      const angle = (i / Math.max(omcNodes.length, 1)) * 2 * Math.PI;
-      positions.set(n.id, {
-        x: centerX + omcRadius * Math.cos(angle),
-        y: centerY + omcRadius * Math.sin(angle),
+      const boundingR =
+        Math.max(...items.map((it) => Math.hypot(it.x, it.y) + it.effR), 1) + 10;
+      clusters.push({ x: 0, y: 0, r: boundingR, members: items });
+    });
+
+    // --- Seed and de-overlap the clusters themselves, so community
+    // boundaries stay spatially distinct instead of interleaving. ---
+    const avgClusterR = clusters.reduce((sum, c) => sum + c.r, 0) / Math.max(1, clusters.length);
+    const macroSpacing = avgClusterR * 0.5 + 2;
+    const macroSeed = phyllotaxisSeed(clusters.length, macroSpacing);
+    clusters.forEach((c, i) => {
+      c.x = macroSeed[i].x;
+      c.y = macroSeed[i].y;
+    });
+    relaxOverlaps(clusters, (c) => c.r, 80, 16);
+
+    // Compose: each member's absolute (pre-fit) position is its
+    // cluster-local offset plus that cluster's own resolved anchor.
+    clusters.forEach((c) => {
+      c.members.forEach((m) => {
+        m.x += c.x;
+        m.y += c.y;
       });
     });
 
-    depotNodes.forEach((n, i) => {
-      const angle = (i / Math.max(depotNodes.length, 1)) * 2 * Math.PI;
-      positions.set(n.id, {
-        x: centerX + depotRadius * Math.cos(angle),
-        y: centerY + depotRadius * Math.sin(angle),
-      });
-    });
+    // Final global safety pass across every node together — mops up any
+    // residual overlap the two-level composition above left at cluster
+    // boundaries, so "never overlap" holds regardless of graph shape.
+    const allItems = Array.from(itemById.values());
+    relaxOverlaps(allItems, (it) => it.r, 40, 3);
 
-    const maxOmcLeakage = Math.max(1, ...omcNodes.map((n) => n.leakage_kes));
-    const maxDepotLeakage = Math.max(1, ...depotNodes.map((n) => n.leakage_kes));
+    // --- Fit to canvas: scale + translate the whole layout so it fills
+    // the panel without excessive white space (small graphs) or spilling
+    // off-canvas (dense ones), while keeping every node's size relative
+    // to its peers exactly as computed above (uniform scale preserves
+    // ratios). ---
+    const MARGIN = 36;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    allItems.forEach((it) => {
+      minX = Math.min(minX, it.x - it.effR);
+      maxX = Math.max(maxX, it.x + it.effR);
+      minY = Math.min(minY, it.y - it.effR);
+      maxY = Math.max(maxY, it.y + it.effR);
+    });
+    const bboxW = Math.max(1, maxX - minX);
+    const bboxH = Math.max(1, maxY - minY);
+    const rawScale = Math.min(
+      (WIDTH - MARGIN * 2) / bboxW,
+      (HEIGHT - MARGIN * 2) / bboxH,
+    );
+    const scale = Math.min(2.4, Math.max(0.4, rawScale));
+    const bboxCx = (minX + maxX) / 2;
+    const bboxCy = (minY + maxY) / 2;
+    const tx = WIDTH / 2 - bboxCx * scale;
+    const ty = HEIGHT / 2 - bboxCy * scale;
 
     return graph.nodes.map((n) => {
-      const pos = positions.get(n.id) ?? { x: centerX, y: centerY };
-      const isDepot = !OUTER_TYPES.has(n.type);
-      const base = isDepot ? 9 : 6;
-      const extra = isDepot ? 9 : 13;
-      const maxLeakage = isDepot ? maxDepotLeakage : maxOmcLeakage;
-      const t = Math.sqrt(Math.max(0, n.leakage_kes) / maxLeakage);
+      const it = itemById.get(n.id)!;
       return {
         ...n,
-        x: pos.x,
-        y: pos.y,
-        r: base + extra * t,
+        x: it.x * scale + tx,
+        y: it.y * scale + ty,
+        r: it.r * scale,
       };
     });
   }, [graph]);
@@ -230,16 +405,8 @@ export default function FraudGraph() {
   return (
     <section className="flex flex-col gap-5 bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm relative text-zinc-800 dark:text-zinc-100">
       <div>
-        <h2 className="text-base font-bold text-zinc-900 dark:text-white">
-          Risk Intelligence — Oil Leakage Network
-        </h2>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mt-1">
-          This view is deliberately scoped to the Oil Revenue domain. OMCs
-          ring the depots at the center of the network; node size scales with
-          leakage value and color with risk severity. Inuka relationships are
-          investigated from the Inuka workspace instead of being mixed into
-          this graph.
-        </p>
+        <h2 className="text-base font-bold text-zinc-900 dark:text-white">{riskConfig[direction].title}</h2>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mt-1">{riskConfig[direction].description}</p>
       </div>
 
       {error && (

@@ -1,3 +1,6 @@
-import InukaDimensionTable from "@/components/InukaDimensionTable";
+import { redirect } from "next/navigation";
 
-export default function InukaOfficersPage() { return <InukaDimensionTable dimension="officers" />; }
+/** Superseded by /dashboard/outbound/anomalies (officer grouping). */
+export default function InukaOfficersRedirect() {
+  redirect("/dashboard/outbound/anomalies");
+}
