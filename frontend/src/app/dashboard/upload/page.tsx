@@ -22,9 +22,9 @@ function UploadContent() {
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto">
       <header>
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Ad-hoc Reconciliation</p>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground mt-1">Upload CSVs</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-xs sm:text-sm font-extrabold text-[#b3312c] dark:text-[#ec835a] uppercase tracking-wider">Ad-hoc Reconciliation</p>
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground mt-1">Upload CSVs</h1>
+        <p className="text-sm sm:text-base font-medium text-muted-foreground mt-1.5">
           Reconcile your own Dispatches, Invoices, and Payments CSVs instantly — nothing is written to the database.
         </p>
       </header>

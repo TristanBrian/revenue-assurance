@@ -7,6 +7,7 @@ import { useMateriality } from "@/context/MaterialityContext";
 import { reportsConfig, anomaliesConfig } from "@/config/direction-config";
 import type { WorkspaceDirection } from "@/lib/workspace";
 import RequirePermission from "@/components/RequirePermission";
+import ConsentModal from "@/components/ConsentModal";
 import FieldSelectorModal from "@/components/FieldSelectorModal";
 import RecordHistoryDrawer from "@/components/RecordHistoryDrawer";
 import ReportVerifierModal from "@/components/ReportVerifierModal";
@@ -56,6 +57,8 @@ function ReportsContent({ direction }: { direction: WorkspaceDirection }) {
   const [fieldSelectorOpen, setFieldSelectorOpen] = useState(false);
   const [verifierOpen, setVerifierOpen] = useState(false);
   const [historyTarget, setHistoryTarget] = useState<{ type: string; id: string } | null>(null);
+  // The privacy notice is deliberately shown on every entry to Reports.
+  const [consentOpen, setConsentOpen] = useState(true);
   const pageSize = 10;
 
   useEffect(() => {
@@ -151,10 +154,11 @@ function ReportsContent({ direction }: { direction: WorkspaceDirection }) {
 
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-6">
-      <header>
-        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{direction === "inbound" ? "Oil Revenue" : "Inuka Programs"} workspace</p>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{direction === "inbound" ? "Oil Revenue" : "Inuka Programs"} workspace</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground">Reports and evidence</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Select a report purpose, inspect the records behind the totals, and export a traceable file for review or decision-making.</p>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Select a report purpose, inspect the records behind the totals, and export a traceable file for review or decision-making.</p></div>
+        <button type="button" onClick={() => setConsentOpen(true)} className="shrink-0 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-accent">Data privacy notice</button>
       </header>
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -176,11 +180,14 @@ function ReportsContent({ direction }: { direction: WorkspaceDirection }) {
         <div className="flex flex-col gap-3 border-t border-border p-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6"><span>{rows.length === 0 ? "0" : `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, rows.length)}`} of {rows.length} records</span><div className="flex items-center gap-2"><button type="button" disabled={page === 1} onClick={() => setPage((current) => current - 1)} className="rounded-lg border border-border px-3 py-1.5 font-semibold hover:bg-accent disabled:opacity-40">Previous</button><span>Page {page} of {totalPages}</span><button type="button" disabled={page === totalPages} onClick={() => setPage((current) => current + 1)} className="rounded-lg border border-border px-3 py-1.5 font-semibold hover:bg-accent disabled:opacity-40">Next</button></div></div>
       </section>
 
-      <section className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">3. Export and verify</p><h2 className="mt-1 text-lg font-bold text-foreground">Create a report package</h2><p className="mt-1 text-sm text-muted-foreground">{config.exportLabel}. Verify the file signature when it is received or shared.</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setFieldSelectorOpen(true)} disabled={reportType === "icms"} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40">Export Excel</button><button type="button" onClick={exportCsv} disabled={rows.length === 0} className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40">Export CSV</button><button type="button" onClick={() => setVerifierOpen(true)} className="rounded-lg border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/5">Verify file</button></div></div>{reportType === "icms" && <p className="mt-4 rounded-lg border border-status-info/25 bg-status-info-bg px-4 py-3 text-xs text-status-info">Excel export is available for reconciliation datasets. Use the CSV export above for the selected iCMS log view.</p>}</section>
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">3. Export report</p><h2 className="mt-1 text-lg font-bold text-foreground">Create a minimized report package</h2><p className="mt-1 text-sm text-muted-foreground">{config.exportLabel}. Select only the fields required for the report purpose.</p></div><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setFieldSelectorOpen(true)} disabled={reportType === "icms"} className="rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40">Export Excel</button><button type="button" onClick={exportCsv} disabled={rows.length === 0} className="rounded-lg border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40">Export CSV</button></div></div>{reportType === "icms" && <p className="mt-4 rounded-lg border border-status-info/25 bg-status-info-bg px-4 py-3 text-xs text-status-info">Excel export is available for reconciliation datasets. Use the CSV export above for the selected iCMS log view.</p>}</section>
+
+      <section className="rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">4. Verify authenticity</p><h2 className="mt-1 text-lg font-bold text-foreground">SHA-256 report verifier</h2><p className="mt-1 text-sm text-muted-foreground">Validate the cryptographic digest before relying on or sharing an exported file.</p></div><button type="button" onClick={() => setVerifierOpen(true)} className="rounded-lg border border-primary/30 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/5">Verify file</button></div></section>
 
       <FieldSelectorModal isOpen={fieldSelectorOpen} onClose={() => setFieldSelectorOpen(false)} onConfirmExport={exportExcel} exporting={exporting} />
       <ReportVerifierModal isOpen={verifierOpen} onClose={() => setVerifierOpen(false)} />
       <RecordHistoryDrawer isOpen={!!historyTarget} onClose={() => setHistoryTarget(null)} targetType={historyTarget?.type ?? ""} targetId={historyTarget?.id ?? ""} />
+      <ConsentModal forceShow={consentOpen} onAccept={() => setConsentOpen(false)} />
     </div>
   );
 }

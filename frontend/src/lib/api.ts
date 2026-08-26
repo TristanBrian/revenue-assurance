@@ -333,11 +333,15 @@ export async function getAnomalies(
   const res = await authFetch(url);
   const result = await unwrap<AnomalyTableResult>(res);
 
-  // MASK CUSTOMER NAMES IN ANOMALIES
+  // Beneficiary masking belongs only to the outbound/Inuka domain. Applying
+  // it to inbound rows turns valid OMC names into beneficiary-style IDs and
+  // blurs the strict domain separation used throughout the report module.
   if (result?.anomalies && Array.isArray(result.anomalies)) {
     result.anomalies = result.anomalies.map((anomaly) => ({
       ...anomaly,
-      customer: maskBeneficiaryId(anomaly.customer),
+      customer: anomaly.flow_direction === "outbound"
+        ? maskBeneficiaryId(anomaly.customer)
+        : anomaly.customer,
     }));
   }
 
@@ -679,10 +683,12 @@ export async function downloadExportWithFields(
     materiality = 100000,
     fields?: string[],
     direction: Direction = "all",
+    maskSensitive = true,
 ): Promise<Blob> {
   const url = new URL("/api/reconcile/export", API_URL);
   url.searchParams.set("materiality", String(materiality));
   url.searchParams.set("direction", direction);
+  url.searchParams.set("mask_sensitive", String(maskSensitive));
   if (fields && fields.length > 0) {
     url.searchParams.set("fields", fields.join(","));
   }

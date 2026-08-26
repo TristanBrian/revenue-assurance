@@ -97,7 +97,7 @@ export default function InukaDashboard() {
       : 1;
 
   return (
-      <div className="flex flex-col gap-6 max-w-6xl mx-auto">
+      <div className="flex flex-col gap-6 w-full max-w-[1700px] mx-auto">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Inuka Program Assurance</p>

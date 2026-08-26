@@ -87,10 +87,23 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   // classes, which force it open there regardless of this state). One
   // piece of state, no separate "mobile menu" flag.
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    setSidebarCollapsed(window.localStorage.getItem("flowguard_sidebar_collapsed") === "true");
+  }, []);
+
+  function toggleSidebar() {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem("flowguard_sidebar_collapsed", String(next));
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -175,7 +188,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex h-full w-60 shrink-0 flex-col overflow-y-auto bg-sidebar border-r border-sidebar-border p-3 transition-transform duration-200 ease-in-out lg:static lg:z-auto lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex h-full w-60 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar p-3 transition-[transform,width] duration-300 ease-in-out lg:static lg:z-auto lg:translate-x-0 ${sidebarCollapsed ? "lg:w-20" : "lg:w-1/4"} ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -208,7 +221,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               {BRAND_CONFIG.shortName.slice(0, 2).toUpperCase()}
             </div>
           )}
-          <div className="min-w-0">
+          <div className={`min-w-0 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
             <p className="text-sm font-bold text-sidebar-foreground leading-none truncate">
               {BRAND_CONFIG.companyName}
             </p>
@@ -216,12 +229,23 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               {isInukaWorkspace ? "Inuka Program Assurance" : BRAND_CONFIG.systemName}
             </p>
           </div>
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="ml-auto hidden shrink-0 rounded-md p-1.5 text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground lg:block"
+          >
+            <svg className={`h-4 w-4 transition-transform ${sidebarCollapsed ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
         </div>
 
-        <p className="px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground">
+        <p className={`px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground ${sidebarCollapsed ? "lg:hidden" : ""}`}>
           Workspace
         </p>
-        {canSwitchWorkspace && (
+        {canSwitchWorkspace && !sidebarCollapsed && (
           <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-sidebar-accent/50 p-1">
             {(["inbound", "outbound"] as const).map((d) => (
               <button
@@ -252,19 +276,20 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.id}
                 href={href}
-                className={`group flex items-center justify-between rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors ${
+                title={sidebarCollapsed ? navLabel(item, direction) : undefined}
+                className={`group relative flex items-center justify-between rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""} ${
                   active
                     ? "bg-sidebar-accent text-sidebar-foreground"
                     : "text-sidebar-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
                 }`}
               >
-                <span className="flex items-center gap-2.5">
+                <span className={`flex items-center ${sidebarCollapsed ? "lg:justify-center" : "gap-2.5"}`}>
                   <span className={active ? "text-sidebar-primary" : ""}>{item.icon}</span>
-                  {navLabel(item, direction)}
+                  <span className={sidebarCollapsed ? "lg:hidden" : ""}>{navLabel(item, direction)}</span>
                 </span>
                 {count > 0 && (
-                  <span className="flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-sidebar-primary px-1 text-[9px] font-bold text-sidebar-primary-foreground">
-                    {count}
+                  <span className={`flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-sidebar-primary px-1 text-[9px] font-bold text-sidebar-primary-foreground ${sidebarCollapsed ? "lg:absolute lg:right-1 lg:top-0.5" : ""}`}>
+                    {count > 99 ? "99+" : count}
                   </span>
                 )}
               </Link>
@@ -273,11 +298,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">
-          <div className="border-t border-sidebar-border pt-3 flex items-center gap-2.5 px-1">
+          <div className={`border-t border-sidebar-border pt-3 flex items-center gap-2.5 px-1 ${sidebarCollapsed ? "lg:flex-col" : ""}`}>
             <div className="w-7 h-7 shrink-0 rounded-full bg-sidebar-primary/20 text-sidebar-primary flex items-center justify-center text-[11px] font-bold">
               {user?.email?.[0]?.toUpperCase() ?? "?"}
             </div>
-            <div className="min-w-0 flex-1">
+            <div className={`min-w-0 flex-1 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
               {!authLoading && user && (
                 <>
                   <p className="truncate text-[12px] font-semibold text-sidebar-foreground">{user.email}</p>
@@ -455,7 +480,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-auto p-4 md:p-6 bg-background">{children}</main>
+        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-auto bg-background p-4 md:p-6">{children}</main>
       </div>
     </div>
   );
