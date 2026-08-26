@@ -47,6 +47,7 @@ class AlertTier(str, Enum):
 class AlertType(str, Enum):
     # --- Reconciliation (services/reconciliation/reconciliation.py) ---
     CRITICAL_ANOMALY = "critical_anomaly"
+    INUKA_CASE_CRITICAL = "inuka_case_critical"
     ANOMALY_MATERIALITY_SPIKE = "anomaly_materiality_spike"
     OMC_RISK_ESCALATION = "omc_risk_escalation"
     DATA_QUALITY_DROP = "data_quality_drop"
@@ -108,6 +109,13 @@ REGISTRY: dict[AlertType, AlertMeta] = {
         severity="critical",
         target_permissions=["view_anomaly_table"],  # Manager + Revenue Assurance, exactly this pair
         description="New critical anomaly (Missing Invoice/Payment, Under/Overpayment above materiality).",
+    ),
+    AlertType.INUKA_CASE_CRITICAL: AlertMeta(
+        tier=AlertTier.DIGESTED,
+        severity="critical",
+        target_permissions=["view_anomaly_table"],
+        description="A grouped Inuka disbursement assurance case requires evidence review.",
+        notes="Workspace-scoped by related_type=inuka_case; operational messages contain beneficiary IDs, not names.",
     ),
     AlertType.ANOMALY_MATERIALITY_SPIKE: AlertMeta(
         tier=AlertTier.IMMEDIATE,

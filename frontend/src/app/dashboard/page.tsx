@@ -14,6 +14,10 @@ export default function DashboardRootPage() {
 
   useEffect(() => {
     if (loading) return;
+    if (user?.roles.includes("system_admin")) {
+      router.replace("/dashboard/admin");
+      return;
+    }
     router.replace(`/dashboard/${getDefaultDirection(user)}/overview`);
   }, [loading, user, router]);
 

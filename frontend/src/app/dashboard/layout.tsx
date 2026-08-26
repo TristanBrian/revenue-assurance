@@ -143,10 +143,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     router.push("/login");
   }
 
+  const isAdmin = user?.roles.includes("system_admin") ?? false;
   const visibleItems = [
     ...(canSwitchWorkspace ? [REVIEW_QUEUE_ITEM] : []),
     ...navItems,
   ].filter((item) => {
+    if (isAdmin) return false;
     if (item.anyOf && !item.anyOf.some((code) => user?.permissions.includes(code))) return false;
     if (item.directions && !item.directions.includes(direction)) return false;
     return true;
@@ -154,7 +156,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
   const canSeeAllAlerts = user?.permissions.includes("view_anomaly_table") ?? false;
   const canSeeDepotAlerts = user?.permissions.includes("view_depot_alerts") ?? false;
-  const isAdmin = user?.roles.includes("system_admin") ?? false;
   const isRevenueAssurance = user?.roles.includes("revenue_assurance") ?? false;
   const isManager = user?.roles.includes("manager") ?? false;
   const isInukaManager = user?.roles.includes("inuka_manager") ?? false;
@@ -264,6 +265,19 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         )}
         <nav className="flex flex-col gap-0.5">
+          {isAdmin && (
+            <Link
+              href="/dashboard/admin"
+              className={`group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors ${pathname === "/dashboard/admin" ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"}`}
+            >
+              <span className={pathname === "/dashboard/admin" ? "text-sidebar-primary" : ""}>
+                <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m7-10a4 4 0 100-8 4 4 0 000 8zm10 10v-2a4 4 0 00-3-3.87m-1-12a4 4 0 010 7.75" />
+                </svg>
+              </span>
+              User Administration
+            </Link>
+          )}
           {visibleItems.map((item) => {
             const href = item.route(direction);
             const active = pathname === href || (item.id === activeItemId && item.id !== "audit" && item.id !== "review-queue");

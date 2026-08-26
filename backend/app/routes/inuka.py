@@ -1,13 +1,26 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+import csv
+from pathlib import Path
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import enforce_reconciliation_scope, get_db, require_permission
 from app.models.auth.user import User
 from app.services.audit.audit_service import get_record_audit_history, log_action
+from app.services.alerts.alert_service import notify_inuka_cases
 from app.services.inuka_assurance import beneficiary_detail, build_inuka_cases, dimension_summary
+from app.services.inuka_stream import recent_events, record_event, stream_status
 
 router = APIRouter()
+
+
+class StreamEventRequest(BaseModel):
+    event_type: str = Field(min_length=3, max_length=80)
+    pillar: str = Field(min_length=2, max_length=40)
+    beneficiary_id: str | None = Field(default=None, max_length=80)
+    source_system: str = Field(default="external-adapter", max_length=120)
+    occurred_at: str | None = None
+    payload: dict = Field(default_factory=dict)
 
 
 class CaseActionRequest(BaseModel):
@@ -28,6 +41,83 @@ def _user(user: User) -> User:
     return user
 
 
+@router.get("/stream/status")
+def inuka_stream_status(user: User = Depends(require_permission("view_metrics"))):
+    _user(user)
+    return stream_status()
+
+
+@router.get("/stream/events")
+def inuka_stream_events(limit: int = Query(25, ge=1, le=100), user: User = Depends(require_permission("view_metrics"))):
+    _user(user)
+    return {"items": recent_events(limit)}
+
+
+@router.post("/stream/events")
+def ingest_inuka_stream_event(payload: StreamEventRequest, user: User = Depends(require_permission("view_anomaly_table"))):
+    _user(user)
+    allowed = {"Scholarship", "Plus", "Vocational", "Tech"}
+    if payload.pillar not in allowed:
+        raise HTTPException(status_code=422, detail="pillar must be one of Scholarship, Plus, Vocational, or Tech")
+    event = payload.model_dump()
+    extra = event.pop("payload") or {}
+    event.update(extra)
+    return record_event(event)
+
+
+@router.get("/consents")
+def inuka_consents(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    status: str | None = Query(None),
+    consent_type: str | None = Query(None),
+    search: str | None = Query(None),
+    user: User = Depends(require_permission("view_anomaly_table")),
+):
+    """Consent register for the Inuka programme assurance workspace.
+
+    The hackathon dataset is synthetic CSV data. In production this adapter
+    is replaced by the programme registry/consent service, but the response
+    contract remains stable for the dashboard and external-report controls.
+    """
+    _user(user)
+    candidates = [Path("data/raw/beneficiary_consents.csv"), Path("scripts/data/raw/beneficiary_consents.csv")]
+    source = next((path for path in candidates if path.exists()), None)
+    rows: list[dict] = []
+    if source:
+        with source.open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                current = (row.get("status") or "pending").lower()
+                rows.append({
+                    "consent_id": row.get("consent_id"),
+                    "beneficiary_id": row.get("beneficiary_id"),
+                    "consent_type": row.get("consent_type"),
+                    "status": current.title(),
+                    "captured_at": row.get("captured_at"),
+                    "captured_by": row.get("captured_by"),
+                    "can_withdraw": current in {"active", "pending"},
+                    "can_renew": current in {"withdrawn", "expired"},
+                    "anonymised_export_allowed": current == "active",
+                })
+    if status:
+        rows = [row for row in rows if row["status"].lower() == status.lower()]
+    if consent_type:
+        rows = [row for row in rows if str(row["consent_type"]).lower() == consent_type.lower()]
+    if search:
+        query = search.lower()
+        rows = [row for row in rows if query in " ".join(str(value or "") for value in row.values()).lower()]
+    rows.sort(key=lambda row: (row.get("beneficiary_id") or "", row.get("consent_type") or ""))
+    total = len(rows)
+    start = (page - 1) * page_size
+    return {
+        "items": rows[start:start + page_size],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "source": "synthetic_demo_csv",
+    }
+
+
 @router.get("/summary")
 def inuka_summary(user: User = Depends(require_permission("view_metrics"))):
     _user(user)
@@ -45,15 +135,22 @@ def inuka_cases(
     officer_id: str | None = Query(None),
     period: str | None = Query(None),
     search: str | None = Query(None),
+    db: Session = Depends(get_db),
     user: User = Depends(require_permission("view_anomaly_table")),
 ):
     _user(user)
     result = build_inuka_cases(materiality=0)
     cases = result["cases"]
+    try:
+        created_alerts = notify_inuka_cases(db, cases)
+        if created_alerts:
+            db.commit()
+    except Exception:
+        db.rollback()
     if status:
         cases = [x for x in cases if x["status"].lower() == status.lower() or x["severity"].lower() == status.lower()]
     if risk_type:
-        cases = [x for x in cases if x["risk_type"] == risk_type]
+        cases = [x for x in cases if x["risk_type"] == risk_type or any(signal.get("risk_type") == risk_type for signal in x.get("signals", []))]
     if program_id:
         cases = [x for x in cases if x.get("program_id") == program_id]
     if pillar_id:
@@ -64,14 +161,24 @@ def inuka_cases(
         cases = [x for x in cases if x.get("period") == period]
     if search:
         query = search.lower()
-        cases = [x for x in cases if query in " ".join(str(v or "") for v in (x.get("case_id"), x.get("title"), x.get("reason"), x.get("beneficiary_id"), x.get("officer_id"), x.get("program_id"))).lower()]
+        cases = [x for x in cases if query in " ".join(str(v or "") for v in (x.get("case_id"), x.get("primary_record_id"), x.get("title"), x.get("reason"), x.get("beneficiary_id"), x.get("officer_id"), x.get("program_id"), *x.get("signal_types", []), *x.get("source_records", []))).lower()]
     total = len(cases)
     offset = (page - 1) * page_size
     return {"cases": cases[offset:offset + page_size], "pagination": {"page": page, "page_size": page_size, "total": total, "total_pages": (total + page_size - 1) // page_size if total else 0, "has_next": offset + page_size < total, "has_prev": page > 1}, "summary": result["summary"]}
 
 
-def _find_case(case_id: str):
-    return next((item for item in build_inuka_cases(materiality=0)["cases"] if item["case_id"] == case_id), None)
+def _find_case(case_id: str, *, include_sensitive: bool = False):
+    return next((item for item in build_inuka_cases(materiality=0, include_sensitive=include_sensitive)["cases"] if item["case_id"] == case_id), None)
+
+
+@router.get("/cases/{case_id}")
+def inuka_case_detail(case_id: str, user: User = Depends(require_permission("view_anomaly_table"))):
+    """Return one investigation case, including names only in detail view."""
+    _user(user)
+    case = _find_case(case_id, include_sensitive=True)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Assurance case not found")
+    return case
 
 
 @router.get("/cases/{case_id}/actions")

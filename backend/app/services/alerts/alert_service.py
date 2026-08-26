@@ -25,6 +25,7 @@ registry at creation time, resolved against users_with_permission/
 users_with_role (ordinary relational joins, no JSON involved).
 """
 import hashlib
+import logging
 import uuid as uuid_lib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -39,6 +40,7 @@ from app.models.auth.role import Role
 from app.models.auth.user import User
 from app.services.alerts.alert_types import AlertTier, AlertType, get_meta
 
+logger = logging.getLogger(__name__)
 APP_NAME = "KPC Revenue Assurance"
 _VISIBILITY_SCAN_LIMIT = 5000
 
@@ -123,6 +125,29 @@ def _recipient_emails(
     else:
         users = db.query(User).filter(User.is_active.is_(True)).all()
     return [u.email for u in users if u.id != exclude_user_id]
+
+
+def alert_workspace(alert: Alert) -> str:
+    """Return the assurance workspace an alert belongs to.
+
+    Legacy alerts predate the workspace split and are treated as inbound/Oil
+    unless their stable identifier explicitly marks them as Inuka. New
+    outbound graph alerts use the ``cluster_outbound`` related type.
+    """
+    related_type = (alert.related_type or "").lower()
+    related_id = str(alert.related_id or "").upper()
+    category = (alert.category or "").lower()
+    if related_type in {"inuka_case", "inuka_disbursement", "inuka_cluster"}:
+        return "outbound"
+    if related_type == "cluster_outbound":
+        # Older graph runs could stamp an OMC community as outbound. Keep
+        # those Oil alerts out of the Inuka inbox even when their related_type
+        # was written incorrectly; valid outbound clusters never describe OMCs.
+        text = f"{alert.title or ''} {alert.message or ''}".lower()
+        return "inbound" if "omc" in text else "outbound"
+    if related_id.startswith("INUKA-") or category.startswith("inuka_"):
+        return "outbound"
+    return "inbound"
 
 
 def _user_can_see(alert: Alert, perm_codes: set, role_names: set, user_id) -> bool:
@@ -363,6 +388,40 @@ def notify_critical_anomalies(db: Session, anomalies: list[dict]) -> list[Alert]
     return created
 
 
+def notify_inuka_cases(db: Session, cases: list[dict], limit: int = 25) -> list[Alert]:
+    """Create a bounded, deduplicated inbox from grouped Inuka cases.
+
+    Lists and notifications deliberately use beneficiary IDs only. Sensitive
+    names remain behind the case-detail endpoint and its permission check.
+    """
+    created: list[Alert] = []
+    candidates = sorted(
+        (case for case in cases if case.get("case_id") and case.get("severity") == "Critical"),
+        key=lambda case: float(case.get("amount_at_risk") or 0),
+        reverse=True,
+    )[:limit]
+    for case in candidates:
+        case_id = str(case["case_id"])
+        if alert_exists(db, category=AlertType.INUKA_CASE_CRITICAL.value, related_id=case_id):
+            continue
+        signal_labels = case.get("signal_types") or [signal.get("label") or signal.get("risk_type") for signal in case.get("signals", [])]
+        signal_text = ", ".join(str(value) for value in signal_labels[:3] if value) or "payment-control exception"
+        created.append(create_alert(
+            db,
+            alert_type=AlertType.INUKA_CASE_CRITICAL,
+            title=f"Inuka case requires review: {case_id}",
+            message=(
+                f"{case.get('beneficiary_id') or 'Beneficiary ID unavailable'} · "
+                f"{case.get('pillar_id') or 'Unassigned pillar'} · {signal_text} · "
+                f"KES {float(case.get('amount_at_risk') or 0):,.0f} at risk."
+            ),
+            related_type="inuka_case",
+            related_id=case_id,
+            notify_email=False,
+        ))
+    return created
+
+
 def notify_materiality_spike(db: Session, anomalies: list[dict], materiality: float) -> list[Alert]:
     """A single anomaly at >= MATERIALITY_SPIKE_MULTIPLIER x materiality is
     too large to wait for the digest — one immediate alert per such
@@ -567,7 +626,7 @@ def _cluster_identity(node_ids: list[str]) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
 
 
-def notify_fraud_clusters(db: Session, communities: list[dict]) -> list[Alert]:
+def notify_fraud_clusters(db: Session, communities: list[dict], workspace: str = "inbound") -> list[Alert]:
     """
     One Alert row per newly-seen High-risk cluster (identity = hash of its
     sorted OMC-id set — see alert_types.REGISTRY's notes), one digest email
@@ -581,8 +640,14 @@ def notify_fraud_clusters(db: Session, communities: list[dict]) -> list[Alert]:
 
     new_clusters = []
     for community in communities:
-        node_ids = community.get("node_ids", [])
+        node_ids = [str(node_id) for node_id in community.get("node_ids", [])]
         if community.get("risk_level") != "High" or not node_ids:
+            continue
+        if workspace == "outbound" and not any(node_id.upper().startswith(("OFF-", "BEN-")) for node_id in node_ids):
+            logger.warning("Skipping non-Inuka community from outbound alert generation: %s", node_ids[:4])
+            continue
+        if workspace == "inbound" and not any(node_id.upper().startswith(("OMC-", "DEP-", "OMC:", "DEPOT:")) for node_id in node_ids):
+            logger.warning("Skipping non-Oil community from inbound alert generation: %s", node_ids[:4])
             continue
         cluster_id = _cluster_identity(node_ids)
         if alert_exists(db, category=AlertType.FRAUD_CLUSTER_NEW.value, related_id=cluster_id):
@@ -595,7 +660,10 @@ def notify_fraud_clusters(db: Session, communities: list[dict]) -> list[Alert]:
     created = []
     for cluster_id, community in new_clusters:
         alert = Alert(
-            title=f"New high-risk cluster: {community.get('member_count', len(community.get('node_ids', [])))} OMCs",
+            title=(
+                f"New high-risk cluster: {community.get('member_count', len(node_ids))} "
+                f"{'beneficiary/officer entities' if workspace == 'outbound' else 'OMCs'}"
+            ),
             message=(
                 f"Louvain clustering found a new correlated-leakage community — "
                 f"KES {community.get('total_leakage_kes', 0):,} across "
@@ -606,7 +674,7 @@ def notify_fraud_clusters(db: Session, communities: list[dict]) -> list[Alert]:
             category=AlertType.FRAUD_CLUSTER_NEW.value,
             target_permissions=list(meta.target_permissions) or None,
             target_roles=list(meta.target_roles) or None,
-            related_type="cluster",
+            related_type="cluster_outbound" if workspace == "outbound" else "cluster",
             related_id=cluster_id,
         )
         db.add(alert)
@@ -800,12 +868,13 @@ def list_alerts_for_user(
     unread_only: bool = False,
     page: int = 1,
     page_size: int = 50,
+    workspace: str | None = None,
 ) -> tuple[list[Alert], int, int]:
     perm_codes = set(user.permission_codes())
     role_names = {r.name for r in user.roles}
     read_ids = {row[0] for row in db.query(AlertRead.alert_id).filter(AlertRead.user_id == user.id).all()}
 
-    visible = [a for a in _recent_alerts(db) if _user_can_see(a, perm_codes, role_names, user.id)]
+    visible = [a for a in _recent_alerts(db) if _user_can_see(a, perm_codes, role_names, user.id) and (workspace is None or alert_workspace(a) == workspace)]
     unread_count = sum(1 for a in visible if a.id not in read_ids)
 
     if unread_only:
@@ -842,14 +911,14 @@ def mark_alert_read(db: Session, alert_id: str, user_id) -> bool:
     return True
 
 
-def mark_all_read(db: Session, user: User) -> int:
+def mark_all_read(db: Session, user: User, workspace: str | None = None) -> int:
     perm_codes = set(user.permission_codes())
     role_names = {r.name for r in user.roles}
     read_ids = {row[0] for row in db.query(AlertRead.alert_id).filter(AlertRead.user_id == user.id).all()}
     unread = [
         a
         for a in _recent_alerts(db)
-        if _user_can_see(a, perm_codes, role_names, user.id) and a.id not in read_ids
+        if _user_can_see(a, perm_codes, role_names, user.id) and (workspace is None or alert_workspace(a) == workspace) and a.id not in read_ids
     ]
     for a in unread:
         db.add(AlertRead(alert_id=a.id, user_id=user.id))

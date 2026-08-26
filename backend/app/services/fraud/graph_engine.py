@@ -240,6 +240,11 @@ def build_outbound_fraud_graph_from_dataframes(anomalies_df: pd.DataFrame, disbu
     if pair_source.empty:
         return _empty_graph_result()
 
+    beneficiary_labels: dict = {}
+    for _, source_row in pair_source.iterrows():
+        beneficiary_node = f"beneficiary:{source_row['beneficiary_id']}"
+        beneficiary_labels.setdefault(beneficiary_node, str(source_row['beneficiary_id']))
+
     pair_stats = pair_source.groupby(['officer_id', 'beneficiary_id', 'customer']).agg(
         leakage_kes=('leakage_kes', 'sum'),
         anomaly_count=('dispatch_id', 'count')
@@ -263,11 +268,10 @@ def build_outbound_fraud_graph_from_dataframes(anomalies_df: pd.DataFrame, disbu
     RING_CLUSTER_WEIGHT = 10_000_000.0
 
     G = nx.Graph()
-    beneficiary_labels: dict = {}
     for _, row in pair_stats.iterrows():
         officer_node = f"officer:{row['officer_id']}"
         beneficiary_node = f"beneficiary:{row['beneficiary_id']}"
-        beneficiary_labels[beneficiary_node] = row['customer']
+        beneficiary_labels.setdefault(beneficiary_node, str(row['beneficiary_id']))
         G.add_edge(
             officer_node, beneficiary_node,
             weight=float(row['leakage_kes']),

@@ -112,7 +112,7 @@ def fraud_graph(
         # view. See services/alert_service.notify_fraud_clusters.
         if is_cache_miss:
             try:
-                new_alerts = notify_fraud_clusters(db, data.get('communities', []))
+                new_alerts = notify_fraud_clusters(db, data.get('communities', []), workspace=direction)
                 if new_alerts:
                     db.commit()
                     logger.info(f"🔔 {len(new_alerts)} new fraud-cluster alert(s) created")

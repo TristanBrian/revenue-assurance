@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   ApiError,
   clearAuthToken,
+  clearConsentToken,
+  clearResetToken,
   getAuthToken,
   getCurrentUser,
   login as apiLogin,
@@ -84,6 +86,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string,
     password: string,
   ): Promise<{ resetRequired: boolean; termsRequired: boolean }> {
+    clearAuthToken();
+    clearResetToken();
+    clearConsentToken();
     const data = await apiLogin(email, password);
     if (data.reset_required) {
       if (data.reset_token) setResetToken(data.reset_token);

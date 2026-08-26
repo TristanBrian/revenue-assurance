@@ -144,15 +144,15 @@ export const overviewConfig: Record<WorkspaceDirection, PermissionToggleStatConf
     {
       permission: null,
       whenTrue: {
-        label: "Funds at risk",
-        note: "Compare pillar exposure",
+        label: "Funds flagged for review",
+        note: "Deduplicated case exposure",
         href: "/dashboard/outbound/anomalies",
         tone: () => "info",
         getValue: (d) => formatKesCompact(d.caseSummary?.amount_at_risk ?? d.metrics?.total_leakage_kes ?? 0),
       },
       whenFalse: {
-        label: "Funds at risk",
-        note: "Compare pillar exposure",
+        label: "Funds flagged for review",
+        note: "Deduplicated case exposure",
         href: "/dashboard/outbound/anomalies",
         tone: () => "info",
         getValue: (d) => formatKesCompact(d.caseSummary?.amount_at_risk ?? d.metrics?.total_leakage_kes ?? 0),
