@@ -1,4 +1,5 @@
 //import { redirect } from "next/navigation":
+"use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { ApiError, downloadExportWithFields, getMetrics, getEbillingLogs } from "@/lib/api";
