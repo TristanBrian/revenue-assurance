@@ -1,5 +1,6 @@
-import InukaDashboard from "@/components/InukaDashboard";
+import { redirect } from "next/navigation";
 
-export default function InukaOverviewPage() {
-  return <InukaDashboard />;
+/** Superseded by /dashboard/outbound/overview. */
+export default function InukaOverviewRedirect() {
+  redirect("/dashboard/outbound/overview");
 }

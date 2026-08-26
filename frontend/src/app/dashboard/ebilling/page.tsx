@@ -1,10 +1,6 @@
-import EbillingPanel from "@/components/EbillingPanel";
-import RequirePermission from "@/components/RequirePermission";
+import { redirect } from "next/navigation";
 
-export default function EbillingPage() {
-  return (
-    <RequirePermission code="manage_ebilling">
-      <EbillingPanel />
-    </RequirePermission>
-  );
+/** Superseded by /dashboard/[direction]/extra (inbound). */
+export default function EbillingPageRedirect() {
+  redirect("/dashboard/inbound/extra");
 }

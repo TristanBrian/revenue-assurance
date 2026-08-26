@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { getAuditLogs, getAuditSummary, AuditLog, AuditSummary } from "@/lib/api";
 import RequirePermission from "@/components/RequirePermission";
+import AuditVerifyPanel from "@/components/AuditVerifyPanel";
 import { format } from "date-fns";
 
 function AuditContent() {
@@ -158,6 +159,7 @@ function AuditContent() {
         >
           Clear
         </button>
+        <AuditVerifyPanel />
       </div>
 
       {loading && (

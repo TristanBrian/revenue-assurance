@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
-/** OMC risk is now part of the Oil Leakage Explorer. */
+/** OMC risk is part of the Oil Leakage Explorer — superseded by
+ * /dashboard/[direction]/leakage. */
 export default function OmcRiskRedirect() {
-  redirect("/dashboard/heatmap");
+  redirect("/dashboard/inbound/leakage");
 }

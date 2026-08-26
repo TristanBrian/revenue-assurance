@@ -41,7 +41,7 @@ function UploadContent() {
               Back to live dashboard →
             </Link>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Total Dispatched" value={formatKesCompact(result.metrics.total_dispatched_kes)} />
             <StatCard
               label="Total Leakage"
