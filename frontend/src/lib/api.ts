@@ -544,6 +544,69 @@ export async function getAuditLog(id: string): Promise<AuditLog> {
   return unwrap<AuditLog>(res);
 }
 
+// Mirrors backend/app/services/audit/audit_service.py's
+// verify_chain_integrity() per-batch result.
+export interface AuditVerifyBatchResult {
+  batch_index: number;
+  intact: boolean;
+  reason: string | null;
+  broken_at_block_index: number | null;
+  row_count: number;
+  merkle_root: string;
+}
+
+// Mirrors verify_chain_integrity()'s overall return shape — the local
+// (DB-only) half of GET /api/audit/verify.
+export interface AuditVerifyLocalChain {
+  intact: boolean;
+  broken_at_block_index: number | null;
+  reason: string | null;
+  chain_length: number;
+  tip_block_index: number;
+  tip_block_hash: string;
+  broken_at_batch_index: number | null;
+  legacy_row_count: number;
+  batch_count: number;
+  pending_rows: number;
+  batch_results: AuditVerifyBatchResult[];
+}
+
+// Mirrors anchor_service.verify_on_chain_anchor() — the on-chain half.
+// Every field below "configured"/"checked"/"matches"/"reason" is
+// version-dependent (V1 vs V2 anchor — see anchor_service.py's module
+// docstring), hence all optional; UI code should treat presence, not
+// v1/v2 branching, as the signal for what to render.
+export interface AuditVerifyOnChainAnchor {
+  configured: boolean;
+  checked: boolean;
+  matches: boolean | null;
+  reason: string | null;
+  anchor_version?: "v1" | "v2" | null;
+  anchor_block_index?: number | null;
+  anchor_batch_index?: number | null;
+  local_block_hash?: string | null;
+  on_chain_chain_tip_hash?: string | null;
+  local_merkle_root?: string | null;
+  local_batch_root_hash?: string | null;
+  on_chain_merkle_root?: string | null;
+  on_chain_batch_root_hash?: string | null;
+  tx_hash?: string | null;
+  base_block_number?: number | null;
+  anchored_at?: string | null;
+}
+
+export interface AuditVerifyResult {
+  status: string;
+  local_chain: AuditVerifyLocalChain;
+  on_chain_anchor: AuditVerifyOnChainAnchor;
+}
+
+export async function getAuditVerify(): Promise<AuditVerifyResult> {
+  const url = new URL("/api/audit/verify", API_URL);
+  const res = await authFetch(url);
+  return unwrap<AuditVerifyResult>(res);
+}
+
 // ============================================================
 // RECONCILIATION UPLOAD
 // ============================================================

@@ -27,6 +27,40 @@ function formatKesFull(value: number): string {
   }).format(value);
 }
 
+/**
+ * Unified beneficiary masking – "bank statement" style.
+ * - BEN-0158 → BEN-****0158
+ * - Audrey Anderson → BEN-****5837 (consistent hash-based)
+ */
+function maskBeneficiaryId(id: string | undefined | null): string {
+  if (!id) return "Beneficiary";
+
+  // If it's already a BEN-XXXX format, mask it
+  if (id.startsWith("BEN-")) {
+    const clean = id.replace(/^BEN-/, "");
+    // If it already has ****, return as-is
+    if (clean.includes('****')) return id;
+    return `BEN-****${clean.slice(-4)}`;
+  }
+
+  // If it contains a space (likely a person's name) OR is a name pattern
+  if (id.includes(' ') || /^[A-Z][a-z]+\s[A-Z][a-z]+$/.test(id)) {
+    const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const suffix = String(hash % 10000).padStart(4, '0');
+    return `BEN-****${suffix}`;
+  }
+
+  // If it's a long name that's not all caps (likely a person's name without space)
+  if (id.length > 8 && id !== id.toUpperCase() && !id.includes('ENERGY') && !id.includes('OIL')) {
+    const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const suffix = String(hash % 10000).padStart(4, '0');
+    return `BEN-****${suffix}`;
+  }
+
+  // Return unchanged for company names, product names, etc.
+  return id;
+}
+
 interface HoveredCell {
   omc: string;
   product: string;
@@ -73,9 +107,12 @@ export default function Heatmap({ direction, config }: HeatmapProps) {
 
   const productOptions = useMemo(() => ["All", ...(heatmap?.products ?? [])], [heatmap]);
 
-  // Total leakage per OMC (or per OMC for one product, when filtered),
+  // Total leakage per OMC/beneficiary (or for one product, when filtered),
   // sorted descending — the actual question people ask of this data
-  // ("who's worst") rather than a dense OMC x product matrix.
+  // ("who's worst") rather than a dense row x column matrix. Row label is
+  // always masked for display; originalOmc is kept around for the title
+  // tooltip and as a collision-safe React key (two different names can
+  // hash to the same masked suffix).
   const barItems = useMemo(() => {
     if (!heatmap) return [];
     const productIndex = selectedProduct === "All" ? -1 : heatmap.products.indexOf(selectedProduct);
@@ -83,7 +120,7 @@ export default function Heatmap({ direction, config }: HeatmapProps) {
       .map((omc, ri) => {
         const row = heatmap.data[ri] ?? [];
         const value = productIndex === -1 ? row.reduce((sum, v) => sum + v, 0) : (row[productIndex] ?? 0);
-        return { omc, value };
+        return { omc: maskBeneficiaryId(omc), originalOmc: omc, value };
       })
       .filter((item) => item.value > 0)
       .sort((a, b) => b.value - a.value);
@@ -93,12 +130,12 @@ export default function Heatmap({ direction, config }: HeatmapProps) {
 
   const listItems = useMemo(() => {
     if (!heatmap) return [];
-    const items: { omc: string; product: string; value: number }[] = [];
+    const items: { omc: string; originalOmc: string; product: string; value: number }[] = [];
     heatmap.omcs.forEach((omc, ri) => {
       heatmap.products.forEach((product, ci) => {
         const val = heatmap.data[ri]?.[ci] ?? 0;
         if (val > 0) {
-          items.push({ omc, product, value: val });
+          items.push({ omc: maskBeneficiaryId(omc), originalOmc: omc, product, value: val });
         }
       });
     });
@@ -222,8 +259,8 @@ export default function Heatmap({ direction, config }: HeatmapProps) {
               ) : (
                 <div className="flex max-h-[520px] flex-col gap-2.5 overflow-y-auto rounded-lg border border-border bg-muted/20 p-4 pr-3">
                   {barItems.map((item) => (
-                    <div key={item.omc} className="grid grid-cols-[minmax(0,168px)_1fr_92px] items-center gap-3">
-                      <span className="truncate text-xs font-semibold text-foreground/90" title={item.omc}>
+                    <div key={item.originalOmc} className="grid grid-cols-[minmax(0,168px)_1fr_92px] items-center gap-3">
+                      <span className="truncate text-xs font-semibold text-foreground/90" title={item.originalOmc}>
                         {item.omc}
                       </span>
                       <div
@@ -231,7 +268,7 @@ export default function Heatmap({ direction, config }: HeatmapProps) {
                         onMouseEnter={(e) => {
                           const rect = e.currentTarget.getBoundingClientRect();
                           setHoveredCell({
-                            omc: item.omc,
+                            omc: item.originalOmc,
                             product: selectedProduct === "All" ? "All products" : selectedProduct,
                             value: item.value,
                             x: rect.left + rect.width / 2,
@@ -264,7 +301,9 @@ export default function Heatmap({ direction, config }: HeatmapProps) {
                 <tbody className="divide-y divide-border text-foreground/90">
                   {pagedListItems.map((item, index) => (
                     <tr key={index} className="transition-colors hover:bg-accent/60">
-                      <td className="px-4 py-3 font-semibold">{item.omc}</td>
+                      <td className="px-4 py-3 font-semibold" title={item.originalOmc}>
+                        {item.omc}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground">{item.product}</td>
                       <td className="px-4 py-3 font-mono font-bold text-foreground">
                         {formatKesFull(item.value)}
@@ -313,7 +352,7 @@ export default function Heatmap({ direction, config }: HeatmapProps) {
           style={{ left: hoveredCell.x, top: hoveredCell.y }}
         >
           <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Reconciliation Break</span>
-          <span className="text-xs font-bold text-foreground">{hoveredCell.omc}</span>
+          <span className="text-xs font-bold text-foreground">{maskBeneficiaryId(hoveredCell.omc)}</span>
           <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
             <span>{hoveredCell.product}:</span>
             <span className="font-mono font-bold text-primary">
