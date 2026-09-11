@@ -39,6 +39,15 @@ services:
         generateValue: true
 
       # App config
+      - key: APP_NAME
+        value: Reconova
+
+      - key: APP_TAGLINE
+        value: Enterprise Intelligence System
+
+      - key: APP_VERSION
+        value: 2.0.0
+
       - key: MATERIALITY_THRESHOLD
         value: "100000"
 

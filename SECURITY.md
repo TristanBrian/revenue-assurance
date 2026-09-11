@@ -1,6 +1,6 @@
 # Security Policy
 
-FlowGuard is a financial data platform – security is a top priority. We appreciate your help in keeping the project safe.
+Reconova (Enterprise Intelligence System) is a financial and governance data platform – security is a top priority. We appreciate your help in keeping the project safe.
 
 ---
 
@@ -40,13 +40,13 @@ We aim to respond within **48 hours** and will work with you to confirm the issu
 - Use **HTTPS** in production – all deployment examples use SSL.
 - Keep dependencies up-to-date – run `pip list --outdated` regularly.
 - Restrict database access to trusted IPs and use strong passwords.
-- Enable audit trails (FlowGuard logs all critical actions by default).
+- Enable audit trails (Reconova logs all critical actions by default).
 
 ---
 
 ## 🔐 Platform Security Features
 
-FlowGuard includes several built-in security mechanisms:
+Reconova includes several built-in security mechanisms:
 
 | Feature | Description |
 |---------|-------------|
@@ -93,4 +93,4 @@ For general security questions or to report a vulnerability:
 
 ---
 
-**Thank you for helping keep FlowGuard secure!** 🔒
+**Thank you for helping keep Reconova secure!** 🔒

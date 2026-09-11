@@ -1,5 +1,5 @@
 #!/bin/bash
-# run_tests.sh – Full test suite for FlowGuard
+# run_tests.sh – Full test suite for Reconova
 # Generates backend coverage (text + HTML) and frontend test output.
 
 set -e
@@ -7,7 +7,7 @@ set -e
 REPORT_DIR="test_reports"
 mkdir -p "$REPORT_DIR"
 
-echo "🧪 Running FlowGuard test suite..."
+echo "🧪 Running Reconova test suite..."
 echo "========================================"
 
 # 1. Backend tests with coverage (pytest)

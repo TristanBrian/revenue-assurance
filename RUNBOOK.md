@@ -1,4 +1,4 @@
-# 📱 FlowGuard Mobile – Deployment, Testing & Operational Runbook
+# 📱 Reconova Mobile – Enterprise Intelligence System (Deployment, Testing & Operational Runbook)
 
 > **Quick Navigation:** [Quick Start](#-quick-start--expo-go) · [Emulators](#-emulator--simulator-alternatives) · [Test Matrix](#-verification-test-matrix) · [Backend Sync Note](#-backend-divergence--ai-analyst-note) · [Publishing & Production](#-publishing--production-deployment)
 
@@ -6,7 +6,7 @@
 
 ## 🚀 Quick Start – Expo Go (Physical Phone)
 
-The fastest way to test FlowGuard Mobile is using **Expo Go** on a physical Android or iPhone connected to the same Wi-Fi network as your workstation.
+The fastest way to test Reconova Mobile is using **Expo Go** on a physical Android or iPhone connected to the same Wi-Fi network as your workstation.
 
 ### Step 1: Start the Backend & Database
 From the project root:
@@ -108,13 +108,13 @@ Verify these 5 end-to-end flows to confirm operational readiness:
 ## ⚠️ Backend Divergence & AI Analyst Note
 
 > [!NOTE]
-> The **AI Analyst screen** (`/api/fraud/chat`) relies on the conversational fraud-scoring endpoint added in the latest backend updates. If your local backend is behind main, that screen will return a controlled fallback error (`Cannot reach FlowGuard...` or `404`). The remaining 4 core screens (Overview, Anomalies, Alerts Inbox, Profile) are fully operational against current APIs.
+> The **AI Analyst screen** (`/api/fraud/chat`) relies on the conversational fraud-scoring endpoint added in the latest backend updates. If your local backend is behind main, that screen will return a controlled fallback error (`Cannot reach Reconova...` or `404`). The remaining 4 core screens (Overview, Anomalies, Alerts Inbox, Profile) are fully operational against current APIs.
 
 ---
 
 ## 📦 Publishing & Production Deployment
 
-To publish and distribute FlowGuard Mobile for production deployment:
+To publish and distribute Reconova Mobile for production deployment:
 
 ### 1. Production API Environment Setup
 Update `mobile/.env` (or set environment variables in your build provider):
@@ -159,4 +159,4 @@ To build standalone `.apk` / `.aab` for Android and `.ipa` for iOS using Expo Ap
 
 ---
 
-*FlowGuard Mobile • Built for KPC Revenue Assurance & Inuka Foundation Governance*
+*Reconova Mobile • Enterprise Intelligence System • Built for KPC Revenue Assurance & Inuka Foundation Governance*
