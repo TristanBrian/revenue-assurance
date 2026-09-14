@@ -1,4 +1,4 @@
-# FlowGuard / Reconova operations and handover
+# Reconova operations and handover
 
 ## Scope and release status
 
