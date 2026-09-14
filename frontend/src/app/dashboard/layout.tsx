@@ -223,10 +223,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           )}
           <div className={`min-w-0 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
-            <p className="text-sm font-bold text-sidebar-foreground leading-none truncate">
+            <p className="text-base font-bold text-sidebar-foreground leading-none truncate">
               {BRAND_CONFIG.companyName}
             </p>
-            <p className="text-[10px] text-sidebar-muted-foreground leading-none mt-1 truncate">
+            <p className="text-xs text-sidebar-muted-foreground leading-none mt-1 truncate font-medium">
               {isInukaWorkspace ? "Inuka Program Assurance" : BRAND_CONFIG.systemName}
             </p>
           </div>
@@ -243,7 +243,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        <p className={`px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground ${sidebarCollapsed ? "lg:hidden" : ""}`}>
+        <p className={`px-2 mb-1.5 text-xs font-bold uppercase tracking-wider text-sidebar-muted-foreground ${sidebarCollapsed ? "lg:hidden" : ""}`}>
           Workspace
         </p>
         {canSwitchWorkspace && (
@@ -253,7 +253,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 key={d}
                 type="button"
                 onClick={() => switchWorkspace(d)}
-                className={`rounded-md px-2 py-2 text-[10px] font-semibold transition-colors ${
+                className={`rounded-md px-2.5 py-2 text-xs font-bold transition-colors ${
                   direction === d
                     ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                     : "text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
@@ -264,15 +264,15 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             ))}
           </div>
         )}
-        <nav className="flex flex-col gap-0.5">
+        <nav className="flex flex-col gap-1">
           {isAdmin && (
             <Link
               href="/dashboard/admin"
               title={sidebarCollapsed ? "User Administration" : undefined}
-              className={`group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""} ${pathname === "/dashboard/admin" ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"}`}
+              className={`group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition-colors ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""} ${pathname === "/dashboard/admin" ? "bg-sidebar-accent text-sidebar-foreground" : "text-sidebar-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"}`}
             >
               <span className={pathname === "/dashboard/admin" ? "text-sidebar-primary" : ""}>
-                <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m7-10a4 4 0 100-8 4 4 0 000 8zm10 10v-2a4 4 0 00-3-3.87m-1-12a4 4 0 010 7.75" />
                 </svg>
               </span>
@@ -292,18 +292,18 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 key={item.id}
                 href={href}
                 title={sidebarCollapsed ? navLabel(item, direction) : undefined}
-                className={`group relative flex items-center justify-between rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""} ${
+                className={`group relative flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-semibold transition-colors ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""} ${
                   active
-                    ? "bg-sidebar-accent text-sidebar-foreground"
+                    ? "bg-sidebar-accent text-sidebar-foreground font-bold"
                     : "text-sidebar-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
                 }`}
               >
-                <span className={`flex items-center ${sidebarCollapsed ? "lg:justify-center" : "gap-2.5"}`}>
+                <span className={`flex items-center ${sidebarCollapsed ? "lg:justify-center" : "gap-3"}`}>
                   <span className={active ? "text-sidebar-primary" : ""}>{item.icon}</span>
                   <span className={sidebarCollapsed ? "lg:hidden" : ""}>{navLabel(item, direction)}</span>
                 </span>
                 {count > 0 && (
-                  <span className={`flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-sidebar-primary px-1 text-[9px] font-bold text-sidebar-primary-foreground ${sidebarCollapsed ? "lg:absolute lg:right-1 lg:top-0.5" : ""}`}>
+                  <span className={`flex h-5 min-w-5 items-center justify-center rounded-full bg-sidebar-primary px-1.5 text-xs font-bold text-sidebar-primary-foreground ${sidebarCollapsed ? "lg:absolute lg:right-1 lg:top-0.5" : ""}`}>
                     {count > 99 ? "99+" : count}
                   </span>
                 )}
@@ -314,14 +314,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
         <div className="mt-auto flex flex-col gap-3">
           <div className={`border-t border-sidebar-border pt-3 flex items-center gap-2.5 px-1 ${sidebarCollapsed ? "lg:flex-col" : ""}`}>
-            <div className="w-7 h-7 shrink-0 rounded-full bg-sidebar-primary/20 text-sidebar-primary flex items-center justify-center text-[11px] font-bold">
+            <div className="w-8 h-8 shrink-0 rounded-full bg-sidebar-primary/20 text-sidebar-primary flex items-center justify-center text-xs font-bold">
               {user?.email?.[0]?.toUpperCase() ?? "?"}
             </div>
             <div className={`min-w-0 flex-1 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
               {!authLoading && user && (
                 <>
-                  <p className="truncate text-[12px] font-semibold text-sidebar-foreground">{user.email}</p>
-                  <p className="text-[10px] capitalize text-sidebar-muted-foreground truncate">
+                  <p className="truncate text-xs font-bold text-sidebar-foreground">{user.email}</p>
+                  <p className="text-xs capitalize text-sidebar-muted-foreground truncate font-medium">
                     {user.roles.join(", ").replace(/_/g, " ")}
                   </p>
                 </>
@@ -357,11 +357,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
             {showSearch ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground max-w-md w-full">
-                <div className="flex items-center gap-2 w-full rounded-md border border-border bg-muted/60 px-3 py-1.5 text-xs">
-                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <div className="flex items-center gap-2 w-full rounded-md border border-border bg-muted/60 px-3 py-2 text-sm">
+                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z" />
                   </svg>
-                  <span className="truncate">{isInukaWorkspace ? "Search beneficiaries, officers, payouts…" : "Search anomalies, OMCs, invoices…"}</span>
+                  <span className="truncate text-xs sm:text-sm">{isInukaWorkspace ? "Search beneficiaries, officers, payouts…" : "Search anomalies, OMCs, invoices…"}</span>
                 </div>
               </div>
             ) : (
@@ -378,7 +378,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               >
                 <BellIcon />
                 {criticalCount > 0 && (
-                  <span className="absolute top-1 right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-status-critical px-1 text-[8px] font-bold text-white">
+                  <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] font-bold text-white">
                     {criticalCount > 99 ? "99+" : criticalCount}
                   </span>
                 )}
@@ -396,7 +396,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 >
                   <BellIcon />
                   {depotAlerts && depotAlerts.criticalCount > 0 && (
-                    <span className="absolute top-1 right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-status-critical px-1 text-[8px] font-bold text-white">
+                    <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] font-bold text-white">
                       {depotAlerts.criticalCount > 99 ? "99+" : depotAlerts.criticalCount}
                     </span>
                   )}
@@ -404,24 +404,24 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 {depotAlertsOpen && (
                   <div className="absolute right-0 mt-1 w-80 rounded-md border border-border bg-popover shadow-lg py-2 z-40">
                     <div className="px-3 pb-2 border-b border-border">
-                      <p className="text-xs font-bold text-foreground">
+                      <p className="text-sm font-bold text-foreground">
                         {depotAlerts ? depotAlerts.depotId : "Your depot"} — critical alerts
                       </p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Scoped to your assigned depot only</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Scoped to your assigned depot only</p>
                     </div>
                     {!depotAlerts || depotAlerts.items.length === 0 ? (
-                      <p className="px-3 py-4 text-xs text-muted-foreground italic">No alerts for your depot right now.</p>
+                      <p className="px-3 py-4 text-xs sm:text-sm text-muted-foreground italic">No alerts for your depot right now.</p>
                     ) : (
                       <div className="max-h-72 overflow-y-auto divide-y divide-border">
                         {depotAlerts.items.slice(0, 8).map((a) => (
                           <div key={a.dispatch_id} className="px-3 py-2">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-semibold text-foreground truncate">{a.customer}</span>
-                              <span className="text-xs font-mono font-bold text-status-critical shrink-0">
+                              <span className="text-xs sm:text-sm font-semibold text-foreground truncate">{a.customer}</span>
+                              <span className="text-xs sm:text-sm font-mono font-bold text-status-critical shrink-0">
                                 {formatKes(a.leakage_kes)}
                               </span>
                             </div>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               {a.break_type} · {a.dispatch_id}
                             </p>
                           </div>
@@ -444,7 +444,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 {THEME_ICONS[theme]}
               </button>
               {themeMenuOpen && (
-                <div className="absolute right-0 mt-1 w-32 rounded-md border border-border bg-popover shadow-lg py-1 z-40">
+                <div className="absolute right-0 mt-1 w-36 rounded-md border border-border bg-popover shadow-lg py-1 z-40">
                   {(["light", "dark", "system"] as const).map((mode) => (
                     <button
                       key={mode}
@@ -453,7 +453,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                         setTheme(mode);
                         setThemeMenuOpen(false);
                       }}
-                      className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs capitalize transition-colors ${
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-xs sm:text-sm capitalize transition-colors ${
                         theme === mode
                           ? "text-foreground font-semibold bg-accent"
                           : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -470,24 +470,24 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {routeDirection && (
-          <div className={`border-b px-4 sm:px-6 py-2.5 ${isInukaWorkspace ? "border-status-info/20 bg-status-info-bg/50" : "border-primary/15 bg-primary/5"}`}>
+          <div className={`border-b px-4 sm:px-6 py-3 ${isInukaWorkspace ? "border-status-info/20 bg-status-info-bg/50" : "border-primary/15 bg-primary/5"}`}>
             <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[9px] font-bold ${isInukaWorkspace ? "bg-status-info-bg text-status-info" : "bg-primary/10 text-primary"}`}>
+              <div className="flex min-w-0 items-center gap-3">
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-xs font-extrabold ${isInukaWorkspace ? "bg-status-info-bg text-status-info" : "bg-primary/10 text-primary"}`}>
                   {isInukaWorkspace ? "IN" : "OIL"}
                 </span>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <p className="truncate text-xs font-bold text-foreground">{workspaceLabel}</p>
-                    <span className="rounded-full bg-background/70 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <p className="truncate text-sm sm:text-base font-bold text-foreground">{workspaceLabel}</p>
+                    <span className="rounded-full bg-background/80 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-muted-foreground border border-border/50">
                       {roleMode}
                     </span>
                   </div>
-                  <p className="truncate text-[10px] text-muted-foreground">{workspaceDescription}</p>
+                  <p className="truncate text-xs sm:text-sm font-medium text-muted-foreground">{workspaceDescription}</p>
                 </div>
               </div>
               {canSwitchWorkspace && (
-                <p className="text-[10px] text-muted-foreground sm:text-right">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground sm:text-right">
                   Switch workspace to change the dataset and controls shown.
                 </p>
               )}

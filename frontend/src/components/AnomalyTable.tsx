@@ -118,16 +118,16 @@ export default function AnomalyTable({
 
   return (
     <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950/40 shadow-sm">
-      <table className="w-full min-w-[640px] text-left text-sm">
-        <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 text-zinc-500 dark:text-zinc-400 font-medium">
+      <table className="w-full min-w-[640px] text-left text-sm sm:text-base">
+        <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 text-zinc-600 dark:text-zinc-300 font-semibold">
           <tr>
-            <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">
+            <th className="px-4 py-3.5 text-xs sm:text-sm uppercase tracking-wider font-bold">
               {idLabel}
             </th>
             {columns.map((col) => (
               <th
                 key={col.key}
-                className="cursor-pointer select-none px-4 py-3 text-xs uppercase tracking-wider font-semibold hover:text-zinc-950 dark:hover:text-white transition-colors"
+                className="cursor-pointer select-none px-4 py-3.5 text-xs sm:text-sm uppercase tracking-wider font-bold hover:text-zinc-950 dark:hover:text-white transition-colors"
                 onClick={() => toggleSort(col.key)}
               >
                 <div className="flex items-center gap-1">
@@ -138,7 +138,7 @@ export default function AnomalyTable({
                 </div>
               </th>
             ))}
-            <th className="px-4 py-3 text-xs uppercase tracking-wider font-semibold">
+            <th className="px-4 py-3.5 text-xs sm:text-sm uppercase tracking-wider font-bold">
               Status
             </th>
           </tr>
@@ -156,34 +156,34 @@ export default function AnomalyTable({
                     : "hover:bg-zinc-100/60 dark:hover:bg-zinc-900/40"
                 }`}
               >
-                <td className="px-4 py-3.5 font-mono text-xs font-semibold text-zinc-500 dark:text-zinc-400 group-hover:text-zinc-850 group-hover:dark:text-zinc-200">
+                <td className="px-4 py-3.5 font-mono text-xs sm:text-sm font-semibold text-zinc-600 dark:text-zinc-300 group-hover:text-zinc-850 group-hover:dark:text-zinc-200">
                   {a.dispatch_id}
                 </td>
                 <td className="px-4 py-3.5 font-medium">{a.customer}</td>
-                <td className="px-4 py-3.5 text-zinc-550 dark:text-zinc-400">{a.break_type}</td>
+                <td className="px-4 py-3.5 text-zinc-600 dark:text-zinc-300">{a.break_type}</td>
                 <td className="px-4 py-3.5 font-semibold font-mono text-zinc-900 dark:text-white">
                   {formatKes(a.leakage_kes)}
                 </td>
-                <td className="px-4 py-3.5 text-zinc-550 dark:text-zinc-400">{a.age_days}</td>
+                <td className="px-4 py-3.5 text-zinc-600 dark:text-zinc-300">{a.age_days}</td>
                 <td className="px-4 py-3.5">
                   {a.fraud_tier != null ? (
                     <div className="flex items-center gap-1.5">
                       <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${fraudTierClass(a.fraud_tier)}`}
+                        className={`rounded-full px-2.5 py-1 text-xs sm:text-sm font-bold ${fraudTierClass(a.fraud_tier)}`}
                       >
                         {a.fraud_tier}
                       </span>
-                      <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                      <span className="font-mono text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
                         {a.fraud_score?.toFixed(0)}
                       </span>
                     </div>
                   ) : (
-                    <span className="text-xs text-zinc-400 dark:text-zinc-600">—</span>
+                    <span className="text-xs sm:text-sm text-zinc-400 dark:text-zinc-600">—</span>
                   )}
                 </td>
                 <td className="px-4 py-3.5">
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusClass(a.status)}`}
+                    className={`rounded-full px-2.5 py-1 text-xs sm:text-sm font-bold ${statusClass(a.status)}`}
                   >
                     {a.status}
                   </span>

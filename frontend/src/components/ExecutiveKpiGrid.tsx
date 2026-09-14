@@ -83,28 +83,28 @@ export default function ExecutiveKpiGrid({
           >
             <div>
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                <span className="text-sm font-bold tracking-wider text-muted-foreground uppercase">
                   {card.title}
                 </span>
                 <div className={`p-2 rounded-lg border ${card.iconBg}`}>
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-5 h-5" />
                 </div>
               </div>
 
-              <div className="text-2xl font-bold tracking-tight text-foreground mb-1">
+              <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mb-1">
                 {card.value}
               </div>
 
-              <p className="text-xs text-muted-foreground font-medium mb-3">
+              <p className="text-xs sm:text-sm text-muted-foreground font-medium mb-3">
                 {card.subtitle}
               </p>
             </div>
 
-            <div className="pt-3 border-t border-border/40 flex items-center justify-between text-xs">
-              <span className={`font-semibold ${card.trendPositive ? "text-emerald-500" : "text-amber-500"}`}>
+            <div className="pt-3 border-t border-border/40 flex items-center justify-between text-xs sm:text-sm">
+              <span className={`font-bold ${card.trendPositive ? "text-emerald-500" : "text-amber-500"}`}>
                 {card.trend}
               </span>
-              <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted/60 px-2 py-0.5 rounded font-medium">
                 Demo preview
               </span>
             </div>

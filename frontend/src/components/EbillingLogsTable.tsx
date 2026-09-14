@@ -60,60 +60,60 @@ export default function EbillingLogsTable({
   return (
     <div>
       <div className="overflow-x-auto rounded-lg border border-border bg-card">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[720px] text-left text-sm sm:text-base">
           <thead className="border-b border-border bg-muted/50">
             <tr>
-              <th className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Invoice ID
               </th>
-              <th className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Customer
               </th>
-              <th className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Value
               </th>
-              <th className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Status
               </th>
-              <th className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Retries
               </th>
-              <th className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Last Attempt
               </th>
-              <th className="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-3 text-xs sm:text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Error
               </th>
-              <th className="px-4 py-2" />
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {logs.map((log, i) => (
               <tr key={`${log.invoice_id}-${i}`} className="transition-colors hover:bg-accent/40">
-                <td className="px-4 py-2.5 font-mono text-xs text-foreground/90">{log.invoice_id}</td>
-                <td className="px-4 py-2.5 text-foreground/90">{log.customer_name ?? "—"}</td>
-                <td className="px-4 py-2.5 font-mono text-foreground/90">{formatKes(log.value_kes)}</td>
-                <td className="px-4 py-2.5">
+                <td className="px-4 py-3 font-mono text-sm font-semibold text-foreground/90">{log.invoice_id}</td>
+                <td className="px-4 py-3 text-foreground/90 font-medium">{log.customer_name ?? "—"}</td>
+                <td className="px-4 py-3 font-mono text-foreground/90 font-medium">{formatKes(log.value_kes)}</td>
+                <td className="px-4 py-3">
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${statusClass(log.status)}`}
+                    className={`rounded-full px-2.5 py-1 text-xs sm:text-sm font-bold ${statusClass(log.status)}`}
                   >
                     {log.status}
                   </span>
                 </td>
-                <td className="px-4 py-2.5 text-foreground/90">{log.retry_count}</td>
-                <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                <td className="px-4 py-3 text-foreground/90 font-medium">{log.retry_count}</td>
+                <td className="px-4 py-3 text-xs sm:text-sm text-muted-foreground">
                   {log.last_attempt}
                 </td>
-                <td className="max-w-[200px] truncate px-4 py-2.5 text-xs text-status-critical">
+                <td className="max-w-[200px] truncate px-4 py-3 text-xs sm:text-sm text-status-critical">
                   {log.error_message ?? "—"}
                 </td>
-                <td className="px-4 py-2.5">
+                <td className="px-4 py-3">
                   {log.status === "failed" && (
                     <button
                       type="button"
                       onClick={() => handleRetry(log.invoice_id)}
                       disabled={retrying === log.invoice_id}
-                      className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-opacity disabled:opacity-40"
+                      className="rounded-md bg-primary px-3 py-1.5 text-xs sm:text-sm font-semibold text-primary-foreground transition-opacity disabled:opacity-40"
                     >
                       {retrying === log.invoice_id ? "Retrying…" : "Retry"}
                     </button>

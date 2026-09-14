@@ -49,27 +49,27 @@ export default function GantryYardGrid({ lanes, onRefresh, loading = false }: Ga
         <div>
           <div className="flex items-center gap-2">
             <Truck className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-bold text-foreground tracking-tight">
+            <h3 className="text-xl font-extrabold text-foreground tracking-tight">
               Live Depot & Gantry Yard Control Visualization
             </h3>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 font-medium">
             Real-time loading lane status (Gantry Lanes 1–6) & automated gate clearance holds
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="flex items-center gap-1 text-emerald-500 font-semibold bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <div className="flex items-center gap-2 text-xs sm:text-sm">
+            <span className="flex items-center gap-1.5 text-emerald-500 font-bold bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
               Clean (Clean Gate)
             </span>
-            <span className="flex items-center gap-1 text-amber-500 font-semibold bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            <span className="flex items-center gap-1.5 text-amber-500 font-bold bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
               Warning
             </span>
-            <span className="flex items-center gap-1 text-rose-500 font-semibold bg-rose-500/10 px-2 py-1 rounded border border-rose-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+            <span className="flex items-center gap-1.5 text-rose-500 font-bold bg-rose-500/10 px-2.5 py-1 rounded border border-rose-500/20">
+              <span className="w-2 h-2 rounded-full bg-rose-500" />
               Hold Triggered
             </span>
           </div>
@@ -108,52 +108,52 @@ export default function GantryYardGrid({ lanes, onRefresh, loading = false }: Ga
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-foreground">{lane.lane_name}</span>
-                  <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                  <span className="font-bold text-base text-foreground">{lane.lane_name}</span>
+                  <span className="text-xs font-mono font-bold bg-muted px-2 py-0.5 rounded text-muted-foreground">
                     {lane.product_code}
                   </span>
                 </div>
 
-                <div className={`px-2 py-0.5 rounded-full border text-[11px] font-semibold flex items-center gap-1.5 ${statusInfo.bg}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dot}`} />
+                <div className={`px-2.5 py-0.5 rounded-full border text-xs font-bold flex items-center gap-1.5 ${statusInfo.bg}`}>
+                  <span className={`w-2 h-2 rounded-full ${statusInfo.dot}`} />
                   {lane.status.toUpperCase()}
                 </div>
               </div>
 
               <div className="space-y-2 mb-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <Truck className="w-3.5 h-3.5 text-muted-foreground" /> Truck ID:
+                <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <span className="text-muted-foreground font-medium flex items-center gap-1">
+                    <Truck className="w-4 h-4 text-muted-foreground" /> Truck ID:
                   </span>
                   <span className="font-mono font-bold text-foreground">{lane.current_truck_id}</span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">OMC Customer:</span>
-                  <span className="font-semibold text-foreground truncate max-w-[140px]">{lane.omc_name}</span>
+                <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <span className="text-muted-foreground font-medium">OMC Customer:</span>
+                  <span className="font-bold text-foreground truncate max-w-[160px]">{lane.omc_name}</span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Meter vs Invoice:</span>
+                <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <span className="text-muted-foreground font-medium">Meter vs Invoice:</span>
                   <span className={`font-mono font-bold ${delta !== 0 ? "text-rose-500" : "text-emerald-500"}`}>
                     {lane.meter_volume_l.toLocaleString()} L / {lane.invoiced_volume_l.toLocaleString()} L
-                    {delta > 0 && <span className="ml-1 text-[10px]">(+{delta.toLocaleString()}L)</span>}
+                    {delta > 0 && <span className="ml-1 text-xs font-bold">(+{delta.toLocaleString()}L)</span>}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-muted-foreground" /> Dwell Time:
+                <div className="flex items-center justify-between text-xs sm:text-sm">
+                  <span className="text-muted-foreground font-medium flex items-center gap-1">
+                    <Clock className="w-4 h-4 text-muted-foreground" /> Dwell Time:
                   </span>
-                  <span className={`font-mono font-semibold ${lane.dwell_time_mins > lane.free_time_limit_mins ? "text-amber-500" : "text-foreground"}`}>
+                  <span className={`font-mono font-bold ${lane.dwell_time_mins > lane.free_time_limit_mins ? "text-amber-500" : "text-foreground"}`}>
                     {lane.dwell_time_mins} min / {lane.free_time_limit_mins} min limit
                   </span>
                 </div>
               </div>
 
               {lane.automated_hold_reason && (
-                <div className="p-2 rounded border border-rose-500/20 bg-rose-500/10 text-[11px] text-rose-500 font-medium flex items-start gap-1.5">
-                  <StatusIcon className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <div className="p-2.5 rounded border border-rose-500/30 bg-rose-500/10 text-xs text-rose-500 font-semibold flex items-start gap-1.5">
+                  <StatusIcon className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{lane.automated_hold_reason}</span>
                 </div>
               )}

@@ -83,17 +83,17 @@ export default function StatCard({
   const content = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[13px] text-muted-foreground">{label}</span>
+        <span className="text-sm font-semibold text-muted-foreground">{label}</span>
         {icon && (
           <span className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${TONE_ICON_BG[tone]}`}>
             {icon}
           </span>
         )}
       </div>
-      <span className="text-3xl font-bold tracking-tight text-foreground mt-2">{value}</span>
+      <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mt-2">{value}</span>
 
       {typeof progress === "number" ? (
-        <div className="mt-2.5 h-1.5 w-full rounded-full bg-muted overflow-hidden">
+        <div className="mt-2.5 h-2 w-full rounded-full bg-muted overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${TONE_BAR_FILL[tone]}`}
             style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}
@@ -101,11 +101,11 @@ export default function StatCard({
         </div>
       ) : note ? (
         notePill ? (
-          <span className={`mt-2 w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${TONE_NOTE_PILL[tone]}`}>
+          <span className={`mt-2 w-fit rounded-full px-2.5 py-1 text-xs sm:text-sm font-semibold ${TONE_NOTE_PILL[tone]}`}>
             {note}
           </span>
         ) : (
-          <span className={`text-[11px] font-medium mt-1.5 ${TONE_NOTE_TEXT[tone]}`}>{note}</span>
+          <span className={`text-xs sm:text-sm font-medium mt-1.5 ${TONE_NOTE_TEXT[tone]}`}>{note}</span>
         )
       ) : null}
     </>

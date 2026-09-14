@@ -190,8 +190,8 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 16px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
@@ -200,58 +200,58 @@ body {
 /* System-wide Typography Hierarchy matching KPC Enterprise Standards */
 h1, .page-title {
   font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 1.625rem; /* 26px (24-28px range) */
-  font-weight: 700; /* 600-700 */
+  font-size: 1.75rem; /* 28px */
+  font-weight: 700;
   letter-spacing: -0.025em;
 }
 
 h2, .section-heading {
   font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 1.1875rem; /* 19px (18-20px range) */
+  font-size: 1.25rem; /* 20px */
   font-weight: 600;
   letter-spacing: -0.015em;
 }
 
 h3, .card-title {
   font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 0.9375rem; /* 15px (14-16px range) */
+  font-size: 1.0625rem; /* 17px */
   font-weight: 600;
 }
 
 .kpi-number, .stat-value {
   font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 1.75rem; /* 28px (24-36px range) */
-  font-weight: 700; /* 600-700 */
+  font-size: 2rem; /* 32px */
+  font-weight: 800;
   letter-spacing: -0.03em;
 }
 
 table {
   font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 0.84375rem; /* 13.5px (13-14px range) */
+  font-size: 0.9375rem; /* 15px */
 }
 
 th, .table-header {
   font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 0.8125rem; /* 13px (12-14px range) */
-  font-weight: 600;
+  font-size: 0.84375rem; /* 13.5px */
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 td, .table-data {
   font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 0.84375rem; /* 13.5px (13-14px range) */
+  font-size: 0.9375rem; /* 15px */
   font-weight: 400;
 }
 
 button, .btn {
   font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 0.875rem; /* 14px */
+  font-size: 0.9375rem; /* 15px */
   font-weight: 600;
 }
 
 label, .field-label {
   font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
-  font-size: 0.8125rem; /* 13px (12-14px range) */
+  font-size: 0.875rem; /* 14px */
   font-weight: 500;
 }
