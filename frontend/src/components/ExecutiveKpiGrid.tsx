@@ -20,9 +20,9 @@ function formatKes(val: number): string {
 
 export default function ExecutiveKpiGrid({
   totalRevenueProtectedKes,
-  volumeVarianceIndexPct = 96.4,
-  automatedDemurrageRecoveredKes = 14250000,
-  activeGateHoldsCount = 2,
+  volumeVarianceIndexPct,
+  automatedDemurrageRecoveredKes,
+  activeGateHoldsCount,
   gantrySummary,
 }: ExecutiveKpiGridProps) {
   const varianceIndex = gantrySummary?.volume_variance_index_pct ?? volumeVarianceIndexPct;
@@ -32,10 +32,10 @@ export default function ExecutiveKpiGrid({
   const cards = [
     {
       id: "revenue-protected",
-      title: "Total Revenue Protected",
-      subtitle: "Real-time counter of saved leakage",
+      title: "Recorded Payments",
+      subtitle: "Payments recorded in reconciliation data",
       value: formatKes(totalRevenueProtectedKes),
-      trend: "+12.4% vs last period",
+      trend: "Payments are not leakage savings",
       trendPositive: true,
       icon: ShieldCheck,
       iconBg: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
@@ -44,9 +44,9 @@ export default function ExecutiveKpiGrid({
       id: "variance-index",
       title: "Volume Variance Index",
       subtitle: "Physical meter vs invoice alignment",
-      value: `${varianceIndex.toFixed(1)}%`,
+      value: varianceIndex == null ? "Unavailable" : `${varianceIndex.toFixed(1)}%`,
       trend: "Target: >95.0%",
-      trendPositive: varianceIndex >= 95.0,
+      trendPositive: (varianceIndex ?? 0) >= 95.0,
       icon: BarChart3,
       iconBg: "bg-blue-500/10 text-blue-500 border-blue-500/20",
     },
@@ -54,8 +54,8 @@ export default function ExecutiveKpiGrid({
       id: "demurrage-recovered",
       title: "Automated Demurrage Billed",
       subtitle: "Automated dwell-time cost recovery",
-      value: formatKes(demurrageRecovered),
-      trend: "Auto-invoiced via Gantry",
+      value: demurrageRecovered == null ? "Unavailable" : formatKes(demurrageRecovered),
+      trend: "Billing integration pending",
       trendPositive: true,
       icon: Clock,
       iconBg: "bg-amber-500/10 text-amber-500 border-amber-500/20",
@@ -64,11 +64,11 @@ export default function ExecutiveKpiGrid({
       id: "gate-holds",
       title: "Active Gate-Holds",
       subtitle: "Trucks held due to volume mismatch",
-      value: `${gateHolds} Trucks`,
-      trend: gateHolds > 0 ? "Automated Hold Active" : "All Lanes Clear",
+      value: gateHolds == null ? "Unavailable" : `${gateHolds} Trucks`,
+      trend: (gateHolds ?? 0) > 0 ? "Automated Hold Active" : "All Lanes Clear",
       trendPositive: gateHolds === 0,
       icon: AlertTriangle,
-      iconBg: gateHolds > 0 ? "bg-rose-500/10 text-rose-500 border-rose-500/20" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+      iconBg: (gateHolds ?? 0) > 0 ? "bg-rose-500/10 text-rose-500 border-rose-500/20" : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
     },
   ];
 
@@ -105,7 +105,7 @@ export default function ExecutiveKpiGrid({
                 {card.trend}
               </span>
               <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
-                Live
+                Demo preview
               </span>
             </div>
           </div>

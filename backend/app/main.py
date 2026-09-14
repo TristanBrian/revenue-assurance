@@ -12,7 +12,6 @@ from app.routes.audit import audit
 from app.routes.alerts import alerts
 from app.routes import inuka
 from app.routes import report_verify
-from app.routes import alerts
 # from app.routes import chatbot
 
 from app.config import settings
@@ -204,7 +203,7 @@ async def version():
     }
 
 @app.get("/health")
-async def health_check():
+async def health_check(response: Response):
     db_status = "disconnected"
     start_time = time.time()
     try:
@@ -212,8 +211,9 @@ async def health_check():
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         db_status = "connected"
-    except Exception as e:
-        db_status = f"error: {str(e)}"
+    except Exception:
+        logger.exception("Database readiness check failed")
+        response.status_code = 503
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
         "database": db_status,
@@ -224,11 +224,13 @@ async def health_check():
 
 @app.head("/health")
 async def head_health():
-    return Response(status_code=200)
+    response = Response()
+    await health_check(response)
+    return response
 
 @app.get("/api/health")
-async def api_health():
-    return await health_check()
+async def api_health(response: Response):
+    return await health_check(response)
 
 @app.get("/ping")
 async def ping():

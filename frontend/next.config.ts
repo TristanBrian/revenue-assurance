@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   compress: true,
-  turbopack: {},
+  turbopack: { root: process.cwd() },
   typescript: {
     ignoreBuildErrors: false,
   },

@@ -32,7 +32,7 @@ export default function VolumeDriftChart({ data }: VolumeDriftChartProps) {
             </h3>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Real-time variance analytics tracking physical gantry meters vs financial billing
+            Illustrative sample volumes; telemetry history is not connected
           </p>
         </div>
 
@@ -86,9 +86,9 @@ export default function VolumeDriftChart({ data }: VolumeDriftChartProps) {
 
       <div className="mt-6 pt-4 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
-          <TrendingUp className="w-4 h-4 text-emerald-500" /> Average Meter Alignment: <strong>96.4% Accuracy</strong>
+          <TrendingUp className="w-4 h-4 text-emerald-500" /> Average Meter Alignment: <strong>{(100 * (1 - chartData.reduce((sum, row) => sum + Math.abs(row.loaded_volume - row.invoiced_volume), 0) / Math.max(1, chartData.reduce((sum, row) => sum + row.invoiced_volume, 0)))).toFixed(1)}%</strong>
         </span>
-        <span>Updated real-time from Gantry Telemetry</span>
+        <span>Sample data — not live telemetry</span>
       </div>
     </div>
   );

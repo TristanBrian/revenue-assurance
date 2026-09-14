@@ -118,7 +118,7 @@ def reconcile_gantry_lanes(
     _: User = Depends(require_permission("view_metrics")),
 ):
     """
-    Returns live loading status for Gantry Lanes 1 to 6.
+    Returns synthetic demo loading status for Gantry Lanes 1 to 6.
     Compares physical meter readings vs commercial invoice quantities,
     dwell time against free-time limits, and automated gate clearance/hold states.
     """
@@ -211,14 +211,15 @@ def reconcile_gantry_lanes(
         ]
         return {
             "status": "success",
+            "source": "synthetic_demo",
             "lanes": lanes,
             "summary": {
                 "total_lanes": len(lanes),
                 "clean_count": sum(1 for l in lanes if l["status"] == "green"),
                 "warning_count": sum(1 for l in lanes if l["status"] == "yellow"),
                 "hold_count": sum(1 for l in lanes if l["status"] == "red"),
-                "volume_variance_index_pct": 96.4,
-                "automated_demurrage_recovered_kes": 14250000,
+                "volume_variance_index_pct": round(100 * (1 - sum(abs(l["meter_volume_l"] - l["invoiced_volume_l"]) for l in lanes) / sum(l["invoiced_volume_l"] for l in lanes)), 2),
+                "automated_demurrage_recovered_kes": 0,
                 "active_gate_holds_count": sum(1 for l in lanes if l["status"] == "red"),
             },
         }

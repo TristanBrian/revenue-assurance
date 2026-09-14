@@ -11,7 +11,6 @@ import type { WorkspaceDirection } from "@/lib/workspace";
 import StatCardGrid from "@/components/StatCardGrid";
 import ExposureRecoveryChart from "@/components/ExposureRecoveryChart";
 import ManagerAlertsCard from "@/components/ManagerAlertsCard";
-import LiveFeed from "@/components/LiveFeed";
 import InukaCaseModal from "@/components/InukaCaseModal";
 import ExecutiveKpiGrid from "@/components/ExecutiveKpiGrid";
 import GantryYardGrid from "@/components/GantryYardGrid";
@@ -27,11 +26,6 @@ function formatKesCompact(value: number): string {
   if (value >= 1e9) return `KES ${(value / 1e9).toFixed(2)}B`;
   if (value >= 1e6) return `KES ${(value / 1e6).toFixed(2)}M`;
   return formatKes(value);
-}
-
-function RiskDot({ level }: { level: "Low" | "Medium" | "High" }) {
-  const color = level === "High" ? "bg-status-critical" : level === "Medium" ? "bg-status-medium" : "bg-status-low";
-  return <span className={`w-2 h-2 rounded-full shrink-0 ${color}`} />;
 }
 
 // Inbound break-type breakdown — labels/colors/keys exactly as the
@@ -73,8 +67,6 @@ export default function OverviewPage() {
 
   const canViewMetrics = user?.permissions.includes("view_metrics") ?? false;
   const canViewOmcRisk = direction === "inbound" && (user?.permissions.includes("view_omc_risk_profile") ?? false);
-  const canViewLiveFeed = user?.permissions.includes("view_live_feed") ?? false;
-  const isManager = user?.roles.includes("manager") ?? false;
 
   const fetchGantryLanesData = async () => {
     try {
@@ -84,24 +76,8 @@ export default function OverviewPage() {
         setGantrySummary(res.summary);
       }
     } catch {
-      // Fallback demo lanes if endpoint unavailable
-      setGantryLanes([
-        { lane_id: 1, lane_name: "Gantry Lane 1", status: "green", current_truck_id: "KCF 892Y", omc_name: "Petro Kenya", product_code: "AGO", meter_volume_l: 34000, invoiced_volume_l: 34000, dwell_time_mins: 28, free_time_limit_mins: 45, automated_hold_reason: null, gate_clearance: "ISSUED" },
-        { lane_id: 2, lane_name: "Gantry Lane 2", status: "red", current_truck_id: "KDD 104B", omc_name: "Lake Oil", product_code: "PMS", meter_volume_l: 38500, invoiced_volume_l: 32000, dwell_time_mins: 52, free_time_limit_mins: 45, automated_hold_reason: "Meter volume exceeds invoiced volume (+6,500 L unbilled)", gate_clearance: "HOLD_TRIGGERED" },
-        { lane_id: 3, lane_name: "Gantry Lane 3", status: "yellow", current_truck_id: "KDA 512P", omc_name: "Rift Energy", product_code: "AGO", meter_volume_l: 40000, invoiced_volume_l: 40000, dwell_time_mins: 42, free_time_limit_mins: 45, automated_hold_reason: "Dwell time approaching 45-minute free-time limit", gate_clearance: "WARNING" },
-        { lane_id: 4, lane_name: "Gantry Lane 4", status: "green", current_truck_id: "KCU 301M", omc_name: "Hass Petroleum", product_code: "DPK", meter_volume_l: 25000, invoiced_volume_l: 25000, dwell_time_mins: 19, free_time_limit_mins: 45, automated_hold_reason: null, gate_clearance: "ISSUED" },
-        { lane_id: 5, lane_name: "Gantry Lane 5", status: "red", current_truck_id: "KCP 774T", omc_name: "Galana Oil", product_code: "AGO", meter_volume_l: 36000, invoiced_volume_l: 30000, dwell_time_mins: 64, free_time_limit_mins: 45, automated_hold_reason: "Meter discrepancy (+6,000 L) & Demurrage Exceeded (+19 mins)", gate_clearance: "HOLD_TRIGGERED" },
-        { lane_id: 6, lane_name: "Gantry Lane 6", status: "green", current_truck_id: "KDG 990W", omc_name: "Ola Energy", product_code: "PMS", meter_volume_l: 42000, invoiced_volume_l: 42000, dwell_time_mins: 31, free_time_limit_mins: 45, automated_hold_reason: null, gate_clearance: "ISSUED" }
-      ]);
-      setGantrySummary({
-        total_lanes: 6,
-        clean_count: 3,
-        warning_count: 1,
-        hold_count: 2,
-        volume_variance_index_pct: 96.4,
-        automated_demurrage_recovered_kes: 14250000,
-        active_gate_holds_count: 2
-      });
+      setGantryLanes([]);
+      setGantrySummary(null);
     }
   };
 
@@ -145,7 +121,6 @@ export default function OverviewPage() {
     };
   }, [user, materiality, direction, canViewMetrics, canViewOmcRisk]);
 
-  const sortedOmcs = [...omcProfiles].sort((a, b) => b.leakage_kes - a.leakage_kes).slice(0, 5);
   const breakTypes = direction === "inbound" ? INBOUND_BREAK_TYPES : OUTBOUND_BREAK_TYPES;
   const maxBreakLeak = metrics ? Math.max(...breakTypes.map((b) => Number(metrics[b.key] ?? 0)), 1) : 1;
 
@@ -194,7 +169,7 @@ export default function OverviewPage() {
           {/* Executive Control Plane KPI Summary Cards */}
           {direction === "inbound" && (
             <ExecutiveKpiGrid
-              totalRevenueProtectedKes={metrics.total_paid_kes ?? 1204780000}
+              totalRevenueProtectedKes={metrics.total_paid_kes ?? 0}
               gantrySummary={gantrySummary}
             />
           )}
@@ -203,7 +178,7 @@ export default function OverviewPage() {
 
           {direction === "inbound" ? (
             <div className="flex flex-col gap-6">
-              {/* Live Depot & Gantry Yard Control Visualization */}
+              <p className="text-sm text-amber-500" role="status">Gantry lanes are a demo preview; no physical gate controls or demurrage invoices are connected. {gantryLanes.length === 0 ? "Gantry data unavailable." : ""}</p>
               <GantryYardGrid
                 lanes={gantryLanes}
                 onRefresh={fetchGantryLanesData}

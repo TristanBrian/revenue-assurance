@@ -6,9 +6,24 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kpc_ci
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: migration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kpc_ci -d migration_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     defaults:
       run:
         working-directory: backend
@@ -36,6 +51,15 @@ jobs:
           cp scripts/data/raw/* data/raw/ || true
           python scripts/etl_pipeline.py
 
+      - name: Check migrations on PostgreSQL
+        env:
+          DATABASE_URL: postgresql://kpc_ci:ci-only-password@localhost:5432/migration_test
+        run: |
+          alembic upgrade head
+          alembic upgrade head
+          python scripts/seed_roles.py
+          python scripts/seed_terms_documents.py
+
       - name: Run tests
         run: pytest tests/ -v --cov=app.services --cov-report=term
 
@@ -61,6 +85,9 @@ jobs:
 
       - name: Type check
         run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm test
 
       - name: Build
         run: npm run build

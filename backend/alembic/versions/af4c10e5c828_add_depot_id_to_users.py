@@ -29,7 +29,21 @@ def upgrade() -> None:
     # through Alembic, so it carries no primary key in Postgres at all
     # despite the ORM model declaring one — a FOREIGN KEY needs a real
     # unique constraint to reference, so add the PK it should have had.
-    op.create_primary_key('pk_depots', 'depots', ['depot_id'])
+    # Fresh production databases must not need synthetic ETL to migrate.
+    # Existing ETL databases retain their master data; do not replace it.
+    inspector = sa.inspect(op.get_bind())
+    if not inspector.has_table('depots'):
+        op.create_table(
+            'depots',
+            sa.Column('depot_id', sa.Text(), nullable=False),
+            sa.Column('depot_name', sa.Text(), nullable=False),
+            sa.Column('location', sa.Text(), nullable=True),
+            sa.Column('capacity_litres', sa.Integer(), nullable=True),
+            sa.Column('is_active', sa.Boolean(), nullable=True),
+            sa.PrimaryKeyConstraint('depot_id', name='pk_depots'),
+        )
+    elif not inspector.get_pk_constraint('depots')['constrained_columns']:
+        op.create_primary_key('pk_depots', 'depots', ['depot_id'])
     op.add_column('users', sa.Column('depot_id', sa.Text(), nullable=True))
     op.create_foreign_key('fk_users_depot_id_depots', 'users', 'depots', ['depot_id'], ['depot_id'])
 

@@ -627,11 +627,11 @@ export interface GantrySummary {
 }
 
 export interface ReportVerificationResponse {
-  status: "VERIFIED" | "UNKNOWN";
+  status: "VERIFIED" | "UNKNOWN" | "ALTERED";
   filename: string;
   file_hash: string;
   signature: string;
-  audit_match: {
+  audit_match?: {
     log_id: string;
     created_at: string;
     report_type: string;
@@ -640,20 +640,4 @@ export interface ReportVerificationResponse {
   } | null;
 }
 
-export interface AuditVerifyResponse {
-  status: string;
-  local_chain: {
-    valid: boolean;
-    total_logs: number;
-    last_hash: string;
-    details?: string;
-  };
-  on_chain_anchor: {
-    configured: boolean;
-    anchored: boolean;
-    contract_address: string;
-    tx_hash?: string;
-    block_number?: number;
-    block_index?: number;
-  };
-}
+export type AuditVerifyResponse = import("./api").AuditVerifyResult;

@@ -986,8 +986,3 @@ export async function getGantryLanes(): Promise<{
   const res = await authFetch(new URL("/api/reconcile/gantry-lanes", API_URL));
   return unwrap(res);
 }
-
-export async function getAuditVerify(): Promise<import("./types").AuditVerifyResponse> {
-  const res = await authFetch(new URL("/api/audit/verify", API_URL));
-  return unwrap(res);
-}
