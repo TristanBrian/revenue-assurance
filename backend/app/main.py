@@ -107,6 +107,7 @@ app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(inuka.router, prefix="/api/inuka", tags=["Inuka Assurance"])
 app.include_router(report_verify.router, prefix="/api/reports", tags=["Report Verification"])
+app.include_router(control_plane.router, prefix="/api", tags=["Control Plane"])
 
 # ============================================================================
 # ROOT AND HEALTH ENDPOINTS
