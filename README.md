@@ -1,4 +1,4 @@
-# 💰 Reconova – Enterprise Intelligence System
+# Reconova – Enterprise Intelligence System
 
 [![CI](https://github.com/TristanBrian/revenue-assurance/actions/workflows/ci.yml/badge.svg)](https://github.com/TristanBrian/revenue-assurance/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-71%25-brightgreen)](https://github.com/TristanBrian/revenue-assurance)
@@ -12,7 +12,7 @@ Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka
 
 ---
 
-## 📖 Table of Contents
+## Table of Contents
 
 - [Live Demo & Logins](#live-demo--logins)
 - [The Linkup: Hackathon 1 → Hackathon 2](#the-linkup-hackathon-1--hackathon-2)
@@ -33,13 +33,13 @@ Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka
 
 ---
 
-## 🚀 Live Demo & Logins
+## Live Demo & Logins
 
 - **Backend API:** [https://revenue-assurance.fly.dev](https://revenue-assurance.fly.dev)  
 - **Swagger Docs:** [https://revenue-assurance.fly.dev/docs](https://revenue-assurance.fly.dev/docs)  
 - **Frontend (Vercel):** [https://flowgardd.vercel.app](https://flowgardd.vercel.app)  
 
-### 🔑 Demo Logins (Password: `demo-pass-123`)
+### Demo Logins (Password: `demo-pass-123`)
 
 | Role | Email |
 |------|-------|
@@ -53,7 +53,7 @@ Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka
 
 ---
 
-## 🔗 The Linkup: Hackathon 1 → Hackathon 2
+## The Linkup: Hackathon 1 → Hackathon 2
 
 ### Hackathon 1 – KPC Revenue Assurance (Inbound)
 - **Problem:** KPC loses revenue through missing invoices, missing payments, and underpayments.
@@ -77,7 +77,7 @@ We **did not rewrite**. We **extended** the same ETL, reconciliation, fraud dete
 
 ---
 
-## 📦 Hackathon 2 Deliverables – How We Met Every One
+## Hackathon 2 Deliverables – How We Met Every One
 
 | Deliverable | How Reconova Delivers |
 |-------------|------------------------|
@@ -89,7 +89,7 @@ We **did not rewrite**. We **extended** the same ETL, reconciliation, fraud dete
 
 ---
 
-## 🎯 Why Reconova?
+##  Why Reconova?
 
 - **For KPC:** Stops fuel revenue leakage – every dispatch must be invoiced and paid.
 - **For Inuka Foundation:** Protects beneficiary stipends – every attendance must be authorised and disbursed correctly.
@@ -100,7 +100,7 @@ We **did not rewrite**. We **extended** the same ETL, reconciliation, fraud dete
 
 ---
 
-## ⚙️ Key Features (Hackathon 2 Highlights)
+## Key Features (Hackathon 2 Highlights)
 
 | Feature | Hackathon 1 (KPC) | Hackathon 2 (Inuka) |
 |---------|-------------------|----------------------|
@@ -118,7 +118,7 @@ We **did not rewrite**. We **extended** the same ETL, reconciliation, fraud dete
 
 ---
 
-## 🏗️ Architecture (Same Fabric, Two Domains)
+## Architecture (Same Fabric, Two Domains)
 
 ```mermaid
 graph TD
@@ -198,7 +198,7 @@ graph TD
 
 ---
 
-## 📹 Demo
+## Demo
 
 [![KPC Revenue Assurance Demo](https://img.youtube.com/vi/YOUR_VIDEO_ID/maxresdefault.jpg)](https://www.awesomescreenshot.com/video/55902957?key=799900bcdb9e7fce74dd2af6e027f787)
 
@@ -218,7 +218,7 @@ graph TD
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 | Layer | Technology |
 |-------|------------|
@@ -236,7 +236,7 @@ graph TD
 
 ---
 
-## 👥 User Roles & Permissions (Hackathon 2)
+## User Roles & Permissions (Hackathon 2)
 
 | Role | Inbound | Outbound | Key Permissions |
 |------|---------|----------|-----------------|
@@ -250,7 +250,7 @@ Full permission mapping in the [API documentation](#api-endpoints).
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### With Docker (recommended)
 
@@ -274,7 +274,7 @@ See the [full setup guide](#local-development) in the repository.
 
 ---
 
-## 📚 API Endpoints (Key Ones)
+## API Endpoints (Key Ones)
 
 All endpoints (except login, register, webhook) require a JWT token.  
 Full interactive docs: [Swagger UI](https://revenue-assurance.fly.dev/docs) | [ReDoc](https://revenue-assurance.fly.dev/redoc)
@@ -290,7 +290,7 @@ Key endpoints:
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 _
 | Dashboard | Anomaly Table | Fraud Graph |
@@ -303,7 +303,7 @@ _
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ```bash
 docker compose exec backend pytest tests/ -v
@@ -314,7 +314,7 @@ Frontend lint & type checks run via GitHub Actions.
 
 ---
 
-## 🚢 Deployment
+## Deployment
 
 The platform is containerised and deployed on **Fly.io** with a PostgreSQL database.  
 CI/CD is handled by GitHub Actions (tests run on every push/PR).
@@ -328,13 +328,13 @@ fly deploy
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please read our [CONTRIBUTING.md](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before opening issues or pull requests.
 
 ---
 
-## 📄 License
+## License
 
 MIT License – see the [LICENSE](LICENSE) file for details.
 
