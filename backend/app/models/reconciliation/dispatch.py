@@ -28,6 +28,18 @@ class Dispatch(Base):
     risk_rating = Column(Text)  # denormalized snapshot from omcs at dispatch time — may drift, by design
     credit_limit_kes = Column(Integer)  # denormalized snapshot from omcs at dispatch time — may drift, by design
     data_quality_flag = Column(Text)
+    
+    # --- Physical Meter & Demurrage Tracking (Stage 3 Linkup) ---
+    flow_rate = Column(Integer)
+    start_meter = Column(Integer)
+    end_meter = Column(Integer)
+    metered_volume = Column(Integer)
+    
+    gate_in_timestamp = Column(DateTime)
+    gantry_entry_timestamp = Column(DateTime)
+    loading_end_timestamp = Column(DateTime)
+    gate_out_timestamp = Column(DateTime)
+    gate_status = Column(Text, default="PASS")  # PASS / HOLD
 
     omc = relationship("OMC", back_populates="dispatches")
     depot_ref = relationship("Depot", back_populates="dispatches")

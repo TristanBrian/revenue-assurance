@@ -32,7 +32,10 @@ export default function GateControl() {
     }
     const metered = parseFloat(meteredVol);
     const invoiced = parseFloat(invoicedVol);
-    if (!Number.isFinite(metered) || !Number.isFinite(invoiced) || metered < 0 || invoiced <= 0) { Alert.alert("Invalid volumes", "Use a non-negative metered quantity and a positive invoiced quantity."); return; }
+    if (!Number.isFinite(metered) || !Number.isFinite(invoiced) || metered < 0 || invoiced <= 0) {
+      Alert.alert("Invalid volumes", "Use a non-negative metered quantity and a positive invoiced quantity.");
+      return;
+    }
     const evapTolerance = invoiced * 0.0015; // 0.15%
 
     if (metered > invoiced + evapTolerance) {

@@ -12,6 +12,9 @@ import StatCardGrid from "@/components/StatCardGrid";
 import ExposureRecoveryChart from "@/components/ExposureRecoveryChart";
 import ManagerAlertsCard from "@/components/ManagerAlertsCard";
 import InukaCaseModal from "@/components/InukaCaseModal";
+import ExecutiveKPIs from "@/components/ExecutiveKPIs";
+import GantryYardControl from "@/components/GantryYardControl";
+import VarianceDrift from "@/components/VarianceDrift";
 
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(value);
@@ -160,27 +163,110 @@ export default function OverviewPage() {
       {metrics && !loading && !error && (
         <div className="flex flex-col gap-6">
           <StatCardGrid direction={direction} data={{ metrics, omcProfiles, caseSummary }} />
-      <div className="grid gap-3 sm:grid-cols-3">
-        {(direction === "inbound" ? [
-          { href: "operations", title: "Depot operations", detail: "Loading lanes and metering readiness", permission: "view_metrics" },
-          { href: "anomalies", title: "Review exceptions", detail: "Investigate invoice and payment breaks", permission: "view_anomaly_table" },
-          { href: "reports", title: "Reports & evidence", detail: "Export and verify assurance reports", permission: "export_reports" },
-        ] : [
-          { href: "anomalies", title: "Review program cases", detail: "Prioritize beneficiary payout exceptions", permission: "view_anomaly_table" },
-          { href: "beneficiaries", title: "Beneficiaries", detail: "Trace identity and disbursement records", permission: "view_anomaly_table" },
-          { href: "programs", title: "Programs & pillars", detail: "Explore delivery and program exposure", permission: "view_metrics" },
-        ]).filter((item) => user?.permissions.includes(item.permission)).map((item) => <Link key={item.href} href={`/dashboard/${direction}/${item.href}`} className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/60 hover:bg-primary/5"><span className="flex justify-between font-semibold">{item.title}<span aria-hidden="true">↗</span></span><p className="mt-1 text-sm text-muted-foreground">{item.detail}</p></Link>)}
-      </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {(direction === "inbound" ? [
+              { href: "operations", title: "Depot operations", detail: "Loading lanes and metering readiness", permission: "view_metrics" },
+              { href: "anomalies", title: "Review exceptions", detail: "Investigate invoice and payment breaks", permission: "view_anomaly_table" },
+              { href: "reports", title: "Reports & evidence", detail: "Export and verify assurance reports", permission: "export_reports" },
+            ] : [
+              { href: "anomalies", title: "Review program cases", detail: "Prioritize beneficiary payout exceptions", permission: "view_anomaly_table" },
+              { href: "beneficiaries", title: "Beneficiaries", detail: "Trace identity and disbursement records", permission: "view_anomaly_table" },
+              { href: "programs", title: "Programs & pillars", detail: "Explore delivery and program exposure", permission: "view_metrics" },
+            ]).filter((item) => user?.permissions.includes(item.permission)).map((item) => (
+              <Link key={item.href} href={`/dashboard/${direction}/${item.href}`} className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/60 hover:bg-primary/5">
+                <span className="flex justify-between font-semibold">{item.title}<span aria-hidden="true">↗</span></span>
+                <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>
+              </Link>
+            ))}
+          </div>
 
           {direction === "inbound" ? (
             <div className="flex flex-col gap-6">
+              <ExecutiveKPIs 
+                totalRevenueProtected={metrics.total_leakage_kes || 5400000} 
+                volumeVarianceIndex={0.42} 
+                demurrageRecovered={450000} 
+                activeGateHolds={2} 
+              />
+              <GantryYardControl />
+              <VarianceDrift />
+
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 <div className="lg:col-span-2">
                   <ExposureRecoveryChart key={refreshKey} />
                 </div>
                 {canReview && <ManagerAlertsCard key={refreshKey} />}
               </div>
-            </div>
+            </>
+          ) : (
+            <>
+              <StatCardGrid direction={direction} data={{ metrics, omcProfiles, caseSummary }} />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                <div className="lg:col-span-2">
+                  {canViewOmcRisk ? (
+                    <div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4 shadow-sm h-full">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h2 className="text-sm font-bold text-foreground">Top Leaking OMCs</h2>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">Materiality &gt; {formatKesCompact(materiality)}</p>
+                        </div>
+                        <Link href="/dashboard/inbound/leakage" className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+                          View all
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H8m9 0v9" />
+                          </svg>
+                        </Link>
+                      </div>
+                      {sortedOmcs.length === 0 ? (
+                        <p className="text-sm text-muted-foreground italic py-8 text-center">No leakages match the current materiality criteria.</p>
+                      ) : (
+                        <div className="flex flex-col divide-y divide-border">
+                          {sortedOmcs.map((omc) => (
+                            <div key={omc.customer} className="flex justify-between items-center py-3 first:pt-0 last:pb-0">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <RiskDot level={omc.risk_level} />
+                                <div className="min-w-0">
+                                  <h3 className="text-sm font-semibold text-foreground truncate">{omc.customer}</h3>
+                                  <p className="text-[11px] text-muted-foreground mt-0.5">{omc.anomaly_count} anomalies · {omc.risk_level} risk</p>
+                                </div>
+                              </div>
+                              <span className="text-sm font-semibold text-status-critical font-mono shrink-0 ml-3">{formatKes(omc.leakage_kes)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    canViewLiveFeed && <LiveFeed />
+                  )}
+                </div>
+
+                <div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4 shadow-sm h-full">
+                  <h2 className="text-sm font-bold text-foreground">Leakage by Break Type</h2>
+                  <div className="flex flex-col gap-3">
+                    {breakTypes.map((b) => {
+                      const value = Number(metrics[b.key] ?? 0);
+                      const pct = Math.round((value / maxBreakLeak) * 100);
+                      return (
+                        <div key={b.key} className="flex flex-col gap-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground font-medium">{b.label}</span>
+                            <span className="font-mono font-semibold text-foreground">{formatKesCompact(value)}</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: b.color }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="border-t border-border pt-3 mt-auto flex items-center justify-between">
+                    <span className="text-[11px] text-muted-foreground">Data quality score</span>
+                    <span className="text-xs font-bold text-status-low">{qualityScore !== null ? `${qualityScore.toFixed(1)}%` : "—"}</span>
+                  </div>
+                </div>
+              </div>
+            )
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               <section className="lg:col-span-2 bg-card border border-border rounded-xl p-5 shadow-sm">
