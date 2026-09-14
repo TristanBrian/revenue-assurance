@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 type LaneStatus = 'PASS' | 'WARNING' | 'HOLD';
 
@@ -11,7 +11,7 @@ interface Lane {
 }
 
 export function GantryYardControl() {
-  const [lanes, setLanes] = useState<Lane[]>([
+  const [lanes] = useState<Lane[]>([
     { id: 'Lane 1', truck_id: 'KCB 123A', status: 'PASS', dwell_time_hours: 0.5, variance_liters: 0 },
     { id: 'Lane 2', truck_id: 'KDD 456B', status: 'WARNING', dwell_time_hours: 1.8, variance_liters: 10 },
     { id: 'Lane 3', truck_id: 'KAE 789C', status: 'HOLD', dwell_time_hours: 2.5, variance_liters: 500 },
