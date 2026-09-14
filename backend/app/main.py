@@ -12,9 +12,9 @@ from app.routes.audit import audit
 from app.routes.alerts import alerts
 from app.routes import inuka
 from app.routes import report_verify
-from app.routes import alerts
 # from app.routes import chatbot
 
+from app.config import settings
 from sqlalchemy import text
 from app.utils.db_connection import get_engine
 from app.services.audit.anchor_service import run_periodic_anchor_check
@@ -65,9 +65,9 @@ async def lifespan(app: FastAPI):
 # FASTAPI APP
 # ============================================================================
 app = FastAPI(
-    title="KPC Revenue Assurance API",
-    description="Order-to-Cash Leakage Detection & E-Billing Integration",
-    version="2.0.0",
+    title=f"{settings.app_name} API",
+    description=f"{settings.app_tagline} – Order-to-Cash Leakage Detection & E-Billing Integration",
+    version=settings.app_version,
     lifespan=lifespan
 )
 
@@ -115,10 +115,14 @@ app.include_router(report_verify.router, prefix="/api/reports", tags=["Report Ve
 @app.get("/")
 async def root():
     return {
-        "message": "KPC Revenue Assurance API",
+        "message": f"{settings.app_name} API",
+        "tagline": settings.app_tagline,
         "status": "running",
-        "version": "2.0.0",
+        "version": settings.app_version,
+        "legacy_name": settings.app_name_legacy,
+        "legacy_version": settings.app_version_legacy,
         "endpoints": [
+            "GET /api/system/info",
             "POST /api/auth/login",
             "POST /api/auth/reset-password",
             "GET /api/auth/terms",
@@ -174,17 +178,32 @@ async def root():
 async def head_root():
     return Response(status_code=200)
 
+@app.get("/api/system/info", tags=["System"])
+async def system_info():
+    return {
+        "name": settings.app_name,
+        "tagline": settings.app_tagline,
+        "version": settings.app_version,
+        "legacy_name": settings.app_name_legacy,
+        "legacy_version": settings.app_version_legacy,
+        "status": "active"
+    }
+
 @app.get("/version")
 async def version():
     return {
-        "version": "2.0.0",
-        "service": "kpc-revenue-assurance",
+        "name": settings.app_name,
+        "tagline": settings.app_tagline,
+        "version": settings.app_version,
+        "legacy_name": settings.app_name_legacy,
+        "legacy_version": settings.app_version_legacy,
+        "service": f"{settings.app_name.lower()}-api",
         "status": "production-ready",
         "endpoints_count": len(app.routes)
     }
 
 @app.get("/health")
-async def health_check():
+async def health_check(response: Response):
     db_status = "disconnected"
     start_time = time.time()
     try:
@@ -192,8 +211,9 @@ async def health_check():
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         db_status = "connected"
-    except Exception as e:
-        db_status = f"error: {str(e)}"
+    except Exception:
+        logger.exception("Database readiness check failed")
+        response.status_code = 503
     return {
         "status": "healthy" if db_status == "connected" else "unhealthy",
         "database": db_status,
@@ -204,11 +224,13 @@ async def health_check():
 
 @app.head("/health")
 async def head_health():
-    return Response(status_code=200)
+    response = Response()
+    await health_check(response)
+    return response
 
 @app.get("/api/health")
-async def api_health():
-    return await health_check()
+async def api_health(response: Response):
+    return await health_check(response)
 
 @app.get("/ping")
 async def ping():

@@ -3,16 +3,20 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ApiError, getInukaCases, getMetrics, getOmcRiskProfile } from "@/lib/api";
-import type { InukaCaseSummary, InukaRiskCase, Metrics, OmcRiskProfile as OmcRiskProfileEntry } from "@/lib/types";
+import { ApiError, getInukaCases, getMetrics, getOmcRiskProfile, getGantryLanes } from "@/lib/api";
+import type { InukaCaseSummary, InukaRiskCase, Metrics, OmcRiskProfile as OmcRiskProfileEntry, GantryLane, GantrySummary } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { useMateriality } from "@/context/MaterialityContext";
 import type { WorkspaceDirection } from "@/lib/workspace";
 import StatCardGrid from "@/components/StatCardGrid";
 import ExposureRecoveryChart from "@/components/ExposureRecoveryChart";
 import ManagerAlertsCard from "@/components/ManagerAlertsCard";
-import LiveFeed from "@/components/LiveFeed";
 import InukaCaseModal from "@/components/InukaCaseModal";
+import ExecutiveKpiGrid from "@/components/ExecutiveKpiGrid";
+import GantryYardGrid from "@/components/GantryYardGrid";
+import VolumeDriftChart from "@/components/VolumeDriftChart";
+import DemurrageLeaderboard from "@/components/DemurrageLeaderboard";
+import CryptographicAuditTool from "@/components/CryptographicAuditTool";
 
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(value);
@@ -22,11 +26,6 @@ function formatKesCompact(value: number): string {
   if (value >= 1e9) return `KES ${(value / 1e9).toFixed(2)}B`;
   if (value >= 1e6) return `KES ${(value / 1e6).toFixed(2)}M`;
   return formatKes(value);
-}
-
-function RiskDot({ level }: { level: "Low" | "Medium" | "High" }) {
-  const color = level === "High" ? "bg-status-critical" : level === "Medium" ? "bg-status-medium" : "bg-status-low";
-  return <span className={`w-2 h-2 rounded-full shrink-0 ${color}`} />;
 }
 
 // Inbound break-type breakdown — labels/colors/keys exactly as the
@@ -63,16 +62,32 @@ export default function OverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [gantryLanes, setGantryLanes] = useState<GantryLane[]>([]);
+  const [gantrySummary, setGantrySummary] = useState<GantrySummary | null>(null);
+
   const canViewMetrics = user?.permissions.includes("view_metrics") ?? false;
   const canViewOmcRisk = direction === "inbound" && (user?.permissions.includes("view_omc_risk_profile") ?? false);
-  const canViewLiveFeed = user?.permissions.includes("view_live_feed") ?? false;
-  const isManager = user?.roles.includes("manager") ?? false;
+
+  const fetchGantryLanesData = async () => {
+    try {
+      const res = await getGantryLanes();
+      if (res && res.lanes) {
+        setGantryLanes(res.lanes);
+        setGantrySummary(res.summary);
+      }
+    } catch {
+      setGantryLanes([]);
+      setGantrySummary(null);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
+
+    fetchGantryLanesData();
 
     const promises: Promise<unknown>[] = [
       canViewMetrics ? getMetrics(direction === "outbound" ? 100000 : materiality, direction) : Promise.resolve(null),
@@ -106,7 +121,6 @@ export default function OverviewPage() {
     };
   }, [user, materiality, direction, canViewMetrics, canViewOmcRisk]);
 
-  const sortedOmcs = [...omcProfiles].sort((a, b) => b.leakage_kes - a.leakage_kes).slice(0, 5);
   const breakTypes = direction === "inbound" ? INBOUND_BREAK_TYPES : OUTBOUND_BREAK_TYPES;
   const maxBreakLeak = metrics ? Math.max(...breakTypes.map((b) => Number(metrics[b.key] ?? 0)), 1) : 1;
 
@@ -152,83 +166,42 @@ export default function OverviewPage() {
 
       {metrics && !loading && !error && (
         <div className="flex flex-col gap-6">
+          {/* Executive Control Plane KPI Summary Cards */}
+          {direction === "inbound" && (
+            <ExecutiveKpiGrid
+              totalRevenueProtectedKes={metrics.total_paid_kes ?? 0}
+              gantrySummary={gantrySummary}
+            />
+          )}
+
           <StatCardGrid direction={direction} data={{ metrics, omcProfiles, caseSummary }} />
 
           {direction === "inbound" ? (
-            isManager ? (
+            <div className="flex flex-col gap-6">
+              <p className="text-sm text-amber-500" role="status">Gantry lanes are a demo preview; no physical gate controls or demurrage invoices are connected. {gantryLanes.length === 0 ? "Gantry data unavailable." : ""}</p>
+              <GantryYardGrid
+                lanes={gantryLanes}
+                onRefresh={fetchGantryLanesData}
+                loading={loading}
+              />
+
+              {/* Drift Charts & Demurrage Leaderboard */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <VolumeDriftChart />
+                <DemurrageLeaderboard profiles={omcProfiles} />
+              </div>
+
+              {/* Cryptographic Audit & Report Verification Tool */}
+              <CryptographicAuditTool />
+
+              {/* Original Detailed Metrics & Breakdown */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 <div className="lg:col-span-2">
                   <ExposureRecoveryChart />
                 </div>
                 <ManagerAlertsCard />
               </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                <div className="lg:col-span-2">
-                  {canViewOmcRisk ? (
-                    <div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4 shadow-sm h-full">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h2 className="text-sm font-bold text-foreground">Top Leaking OMCs</h2>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">Materiality &gt; {formatKesCompact(materiality)}</p>
-                        </div>
-                        <Link href="/dashboard/inbound/leakage" className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-                          View all
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M7 17L17 7M17 7H8m9 0v9" />
-                          </svg>
-                        </Link>
-                      </div>
-                      {sortedOmcs.length === 0 ? (
-                        <p className="text-sm text-muted-foreground italic py-8 text-center">No leakages match the current materiality criteria.</p>
-                      ) : (
-                        <div className="flex flex-col divide-y divide-border">
-                          {sortedOmcs.map((omc) => (
-                            <div key={omc.customer} className="flex justify-between items-center py-3 first:pt-0 last:pb-0">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <RiskDot level={omc.risk_level} />
-                                <div className="min-w-0">
-                                  <h3 className="text-sm font-semibold text-foreground truncate">{omc.customer}</h3>
-                                  <p className="text-[11px] text-muted-foreground mt-0.5">{omc.anomaly_count} anomalies · {omc.risk_level} risk</p>
-                                </div>
-                              </div>
-                              <span className="text-sm font-semibold text-status-critical font-mono shrink-0 ml-3">{formatKes(omc.leakage_kes)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    canViewLiveFeed && <LiveFeed />
-                  )}
-                </div>
-
-                <div className="bg-card border border-border rounded-xl p-5 flex flex-col gap-4 shadow-sm h-full">
-                  <h2 className="text-sm font-bold text-foreground">Leakage by Break Type</h2>
-                  <div className="flex flex-col gap-3">
-                    {breakTypes.map((b) => {
-                      const value = Number(metrics[b.key] ?? 0);
-                      const pct = Math.round((value / maxBreakLeak) * 100);
-                      return (
-                        <div key={b.key} className="flex flex-col gap-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground font-medium">{b.label}</span>
-                            <span className="font-mono font-semibold text-foreground">{formatKesCompact(value)}</span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: b.color }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="border-t border-border pt-3 mt-auto flex items-center justify-between">
-                    <span className="text-[11px] text-muted-foreground">Data quality score</span>
-                    <span className="text-xs font-bold text-status-low">{qualityScore !== null ? `${qualityScore.toFixed(1)}%` : "—"}</span>
-                  </div>
-                </div>
-              </div>
-            )
+            </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               <section className="lg:col-span-2 bg-card border border-border rounded-xl p-5 shadow-sm">

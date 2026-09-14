@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "FlowGuard",
-    "slug": "flowguard-mobile",
-    "scheme": "flowguard",
-    "version": "1.0.0",
+    "name": "Reconova",
+    "slug": "reconova-mobile",
+    "scheme": "reconova",
+    "version": "2.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
@@ -13,10 +13,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ke.co.kpc.flowguard"
+      "bundleIdentifier": "ke.co.kpc.reconova"
     },
     "android": {
-      "package": "ke.co.kpc.flowguard"
+      "package": "ke.co.kpc.reconova"
     },
     "extra": {
       "apiUrl": "https://revenue-assurance.fly.dev",

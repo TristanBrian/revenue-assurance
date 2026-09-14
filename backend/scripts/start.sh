@@ -1,93 +1,30 @@
-#!/bin/bash
-set -e          # exit on error
-set -u          # treat unset variables as error
-set -x          # print each command before executing (tracing)
-
-# Trap errors and print the line number
-trap 'echo "❌ Error at line $LINENO (command: $BASH_COMMAND)" >&2; exit 1' ERR
-
-echo "🚀 KPC Revenue Assurance - Startup Script"
-echo "🔍 Environment: ${ENVIRONMENT:-production}"
-echo "📁 Current directory: $(pwd)"
-
-cd "$(dirname "$0")/.." || exit 1
-echo "📁 Changed to backend root: $(pwd)"
-
+#!/usr/bin/env bash
+set -euo pipefail
+trap 'echo "Startup failed at line $LINENO" >&2' ERR
+cd "$(dirname "$0")/.."
 mkdir -p data/raw data/clean logs
 
-# ------------------------------------------------------------------
-# 1. Always run ETL – no database check (Fly.io internal networking
-#    may not resolve .flycast domains reliably during startup).
-# ------------------------------------------------------------------
-RUN_ETL=1
-
-# ------------------------------------------------------------------
-# 2. Run data generation & ETL
-# ------------------------------------------------------------------
-if [ "$RUN_ETL" -eq 1 ]; then
-    # disbursements.csv is the LAST file generate_kpc_data.py writes
-    # (inbound dispatches/invoices/payments first, then substantial
-    # computation, then outbound officers/beneficiaries/attendance/
-    # stipend_authorizations/disbursements — see that script's own
-    # write order). Checking only the three inbound files here used to
-    # let a generation run that crashed/OOM'd/timed out midway (after
-    # inbound, before outbound) look "complete" forever after: this
-    # check would keep finding the inbound CSVs on every restart and
-    # skip regenerating anything, permanently leaving outbound data
-    # missing with no visible error (etl_pipeline.py treats outbound
-    # CSVs as optional and just warns-and-skips them, so nothing else
-    # failed loudly either). Requiring disbursements.csv too means a
-    # partial run gets detected and regenerated from scratch instead of
-    # silently wedging in that state.
-    if [ -f "data/raw/dispatches.csv" ] && [ -f "data/raw/invoices.csv" ] && [ -f "data/raw/payments.csv" ] && [ -f "data/raw/disbursements.csv" ]; then
-        echo "✅ CSVs already exist – skipping generation."
-    else
-        echo "📊 Generating fresh synthetic data..."
-        python scripts/generate_kpc_data.py
-        # Copy generated CSVs to ETL expected location
-        mkdir -p data/raw
-        cp scripts/data/raw/* data/raw/ 2>/dev/null || true
-    fi
-
-    echo "🔄 Running ETL pipeline..."
+# ETL replaces operational tables. Never run it implicitly on a restart.
+if [ "${BOOTSTRAP_DEMO_DATA:-false}" = "true" ]; then
+    echo "Bootstrapping synthetic demo data (dedicated demo database only)"
+    python scripts/generate_kpc_data.py
+    cp scripts/data/raw/*.csv data/raw/
     python scripts/etl_pipeline.py
-else
-    echo "⏭️ Skipping ETL pipeline (data already present)."
+    python scripts/setup_medallion.py
+    python scripts/load_master_data.py
 fi
 
-# ------------------------------------------------------------------
-# 3. Medallion lakehouse (always run, but never break startup)
-# ------------------------------------------------------------------
-echo "🔄 Setting up medallion schema (bronze/silver/gold)..."
-python scripts/setup_medallion.py || true
+if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
+    alembic upgrade head
+    python scripts/seed_roles.py
+    python scripts/seed_terms_documents.py
+fi
 
-echo "🔄 Loading master data (master schema)..."
-python scripts/load_master_data.py || true
-
-# ------------------------------------------------------------------
-# 4. Always run migrations and seeding
-# ------------------------------------------------------------------
-echo "🔄 Running Alembic migrations..."
-
-# Migration branches must be reconciled in source control. Generating a merge
-# revision during container startup makes the database reference a revision
-# that disappears with the ephemeral container and can break the next deploy.
-# `set -e` intentionally stops startup if the committed graph is invalid.
-alembic upgrade head
-
-echo "🔄 Seeding roles and platform bootstrap..."
-python scripts/seed_roles.py
-python scripts/seed_admin.py
-python scripts/seed_terms_documents.py
-
-# Demo accounts are deliberately opt-in. Running this on every deployment
-# would overwrite demo passwords and force every demo user through reset again.
+if [ "${BOOTSTRAP_ADMIN:-false}" = "true" ]; then
+    python scripts/seed_admin.py
+fi
 if [ "${SEED_DEMO_USERS:-false}" = "true" ]; then
-    echo "🔐 SEED_DEMO_USERS=true — resetting local demo accounts"
     python scripts/seed_demo_users.py
-else
-    echo "⏭️ Skipping demo-account seeding (set SEED_DEMO_USERS=true for a local demo)"
 fi
 
-echo "🚀 Starting Uvicorn server..."
-exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"

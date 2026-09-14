@@ -4,9 +4,8 @@ entirely — the only way to bootstrap one, since POST /api/auth/register is
 gated behind require_permission("manage_users") and nothing exists yet to
 grant that permission to anyone.
 
-*** Hardcoded, known credentials — committed to the repo in plaintext.
-Fine for a local/hackathon deployment; change the password after first
-login (or stop using this script) if this ever runs anywhere more exposed. ***
+Credentials must be supplied through BOOTSTRAP_ADMIN_EMAIL and
+BOOTSTRAP_ADMIN_PASSWORD. Existing accounts are never reset.
 
 Run with (from backend/, same as seed_roles.py — run that first, this
 script depends on the system_admin role already existing):
@@ -22,12 +21,14 @@ from app.models.auth.role import Role
 from app.models.auth.user import User
 from app.utils.db_connection import SessionLocal
 
-ADMIN_EMAIL = "admin@yopmail.com"
-ADMIN_PASSWORD = "Admin-Access-123!"
+ADMIN_EMAIL = os.getenv("BOOTSTRAP_ADMIN_EMAIL", "")
+ADMIN_PASSWORD = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", "")
 ADMIN_FULL_NAME = "Admin"
 
 
 def seed():
+    if not ADMIN_EMAIL or len(ADMIN_PASSWORD) < 12:
+        raise RuntimeError("Set BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD (at least 12 characters)")
     db = SessionLocal()
     try:
         existing = db.query(User).filter(User.email == ADMIN_EMAIL).first()

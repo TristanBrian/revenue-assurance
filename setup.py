@@ -1,9 +1,9 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="flowguard",
+    name="reconova",
     version="2.0.0",
-    description="KPC Revenue Assurance + Inuka Governance (Hackathon 2)",
+    description="Reconova – Enterprise Intelligence System (KPC Revenue Assurance + Inuka Governance)",
     author="Null Terminators",
     packages=find_packages(where="backend"),
     package_dir={"": "backend"},

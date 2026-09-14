@@ -1,7 +1,7 @@
-# QA Report – FlowGuard Platform
+# QA Report – Reconova Enterprise Intelligence System
 
 **Date:** 2026-08-22  
-**Version:** 1.0.0  
+**Version:** 2.0.0 (evolution from v1.0.0 - FlowGuard)  
 **Report prepared by:** Null Terminators Team  
 **Status:** ✅ PASSED – Ready for Pilot Deployment
 
@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary
 
-FlowGuard has undergone comprehensive quality assurance covering:
+Reconova (Enterprise Intelligence System) has undergone comprehensive quality assurance covering:
 
 - **Unit & Integration Testing** – backend test suite with coverage reporting; frontend manual UAT.
 - **User Acceptance Testing (UAT)** – simulated real‑world scenarios across all 5 user roles.
@@ -155,7 +155,7 @@ The system handles the expected production workload with caching and performs we
 
 ## 6. Conclusion
 
-FlowGuard passes all QA checks with **71% overall backend coverage** (critical modules > 80%), **100% UAT pass rate**, and stable performance on production‑scale data. The platform is:
+Reconova passes all QA checks with **71% overall backend coverage** (critical modules > 80%), **100% UAT pass rate**, and stable performance on production‑scale data. The platform is:
 
 - **Stable** – No crashes after VM scaling.
 - **Functional** – All endpoints return 200 OK.

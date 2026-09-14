@@ -1,8 +1,8 @@
-# FlowGuard Inuka Hackathon Demo and Data Fabric
+# Reconova Inuka Hackathon Demo and Data Fabric
 
 ## What is implemented
 
-FlowGuard is a synthetic-data demonstration of assurance controls for KPC's Inuka programme pillars: Scholarship, Plus, Vocational, and Tech. It is not connected to KPC production systems and no conclusion about a real beneficiary or payment should be treated as a finding. The demo shows how evidence can be joined, scored, reviewed, and acted on with privacy controls.
+Reconova (Enterprise Intelligence System, formerly FlowGuard) is a synthetic-data demonstration of assurance controls for KPC's Inuka programme pillars: Scholarship, Plus, Vocational, and Tech. It is not connected to KPC production systems and no conclusion about a real beneficiary or payment should be treated as a finding. The demo shows how evidence can be joined, scored, reviewed, and acted on with privacy controls.
 
 The web portal separates Oil Revenue Assurance from Inuka Programme Assurance. Inuka cases are grouped by disbursement/beneficiary-period and show beneficiary IDs in operational lists. A name is available only inside an authorised case investigation.
 
