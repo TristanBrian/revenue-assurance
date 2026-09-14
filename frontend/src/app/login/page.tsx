@@ -48,11 +48,11 @@ export default function LoginPage() {
         />
         <Image
           src={BRAND_CONFIG.landing.bgImage}
-          alt=""
+          alt="Landing Background"
           fill
           priority
           sizes="100vw"
-          className="object-cover opacity-[0.34] mix-blend-screen"
+          className="object-cover opacity-[0.60] mix-blend-screen"
         />
         <ReconovaHeroIllustration className="absolute inset-0 h-full w-full object-cover opacity-[0.14] mix-blend-screen" />
         <div
