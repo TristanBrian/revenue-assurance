@@ -15,7 +15,7 @@ import InukaCaseModal from "@/components/InukaCaseModal";
 import ExecutiveKPIs from "@/components/ExecutiveKPIs";
 import GantryYardControl from "@/components/GantryYardControl";
 import VarianceDrift from "@/components/VarianceDrift";
-
+import LiveFeed from "@/components/LiveFeed";
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(value);
 }
@@ -47,6 +47,11 @@ const OUTBOUND_BREAK_TYPES: { key: keyof Metrics; label: string; color: string }
   { key: "duplicate_disbursement_leak", label: "Duplicate disbursement", color: "var(--chart-4)" },
 ];
 
+function RiskDot({ level }: { level: string }) {
+  const color = level === "HIGH" ? "bg-status-critical" : level === "MEDIUM" ? "bg-amber-500" : "bg-status-success";
+  return <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${color}`} />;
+}
+
 export default function OverviewPage() {
   const { direction } = useParams<{ direction: WorkspaceDirection }>();
   const { user } = useAuth();
@@ -54,7 +59,6 @@ export default function OverviewPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [omcProfiles, setOmcProfiles] = useState<OmcRiskProfileEntry[]>([]);
   const [caseSummary, setCaseSummary] = useState<InukaCaseSummary | null>(null);
-  const [priorityCases, setPriorityCases] = useState<InukaRiskCase[]>([]);
   const [selectedCase, setSelectedCase] = useState<InukaRiskCase | null>(null);
   const [qualityScore, setQualityScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -181,7 +185,7 @@ export default function OverviewPage() {
           </div>
 
           {direction === "inbound" ? (
-            <div className="flex flex-col gap-6">
+            <>
               <ExecutiveKPIs 
                 totalRevenueProtected={metrics.total_leakage_kes || 5400000} 
                 volumeVarianceIndex={0.42} 
