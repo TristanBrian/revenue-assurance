@@ -6,7 +6,7 @@ import Image from "next/image";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { BRAND_CONFIG } from "@/lib/brand-config";
-import ReconovaHeroIllustration from "@/components/FlowGuardHeroIllustration";
+import ReconovaHeroIllustration from "@/components/ReconovaHeroIllustration";
 
 export default function LoginPage() {
   const { login } = useAuth();

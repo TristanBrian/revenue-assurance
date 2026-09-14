@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # Application Metadata
     app_name: str = os.getenv("APP_NAME", "Reconova")
     app_tagline: str = os.getenv("APP_TAGLINE", "Enterprise Intelligence System")
-    app_name_legacy: str = os.getenv("APP_NAME_LEGACY", "FlowGuard")
+    app_name_legacy: str = os.getenv("APP_NAME_LEGACY", "Reconova")
     app_version: str = os.getenv("APP_VERSION", "2.0.0")
     app_version_legacy: str = os.getenv("APP_VERSION_LEGACY", "1.0.0")
 

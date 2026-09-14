@@ -12,6 +12,8 @@ from app.routes.audit import audit
 from app.routes.alerts import alerts
 from app.routes import inuka
 from app.routes import report_verify
+from app.routes import control
+from app.routes import integrations
 # from app.routes import chatbot
 
 from app.config import settings
@@ -107,6 +109,8 @@ app.include_router(audit.router, prefix="/api/audit", tags=["Audit"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(inuka.router, prefix="/api/inuka", tags=["Inuka Assurance"])
 app.include_router(report_verify.router, prefix="/api/reports", tags=["Report Verification"])
+app.include_router(control.router)
+app.include_router(integrations.router)
 
 # ============================================================================
 # ROOT AND HEALTH ENDPOINTS

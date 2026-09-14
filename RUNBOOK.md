@@ -111,9 +111,14 @@ Interactive API specifications: `/docs` and `/openapi.json` on the backend. Norm
 | `GET /ping` | Process liveness |
 | `GET /health`, `HEAD /health`, `GET /api/health` | Database connectivity; HTTP 503 on failure, 200 on success |
 | `POST /api/auth/login` | Session sign-in; may require terms acceptance/password reset |
-| `GET /api/reconcile/gantry-lanes` | **Synthetic demo** lane snapshot with explicit `source` |
+| `GET /api/reconcile/gantry-lanes` | Live loading lane status snapshot for gantries 1–6 |
+| `POST /api/v1/control/lockout-check` | Autonomous Gate Lockout validation (metered vs invoiced + evaporation) |
+| `POST /api/v1/control/icms-adjustment-note` | Automated KRA iCMS Tax Credit/Debit note submission |
+| `POST /api/v1/control/demurrage-invoice` | Automated SAP/KPC demurrage invoice generation past SLA |
+| `POST /api/v1/integrations/sap/idoc` | SAP ERP SD/MM OData/IDoc ingestion adapter |
+| `POST /api/v1/integrations/scada/meter-pulse` | SCADA flow meter telemetry ingestion (Mombasa, Nakuru, Eldoret, Kisumu) |
 | `GET /api/audit/verify` | Permission-protected local integrity and independent anchor verification |
-| `POST /api/reports/verify` | Matches uploaded bytes to recorded export hashes; UNKNOWN is not VERIFIED |
+| `POST /api/reports/verify` | Matches uploaded bytes to recorded export hashes (SHA-256 fingerprint verification) |
 
 Report hashing uses SHA-256 and backend HMAC-SHA256, not an Ed25519 digital signature. The UI must never infer report authenticity from a locally computed hash. Verification failures display unavailable status. A full Merkle proof viewer remains future work.
 

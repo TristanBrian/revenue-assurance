@@ -199,27 +199,27 @@ body {
 
 /* System-wide Typography Hierarchy matching KPC Enterprise Standards */
 h1, .page-title {
-  font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: var(--font-outfit), var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 1.75rem; /* 28px */
   font-weight: 700;
   letter-spacing: -0.025em;
 }
 
 h2, .section-heading {
-  font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: var(--font-outfit), var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 1.25rem; /* 20px */
   font-weight: 600;
   letter-spacing: -0.015em;
 }
 
 h3, .card-title {
-  font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: var(--font-outfit), var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 1.0625rem; /* 17px */
   font-weight: 600;
 }
 
 .kpi-number, .stat-value {
-  font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: var(--font-outfit), var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 2rem; /* 32px */
   font-weight: 800;
   letter-spacing: -0.03em;

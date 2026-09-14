@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Inter } from "next/font/google";
+import { Inter, Outfit } from "next/font/google";
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { DirectionProvider } from "@/context/DirectionContext";
@@ -11,6 +11,13 @@ const inter = Inter({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
   variable: "--font-inter",
+  display: "swap",
+});
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800", "900"],
+  variable: "--font-outfit",
   display: "swap",
 });
 
@@ -31,7 +38,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`h-full antialiased ${inter.variable}`}
+      className={`h-full antialiased ${inter.variable} ${outfit.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">

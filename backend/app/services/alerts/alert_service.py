@@ -274,7 +274,48 @@ def create_alert(
             if not sent and alert_type is not AlertType.ALERT_DELIVERY_FAILED:
                 _notify_alert_delivery_failed(db, failed_alert=alert, recipient_count=len(recipients))
 
+    if resolved_severity in ("critical", "high"):
+        _dispatch_external_webhooks(title=title, message=message, severity=resolved_severity)
+
     return alert
+
+
+def _dispatch_external_webhooks(title: str, message: str, severity: str) -> None:
+    """
+    Dispatches Slack and PagerDuty notifications for critical or high severity events.
+    """
+    import os
+    import json
+    import urllib.request
+
+    slack_url = os.getenv("SLACK_WEBHOOK_URL")
+    if slack_url:
+        try:
+            payload = json.dumps({
+                "text": f"🚨 *[{APP_NAME}] {title}*\n*Severity:* `{severity.upper()}`\n*Message:* {message}"
+            }).encode("utf-8")
+            req = urllib.request.Request(slack_url, data=payload, headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=3)
+        except Exception as err:
+            logger.warning(f"Slack webhook dispatch failed: {err}")
+
+    pd_key = os.getenv("PAGERDUTY_ROUTING_KEY")
+    if pd_key:
+        try:
+            payload = json.dumps({
+                "routing_key": pd_key,
+                "event_action": "trigger",
+                "payload": {
+                    "summary": f"[{APP_NAME}] {title}",
+                    "severity": "critical" if severity == "critical" else "warning",
+                    "source": "KPC Reconova System",
+                    "custom_details": {"message": message}
+                }
+            }).encode("utf-8")
+            req = urllib.request.Request("https://events.pagerduty.com/v2/enqueue", data=payload, headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=3)
+        except Exception as err:
+            logger.warning(f"PagerDuty dispatch failed: {err}")
 
 
 def _notify_alert_delivery_failed(db: Session, failed_alert: Alert, recipient_count: int) -> None:

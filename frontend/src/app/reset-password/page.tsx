@@ -16,7 +16,7 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { BRAND_CONFIG } from "@/lib/brand-config";
-import ReconovaHeroIllustration from "@/components/FlowGuardHeroIllustration";
+import ReconovaHeroIllustration from "@/components/ReconovaHeroIllustration";
 import type { TermsBundle } from "@/lib/types";
 
 // Two modes, one screen (spec: consent bundled into the reset screen, not
