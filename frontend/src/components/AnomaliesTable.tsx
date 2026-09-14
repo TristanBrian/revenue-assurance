@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useMateriality } from "@/context/MaterialityContext";
-import { getAnomalies, updateAnomalyStatus, getAnomalyActions, createAnomalyAction, ApiError, type FraudFeedbackLabel } from "@/lib/api";
+import { getAnomalies, updateAnomalyStatus, getAnomalyActions, createAnomalyAction, downloadExport, ApiError, type FraudFeedbackLabel } from "@/lib/api";
 import type { Anomaly, AnomalyAction, FraudTier } from "@/lib/types";
 import type { AnomaliesConfig } from "@/config/direction-config";
 import type { WorkspaceDirection } from "@/lib/workspace";
@@ -24,16 +24,6 @@ interface AnomaliesTableProps {
   subtitle?: string;
 }
 
-/**
- * The full anomalies investigation experience — search/filter toolbar,
- * sortable table, and the per-row investigation modal (fraud explain,
- * review actions, resolve). ONE component for both directions and both
- * the unscoped list (/dashboard/[direction]/anomalies) and the outbound
- * scoped drill-down (/dashboard/outbound/anomalies/[groupId]) — every
- * direction-specific word or filter option comes from `config`/
- * `scopeParams`, never branched on `direction` internally beyond passing
- * it straight through to getAnomalies()/getAnomalyActions().
- */
 export default function AnomaliesTable({ direction, config, scopeParams, title, subtitle }: AnomaliesTableProps) {
   const { user } = useAuth();
   const { materiality } = useMateriality();
@@ -47,6 +37,9 @@ export default function AnomaliesTable({ direction, config, scopeParams, title, 
   const [breakTypeFilter, setBreakTypeFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [fraudTierFilter, setFraudTierFilter] = useState<"All" | FraudTier>("All");
+  const [minLeakageInput, setMinLeakageInput] = useState<string>("");
+  const [maxLeakageInput, setMaxLeakageInput] = useState<string>("");
+  const [exportingFormat, setExportingFormat] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalAnomalies, setTotalAnomalies] = useState(0);
@@ -108,6 +101,8 @@ export default function AnomaliesTable({ direction, config, scopeParams, title, 
     setLoading(true);
     setError(null);
     try {
+      const minL = minLeakageInput ? Number(minLeakageInput) : undefined;
+      const maxL = maxLeakageInput ? Number(maxLeakageInput) : undefined;
       const data = await getAnomalies(
         materiality,
         page,
@@ -116,6 +111,8 @@ export default function AnomaliesTable({ direction, config, scopeParams, title, 
           breakType: breakTypeFilter === "All" ? undefined : breakTypeFilter,
           status: statusFilter === "All" ? undefined : statusFilter,
           search: searchQuery || undefined,
+          minLeakage: Number.isFinite(minL) ? minL : undefined,
+          maxLeakage: Number.isFinite(maxL) ? maxL : undefined,
           pillarId: scopeParams?.pillarId,
           officerId: scopeParams?.officerId,
         },
@@ -138,7 +135,26 @@ export default function AnomaliesTable({ direction, config, scopeParams, title, 
   useEffect(() => {
     Promise.resolve().then(() => loadAnomalies());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materiality, direction, breakTypeFilter, statusFilter, searchQuery, page, scopeParams?.pillarId, scopeParams?.officerId]);
+  }, [materiality, direction, breakTypeFilter, statusFilter, searchQuery, minLeakageInput, maxLeakageInput, page, scopeParams?.pillarId, scopeParams?.officerId]);
+
+  async function handleExportFormat(fmt: "xlsx" | "csv" | "json") {
+    setExportingFormat(fmt);
+    try {
+      const minL = minLeakageInput ? Number(minLeakageInput) : undefined;
+      const maxL = maxLeakageInput ? Number(maxLeakageInput) : undefined;
+      await downloadExport(materiality, direction, fmt, {
+        breakType: breakTypeFilter === "All" ? undefined : breakTypeFilter,
+        status: statusFilter === "All" ? undefined : statusFilter,
+        search: searchQuery || undefined,
+        minLeakage: Number.isFinite(minL) ? minL : undefined,
+        maxLeakage: Number.isFinite(maxL) ? maxL : undefined,
+      });
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to download export file.");
+    } finally {
+      setExportingFormat(null);
+    }
+  }
 
   async function handleResolve(dispatchId: string, fraudFeedbackLabel?: FraudFeedbackLabel) {
     if (!confirm("Are you sure you want to mark this anomaly as resolved?")) return;
@@ -163,54 +179,108 @@ export default function AnomaliesTable({ direction, config, scopeParams, title, 
         <p className="text-sm text-zinc-500 dark:text-zinc-400">{subtitle ?? `${config.entityLabel} reconciliation leaks`}</p>
       </header>
 
-      <div className="flex flex-col md:flex-row gap-4 bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm">
-        <div className="flex-1 relative">
-          <input
-            type="text"
-            placeholder={`Search by ${config.entityLabel}, ${config.idLabel}, ${config.productLabel}, or ${config.secondaryRecordLabel} ID...`}
-            value={searchInput}
-            onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
-            className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:bg-white rounded-lg px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none transition-all shadow-inner"
-          />
+      <div className="flex flex-col gap-4 bg-white dark:bg-zinc-900/40 border border-zinc-200 dark:border-zinc-800 p-4 rounded-xl shadow-sm">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              placeholder={`Search by ${config.entityLabel}, ${config.idLabel}, ${config.productLabel}, or ${config.secondaryRecordLabel} ID...`}
+              value={searchInput}
+              onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
+              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 focus:bg-white rounded-lg px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none transition-all shadow-inner"
+            />
+          </div>
+          <div className="flex flex-wrap md:flex-nowrap gap-3">
+            <div className="flex flex-col gap-1 w-full sm:w-44">
+              <select
+                value={breakTypeFilter}
+                onChange={(e) => { setBreakTypeFilter(e.target.value); setPage(1); }}
+                className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 focus:outline-none transition-all cursor-pointer shadow-sm"
+              >
+                <option value="All">All Break Types</option>
+                {config.breakTypeOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 w-full sm:w-36">
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 focus:outline-none transition-all cursor-pointer shadow-sm"
+              >
+                <option value="All">All Statuses</option>
+                <option value="Critical">Critical</option>
+                <option value="Pending">Pending</option>
+                <option value="Review Required">Review Required</option>
+                <option value="Resolved">Resolved</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 w-full sm:w-36">
+              <select
+                value={fraudTierFilter}
+                onChange={(e) => setFraudTierFilter(e.target.value as "All" | FraudTier)}
+                className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 focus:outline-none transition-all cursor-pointer shadow-sm"
+              >
+                <option value="All">All Fraud Tiers</option>
+                <option value="Likely Fraud">Likely Fraud</option>
+                <option value="Suspicious">Suspicious</option>
+                <option value="Likely Benign">Likely Benign</option>
+              </select>
+            </div>
+          </div>
         </div>
-        <div className="flex gap-4">
-          <div className="flex flex-col gap-1 w-48">
-            <select
-              value={breakTypeFilter}
-              onChange={(e) => { setBreakTypeFilter(e.target.value); setPage(1); }}
-              className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 focus:outline-none transition-all cursor-pointer shadow-sm"
-            >
-              <option value="All">All Break Types</option>
-              {config.breakTypeOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+
+        {/* Second row: Min/Max Leakage Range & Multi-Format Export Buttons */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-zinc-500 dark:text-zinc-400 font-medium">Leakage KSh:</span>
+            <input
+              type="number"
+              placeholder="Min KSh"
+              value={minLeakageInput}
+              onChange={(e) => { setMinLeakageInput(e.target.value); setPage(1); }}
+              className="w-28 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded px-2 py-1 text-xs text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-indigo-500"
+            />
+            <span className="text-zinc-400">–</span>
+            <input
+              type="number"
+              placeholder="Max KSh"
+              value={maxLeakageInput}
+              onChange={(e) => { setMaxLeakageInput(e.target.value); setPage(1); }}
+              className="w-28 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded px-2 py-1 text-xs text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-indigo-500"
+            />
           </div>
-          <div className="flex flex-col gap-1 w-36">
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 focus:outline-none transition-all cursor-pointer shadow-sm"
-            >
-              <option value="All">All Statuses</option>
-              <option value="Critical">Critical</option>
-              <option value="Pending">Pending</option>
-              <option value="Review Required">Review Required</option>
-              <option value="Resolved">Resolved</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1 w-40">
-            <select
-              value={fraudTierFilter}
-              onChange={(e) => setFraudTierFilter(e.target.value as "All" | FraudTier)}
-              className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 focus:outline-none transition-all cursor-pointer shadow-sm"
-            >
-              <option value="All">All Fraud Tiers</option>
-              <option value="Likely Fraud">Likely Fraud</option>
-              <option value="Suspicious">Suspicious</option>
-              <option value="Likely Benign">Likely Benign</option>
-            </select>
-          </div>
+
+          {user?.permissions.includes("export_reports") && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Export:</span>
+              <button
+                type="button"
+                disabled={!!exportingFormat}
+                onClick={() => handleExportFormat("xlsx")}
+                className="px-2.5 py-1 text-xs font-semibold rounded bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50"
+              >
+                {exportingFormat === "xlsx" ? "..." : "Excel (.xlsx)"}
+              </button>
+              <button
+                type="button"
+                disabled={!!exportingFormat}
+                onClick={() => handleExportFormat("csv")}
+                className="px-2.5 py-1 text-xs font-semibold rounded bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50"
+              >
+                {exportingFormat === "csv" ? "..." : "CSV (.csv)"}
+              </button>
+              <button
+                type="button"
+                disabled={!!exportingFormat}
+                onClick={() => handleExportFormat("json")}
+                className="px-2.5 py-1 text-xs font-semibold rounded bg-purple-600 hover:bg-purple-700 text-white transition-colors disabled:opacity-50"
+              >
+                {exportingFormat === "json" ? "..." : "JSON (.json)"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -226,13 +296,15 @@ export default function AnomaliesTable({ direction, config, scopeParams, title, 
 
       {!loading && !error && (
         <>
-          <AnomalyTable
-            anomalies={fraudTierFilter === "All" ? anomalies : anomalies.filter((a) => a.fraud_tier === fraudTierFilter)}
-            onSelectAnomaly={selectAnomaly}
-            selectedAnomalyId={selectedAnomaly?.dispatch_id}
-            columnLabels={config.columns}
-            idLabel={config.idLabel}
-          />
+          <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+            <AnomalyTable
+              anomalies={fraudTierFilter === "All" ? anomalies : anomalies.filter((a) => a.fraud_tier === fraudTierFilter)}
+              onSelectAnomaly={selectAnomaly}
+              selectedAnomalyId={selectedAnomaly?.dispatch_id}
+              columnLabels={config.columns}
+              idLabel={config.idLabel}
+            />
+          </div>
           <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white px-4 py-3 text-xs dark:border-zinc-800 dark:bg-zinc-900/40 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-zinc-500 dark:text-zinc-400">Showing {anomalies.length ? (page - 1) * pageSize + 1 : 0}–{Math.min(page * pageSize, totalAnomalies)} of {totalAnomalies.toLocaleString()} cases</p>
             <div className="flex items-center gap-2">

@@ -27,7 +27,8 @@ from app.services.reconciliation.reconciliation import (
     calculate_data_quality,
     run_reconciliation_on_dataframes,
     detect_duplicates,
-    calculate_omc_risk
+    calculate_omc_risk,
+    filter_anomalies,
 )
 
 # =============================================================================
@@ -443,6 +444,55 @@ class TestOverpayment:
         assert len(overpayments) == 1
         assert overpayments[0]['dispatch_id'] == 'DISP-004'
         assert overpayments[0]['leakage_kes'] == 100000
+
+
+# =============================================================================
+# TEST 13: NEW EXECUTIVE METRICS & FILTER ANOMALIES
+# =============================================================================
+
+class TestNewExecutiveMetricsAndFilters:
+    """Test new executive metrics calculation and filter_anomalies helper."""
+
+    def test_executive_metrics_present(self, sample_dataframe_fixture):
+        """Test recovery_rate_pct, average_leakage_per_anomaly, critical_anomalies_pct in metrics."""
+        dispatches, invoices, payments, omcs = sample_dataframe_fixture
+        result = run_reconciliation_on_dataframes(dispatches, invoices, payments)
+
+        metrics = result['metrics']
+        assert 'recovery_rate_pct' in metrics
+        assert 'average_leakage_per_anomaly' in metrics
+        assert 'critical_anomalies_pct' in metrics
+        assert isinstance(metrics['recovery_rate_pct'], float)
+        assert isinstance(metrics['average_leakage_per_anomaly'], float)
+        assert isinstance(metrics['critical_anomalies_pct'], float)
+
+    def test_filter_anomalies_helper(self):
+        """Test custom filtering by break_type, status, search term, min/max leakage."""
+        sample_anomalies = [
+            {'dispatch_id': 'DISP-101', 'customer': 'TotalEnergies', 'break_type': 'Missing Invoice', 'status': 'Critical', 'leakage_kes': 150000},
+            {'dispatch_id': 'DISP-102', 'customer': 'Vivo Energy', 'break_type': 'Underpayment', 'status': 'Pending', 'leakage_kes': 50000},
+            {'dispatch_id': 'DISP-103', 'customer': 'Kobil', 'break_type': 'Overpayment', 'status': 'Review Required', 'leakage_kes': 80000},
+        ]
+
+        # Break type filter
+        res = filter_anomalies(sample_anomalies, break_type='Missing Invoice')
+        assert len(res) == 1
+        assert res[0]['dispatch_id'] == 'DISP-101'
+
+        # Status filter
+        res = filter_anomalies(sample_anomalies, status='Pending')
+        assert len(res) == 1
+        assert res[0]['dispatch_id'] == 'DISP-102'
+
+        # Search term filter
+        res = filter_anomalies(sample_anomalies, search='Vivo')
+        assert len(res) == 1
+        assert res[0]['dispatch_id'] == 'DISP-102'
+
+        # Leakage range filter
+        res = filter_anomalies(sample_anomalies, min_leakage=60000, max_leakage=100000)
+        assert len(res) == 1
+        assert res[0]['dispatch_id'] == 'DISP-103'
 
 
 # =============================================================================

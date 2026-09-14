@@ -91,6 +91,9 @@ class Metrics(BaseModel):
     critical_count: int
     pending_count: int
     review_count: int
+    recovery_rate_pct: Optional[float] = None
+    average_leakage_per_anomaly: Optional[float] = None
+    critical_anomalies_pct: Optional[float] = None
     # Outbound-only leak breakdowns (Stage 2) — 0/absent-equivalent on a
     # pure-inbound result, since Metrics is built as a plain dict literal
     # (not this schema) and these two keys are only ever added by

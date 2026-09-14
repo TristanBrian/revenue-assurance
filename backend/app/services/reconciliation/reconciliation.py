@@ -299,6 +299,12 @@ def run_reconciliation_on_dataframes(
         overpayment_leak = int(anomalies_df[anomalies_df['break_type'] == 'Overpayment']['leakage_kes'].sum()) if not anomalies_df.empty else 0
 
         rec_rate = round((1 - (total_leak / total_disp if total_disp > 0 else 0)) * 100, 2)
+        anomaly_count = len(anomalies_df)
+        critical_count = len(anomalies_df[anomalies_df['status'] == 'Critical'])
+
+        recovery_rate_pct = round((total_pay / total_disp * 100) if total_disp > 0 else 100.0, 2)
+        avg_leakage = round((total_leak / anomaly_count) if anomaly_count > 0 else 0.0, 2)
+        crit_pct = round((critical_count / anomaly_count * 100) if anomaly_count > 0 else 0.0, 2)
 
         metrics = {
             'total_dispatched_kes': total_disp,
@@ -310,10 +316,13 @@ def run_reconciliation_on_dataframes(
             'missing_payment_leak': missing_payment_leak,
             'underpayment_leak': underpayment_leak,
             'overpayment_leak': overpayment_leak,
-            'anomaly_count': len(anomalies_df),
-            'critical_count': len(anomalies_df[anomalies_df['status'] == 'Critical']),
+            'anomaly_count': anomaly_count,
+            'critical_count': critical_count,
             'pending_count': len(anomalies_df[anomalies_df['status'] == 'Pending']),
-            'review_count': len(anomalies_df[anomalies_df['status'] == 'Review Required'])
+            'review_count': len(anomalies_df[anomalies_df['status'] == 'Review Required']),
+            'recovery_rate_pct': recovery_rate_pct,
+            'average_leakage_per_anomaly': avg_leakage,
+            'critical_anomalies_pct': crit_pct,
         }
 
         # Load persisted resolution overlay
@@ -1081,3 +1090,41 @@ def run_combined_reconciliation(direction: str = "all", materiality: float = MAT
         'duplicate_anomalies': inbound.get('duplicate_anomalies', []) + outbound.get('duplicate_anomalies', []),
         'omc_risk_profile': inbound.get('omc_risk_profile', []) + outbound.get('omc_risk_profile', []),
     })
+
+
+def filter_anomalies(
+    anomalies: List[Dict],
+    break_type: Optional[str] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    min_leakage: Optional[float] = None,
+    max_leakage: Optional[float] = None,
+) -> List[Dict]:
+    """Applies custom filtering criteria to an anomaly list."""
+    filtered = anomalies
+    if break_type and break_type.lower() != "all":
+        filtered = [a for a in filtered if a.get("break_type", "").lower() == break_type.lower()]
+
+    if status and status.lower() != "all":
+        filtered = [a for a in filtered if a.get("status", "").lower() == status.lower()]
+
+    if search and search.strip():
+        term = search.strip().lower()
+        filtered = [
+            a for a in filtered
+            if term in str(a.get("dispatch_id", "")).lower()
+            or term in str(a.get("customer", "")).lower()
+            or term in str(a.get("invoice_id", "")).lower()
+            or term in str(a.get("product", "")).lower()
+            or term in str(a.get("depot", "")).lower()
+            or term in str(a.get("beneficiary_name", "")).lower()
+        ]
+
+    if min_leakage is not None:
+        filtered = [a for a in filtered if float(a.get("leakage_kes", 0)) >= min_leakage]
+
+    if max_leakage is not None:
+        filtered = [a for a in filtered if float(a.get("leakage_kes", 0)) <= max_leakage]
+
+    return filtered
+

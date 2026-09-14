@@ -366,6 +366,8 @@ def reconcile_anomalies(
     break_type: Optional[str] = Query(None, description="Filter by break type (e.g. Overpayment, Underpayment, Missing Invoice, Missing Payment)"),
     status: Optional[str] = Query(None, description="Filter by status (e.g. Critical, Pending, Review Required, Reconciled)"),
     search: Optional[str] = Query(None, description="Search across OMC, dispatch ID, product, invoice ID"),
+    min_leakage: Optional[float] = Query(None, description="Minimum leakage in KSh"),
+    max_leakage: Optional[float] = Query(None, description="Maximum leakage in KSh"),
     # Outbound-only groupings (Stage 2 frontend's DimensionGroupGrid drill-down —
     # see _build_outbound_anomaly()'s field mapping in reconciliation.py:
     # product <- pillar_id, officer_id is its own real field on every
@@ -409,25 +411,11 @@ def reconcile_anomalies(
         if break_type:
             all_anomalies = [a for a in all_anomalies if a.get('break_type') == break_type]
         if status:
-            # "Resolved" is never a value of the primary `status` field —
-            # that one only ever holds Critical/Pending/Review Required/
-            # Reconciled, straight from run_reconciliation(). Resolution is
-            # a separate overlay (`resolution_status`, set by
-            # POST /reconcile/update and persisted in anomaly_resolutions),
-            # so status=Resolved has to check that field instead or it
-            # would silently match zero rows forever.
             if status == "Resolved":
                 all_anomalies = [a for a in all_anomalies if a.get('resolution_status') == 'Resolved']
             else:
                 all_anomalies = [a for a in all_anomalies if a.get('status') == status]
         if pillar_id:
-            # a['product'] holds the raw pillar code (e.g. "Scholarship"),
-            # but /api/inuka/pillars — and therefore this query param —
-            # deals in pillar_label()'s display names (e.g. "Inuka
-            # Scholarship"). Label the raw side before comparing, and fall
-            # back to "Unassigned" the same way inuka_assurance.dimension_
-            # summary() does when grouping, or that card always matches
-            # zero rows too.
             all_anomalies = [
                 a for a in all_anomalies
                 if (pillar_label(a.get('product')) or 'Unassigned') == pillar_id
@@ -446,6 +434,10 @@ def reconcile_anomalies(
                 or search_lower in str(a.get('product', '')).lower()
                 or search_lower in str(a.get('invoice_id', '')).lower()
             ]
+        if min_leakage is not None:
+            all_anomalies = [a for a in all_anomalies if float(a.get('leakage_kes', 0)) >= min_leakage]
+        if max_leakage is not None:
+            all_anomalies = [a for a in all_anomalies if float(a.get('leakage_kes', 0)) <= max_leakage]
 
         total_anomalies = int(len(all_anomalies))
         total_pages = int((total_anomalies + page_size - 1) // page_size) if total_anomalies > 0 else 1
@@ -784,84 +776,119 @@ def export_report(
     direction: str = Query("all", description="inbound | outbound | all — defaults to all"),
     fields: Optional[str] = Query(None, description="Comma-separated field names for data minimization"),
     mask_sensitive: bool = Query(True, description="Mask identity and account fields in exported report data"),
+    format: str = Query("xlsx", description="xlsx | csv | json — export format"),
+    break_type: Optional[str] = Query(None, description="Filter by break type"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    search: Optional[str] = Query(None, description="Search across fields"),
+    min_leakage: Optional[float] = Query(None, description="Minimum leakage in KSh"),
+    max_leakage: Optional[float] = Query(None, description="Maximum leakage in KSh"),
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("export_reports")),
 ):
     enforce_reconciliation_scope(user, direction)
     try:
         result = run_combined_reconciliation(direction=direction, materiality=materiality)
+        anomalies = result.get('anomalies', [])
 
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            pd.DataFrame([result['metrics']]).to_excel(writer, sheet_name='Summary', index=False)
-
-            anomalies = result.get('anomalies', [])
-            anomalies_df = pd.DataFrame(anomalies)
-
-            def mask_value(value):
-                if pd.isna(value):
-                    return value
-                text = str(value)
-                if len(text) <= 4:
-                    return f"{text[:1]}***"
-                return f"{text[:2]}{'*' * min(6, len(text) - 3)}{text[-1:]}"
-
-            selected_fields_list = []
-            # Data Minimization: filter columns if specified
-            # selected_fields_list always defined (even when fields is empty
-            # or anomalies_df is empty) — it's read again below, outside this
-            # block, when logging the report.export audit entry. Left
-            # unassigned in that branch, this raised UnboundLocalError,
-            # silently swallowed by the "non-fatal" try/except around that
-            # logging call — the export itself still succeeded, but the
-            # audit_match ReportVerifierModal depends on was never written,
-            # so a genuinely authentic export came back "UNKNOWN" on verify.
-            selected_fields_list: list[str] = []
-            if fields and not anomalies_df.empty:
-                selected_fields_list = [f.strip() for f in fields.split(",") if f.strip()]
-                valid_cols = [col for col in selected_fields_list if col in anomalies_df.columns]
-                if valid_cols:
-                    anomalies_df = anomalies_df[valid_cols]
-
-            # Enforce the export dialog's privacy choice on the server. This is
-            # intentionally applied before sheets are split and before hashing.
-            if mask_sensitive and not anomalies_df.empty:
-                sensitive_columns = {
-                    "customer", "beneficiary_name", "beneficiary_id", "officer_id",
-                    "kra_pin", "contact_email", "phone", "id_number", "mpesa_phone",
-                    "mpesa_ref", "payment_account", "account_number",
-                }
-
-                for column in sensitive_columns.intersection(anomalies_df.columns):
-                    anomalies_df[column] = anomalies_df[column].map(mask_value)
-
-            if direction == "all" and not anomalies_df.empty and "flow_direction" in anomalies_df.columns:
-                inbound_df = anomalies_df[anomalies_df['flow_direction'] != 'outbound']
-                outbound_df = anomalies_df[anomalies_df['flow_direction'] == 'outbound']
-                inbound_df.to_excel(writer, sheet_name='Anomalies (Inbound)', index=False)
-                outbound_df.to_excel(writer, sheet_name='Anomalies (Outbound)', index=False)
+        # Apply filtering parameters if passed
+        if break_type:
+            anomalies = [a for a in anomalies if a.get('break_type') == break_type]
+        if status:
+            if status == "Resolved":
+                anomalies = [a for a in anomalies if a.get('resolution_status') == 'Resolved']
             else:
-                anomalies_df.to_excel(writer, sheet_name='Anomalies', index=False)
+                anomalies = [a for a in anomalies if a.get('status') == status]
+        if search:
+            search_lower = search.lower()
+            anomalies = [
+                a for a in anomalies
+                if search_lower in str(a.get('dispatch_id', '')).lower()
+                or search_lower in str(a.get('customer', '')).lower()
+                or search_lower in str(a.get('product', '')).lower()
+                or search_lower in str(a.get('invoice_id', '')).lower()
+            ]
+        if min_leakage is not None:
+            anomalies = [a for a in anomalies if float(a.get('leakage_kes', 0)) >= min_leakage]
+        if max_leakage is not None:
+            anomalies = [a for a in anomalies if float(a.get('leakage_kes', 0)) <= max_leakage]
 
-            pd.DataFrame([result['data_quality']]).to_excel(writer, sheet_name='Data Quality', index=False)
-            if result.get('omc_risk_profile'):
-                omc_risk_df = pd.DataFrame(result['omc_risk_profile'])
-                if mask_sensitive and "customer" in omc_risk_df.columns:
-                    omc_risk_df["customer"] = omc_risk_df["customer"].map(mask_value)
-                omc_risk_df.to_excel(writer, sheet_name='OMC Risk Profile', index=False)
-            if result.get('duplicate_anomalies'):
-                duplicates_df = pd.DataFrame(result['duplicate_anomalies'])
-                if mask_sensitive and "details" in duplicates_df.columns:
-                    duplicates_df["details"] = "[record details masked — use authorized case view]"
-                duplicates_df.to_excel(writer, sheet_name='Duplicates', index=False)
+        anomalies_df = pd.DataFrame(anomalies)
 
-        
-        file_bytes = output.getvalue()
+        def mask_value(value):
+            if pd.isna(value):
+                return value
+            text = str(value)
+            if len(text) <= 4:
+                return f"{text[:1]}***"
+            return f"{text[:2]}{'*' * min(6, len(text) - 3)}{text[-1:]}"
+
+        selected_fields_list: list[str] = []
+        if fields and not anomalies_df.empty:
+            selected_fields_list = [f.strip() for f in fields.split(",") if f.strip()]
+            valid_cols = [col for col in selected_fields_list if col in anomalies_df.columns]
+            if valid_cols:
+                anomalies_df = anomalies_df[valid_cols]
+
+        if mask_sensitive and not anomalies_df.empty:
+            sensitive_columns = {
+                "customer", "beneficiary_name", "beneficiary_id", "officer_id",
+                "kra_pin", "contact_email", "phone", "id_number", "mpesa_phone",
+                "mpesa_ref", "payment_account", "account_number",
+            }
+            for column in sensitive_columns.intersection(anomalies_df.columns):
+                anomalies_df[column] = anomalies_df[column].map(mask_value)
+
+        export_format = format.lower().strip()
+
+        if export_format == "csv":
+            csv_str = anomalies_df.to_csv(index=False)
+            file_bytes = csv_str.encode('utf-8')
+            media_type = "text/csv"
+            filename = "reconciliation_report.csv"
+        elif export_format == "json":
+            json_payload = {
+                "metrics": result['metrics'],
+                "summary": result['summary'],
+                "anomalies": anomalies_df.to_dict(orient="records"),
+                "data_quality": result['data_quality']
+            }
+            import json
+            file_bytes = json.dumps(json_payload, indent=2, default=str).encode('utf-8')
+            media_type = "application/json"
+            filename = "reconciliation_report.json"
+        else:
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                pd.DataFrame([result['metrics']]).to_excel(writer, sheet_name='Summary', index=False)
+                if direction == "all" and not anomalies_df.empty and "flow_direction" in anomalies_df.columns:
+                    inbound_df = anomalies_df[anomalies_df['flow_direction'] != 'outbound']
+                    outbound_df = anomalies_df[anomalies_df['flow_direction'] == 'outbound']
+                    inbound_df.to_excel(writer, sheet_name='Anomalies (Inbound)', index=False)
+                    outbound_df.to_excel(writer, sheet_name='Anomalies (Outbound)', index=False)
+                else:
+                    anomalies_df.to_excel(writer, sheet_name='Anomalies', index=False)
+
+                pd.DataFrame([result['data_quality']]).to_excel(writer, sheet_name='Data Quality', index=False)
+                if result.get('omc_risk_profile'):
+                    omc_risk_df = pd.DataFrame(result['omc_risk_profile'])
+                    if mask_sensitive and "customer" in omc_risk_df.columns:
+                        omc_risk_df["customer"] = omc_risk_df["customer"].map(mask_value)
+                    omc_risk_df.to_excel(writer, sheet_name='OMC Risk Profile', index=False)
+                if result.get('duplicate_anomalies'):
+                    duplicates_df = pd.DataFrame(result['duplicate_anomalies'])
+                    if mask_sensitive and "details" in duplicates_df.columns:
+                        duplicates_df["details"] = "[record details masked — use authorized case view]"
+                    duplicates_df.to_excel(writer, sheet_name='Duplicates', index=False)
+
+            file_bytes = output.getvalue()
+            media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            filename = "reconciliation_report.xlsx"
+
         file_hash, signature = sign_report_bytes(file_bytes)
 
         # Audit Trail Logging & Alerting
         try:
-            notify_bulk_export(db, actor_user_id=user.id, row_count=len(result.get('anomalies', [])))
+            notify_bulk_export(db, actor_user_id=user.id, row_count=len(anomalies))
             log_action(
                 db,
                 actor_user_id=user.id,
@@ -874,6 +901,7 @@ def export_report(
                     "rows_exported": len(anomalies_df),
                     "file_hash": file_hash,
                     "signature": signature,
+                    "export_format": export_format,
                     "included_fields": selected_fields_list,
                     "sensitive_fields_masked": mask_sensitive,
                     "contains_sensitive_omc_pii": not mask_sensitive and "kra_pin" in selected_fields_list,
@@ -884,12 +912,11 @@ def export_report(
             db.rollback()
             logger.error(f"Export audit/alert logging failed (non-fatal): {alert_err}")
 
-        output.seek(0)
         return StreamingResponse(
-            output,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            io.BytesIO(file_bytes),
+            media_type=media_type,
             headers={
-                "Content-Disposition": "attachment; filename=reconciliation_report.xlsx",
+                "Content-Disposition": f"attachment; filename={filename}",
                 "X-Report-Hash": file_hash,
                 "X-Report-Signature": signature
             }

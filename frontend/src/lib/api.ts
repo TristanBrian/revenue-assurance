@@ -328,6 +328,8 @@ export interface AnomalyFilters {
   breakType?: string;
   status?: string;
   search?: string;
+  minLeakage?: number;
+  maxLeakage?: number;
   /** Outbound only — see backend/app/routes/reconciliation/reconcile.py's
    * pillar_id/officer_id query params (added for DimensionGroupGrid's
    * scoped drill-down: /dashboard/outbound/anomalies/[groupId]). No-op
@@ -351,6 +353,8 @@ export async function getAnomalies(
   if (filters.breakType) url.searchParams.set("break_type", filters.breakType);
   if (filters.status) url.searchParams.set("status", filters.status);
   if (filters.search) url.searchParams.set("search", filters.search);
+  if (filters.minLeakage !== undefined) url.searchParams.set("min_leakage", String(filters.minLeakage));
+  if (filters.maxLeakage !== undefined) url.searchParams.set("max_leakage", String(filters.maxLeakage));
   if (filters.pillarId) url.searchParams.set("pillar_id", filters.pillarId);
   if (filters.officerId) url.searchParams.set("officer_id", filters.officerId);
   const res = await authFetch(url);
@@ -712,13 +716,24 @@ export async function downloadTemplate(fileType: TemplateType): Promise<void> {
   saveBlob(await res.blob(), `${fileType}_template.csv`);
 }
 
-export async function downloadExport(materiality = 100000, direction: Direction = "all"): Promise<void> {
+export async function downloadExport(
+    materiality = 100000,
+    direction: Direction = "all",
+    format: "xlsx" | "csv" | "json" = "xlsx",
+    filters: AnomalyFilters = {},
+): Promise<void> {
   const url = new URL("/api/reconcile/export", API_URL);
   url.searchParams.set("materiality", String(materiality));
   url.searchParams.set("direction", direction);
+  url.searchParams.set("format", format);
+  if (filters.breakType) url.searchParams.set("break_type", filters.breakType);
+  if (filters.status) url.searchParams.set("status", filters.status);
+  if (filters.search) url.searchParams.set("search", filters.search);
+  if (filters.minLeakage !== undefined) url.searchParams.set("min_leakage", String(filters.minLeakage));
+  if (filters.maxLeakage !== undefined) url.searchParams.set("max_leakage", String(filters.maxLeakage));
   const res = await authFetch(url);
   if (!res.ok) throw new ApiError(await parseErrorDetail(res), res.status);
-  saveBlob(await res.blob(), "reconciliation_report.xlsx");
+  saveBlob(await res.blob(), `reconciliation_report.${format}`);
 }
 
 export async function downloadExportWithFields(
@@ -726,11 +741,19 @@ export async function downloadExportWithFields(
     fields?: string[],
     direction: Direction = "all",
     maskSensitive = true,
+    format: "xlsx" | "csv" | "json" = "xlsx",
+    filters: AnomalyFilters = {},
 ): Promise<Blob> {
   const url = new URL("/api/reconcile/export", API_URL);
   url.searchParams.set("materiality", String(materiality));
   url.searchParams.set("direction", direction);
   url.searchParams.set("mask_sensitive", String(maskSensitive));
+  url.searchParams.set("format", format);
+  if (filters.breakType) url.searchParams.set("break_type", filters.breakType);
+  if (filters.status) url.searchParams.set("status", filters.status);
+  if (filters.search) url.searchParams.set("search", filters.search);
+  if (filters.minLeakage !== undefined) url.searchParams.set("min_leakage", String(filters.minLeakage));
+  if (filters.maxLeakage !== undefined) url.searchParams.set("max_leakage", String(filters.maxLeakage));
   if (fields && fields.length > 0) {
     url.searchParams.set("fields", fields.join(","));
   }

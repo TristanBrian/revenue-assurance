@@ -40,10 +40,22 @@ export interface Metrics {
   critical_count: number;
   pending_count: number;
   review_count: number;
+  recovery_rate_pct?: number;
+  average_leakage_per_anomaly?: number;
+  critical_anomalies_pct?: number;
   // Outbound (stipend/disbursement) — Stage 2. Absent/undefined on a
   // pure-inbound (direction=inbound) result.
   ghost_payment_leak?: number;
   duplicate_disbursement_leak?: number;
+}
+
+export interface ReconciliationFilterOptions {
+  break_type?: BreakType | "All" | string;
+  status?: AnomalyStatus | "All" | string;
+  search?: string;
+  min_leakage?: number;
+  max_leakage?: number;
+  format?: "xlsx" | "csv" | "json";
 }
 
 export interface Anomaly {
