@@ -243,24 +243,71 @@ def run_reconciliation_on_dataframes(
         merged['invoiced_kes'] = merged[inv_val_col].fillna(0)
         merged['paid_kes'] = merged['total_paid_kes'].fillna(0)
 
-        # Detect breaks
-        merged['invoice_missing'] = merged['invoice_id'].isna()
+        # Volume Variance Calculation (Stage 3 Linkup - Problem 8)
+        # Ensure we have volume columns
+        if 'metered_volume' in merged.columns:
+            merged['metered_volume'] = merged['metered_volume'].fillna(0)
+        elif 'volume_liters' in merged.columns:
+            merged['metered_volume'] = merged['volume_liters'].fillna(0)
+        else:
+            merged['metered_volume'] = 0
+            
+        # Assuming invoices has volume_liters_inv or similar, if not we fallback to dispatched volume
+        inv_vol_col = 'volume_liters_inv' if 'volume_liters_inv' in merged.columns else 'volume_liters'
+        if inv_vol_col in merged.columns:
+            merged['invoiced_volume'] = merged[inv_vol_col].fillna(0)
+        else:
+            merged['invoiced_volume'] = 0
+        
+        merged['volume_variance'] = merged['metered_volume'] - merged['invoiced_volume']
+        
+        # Product-aware evaporation tolerances
+        # e.g., PMS: 0.5%, AGO: 0.3%, IK: 0.2%
+        def get_tolerance(product_str, volume):
+            if not isinstance(product_str, str):
+                return 0
+            p = product_str.upper()
+            if 'PMS' in p: return volume * 0.005
+            if 'AGO' in p: return volume * 0.003
+            if 'IK' in p: return volume * 0.002
+            return 0
+
+        # Apply tolerances
+        if 'product' in merged.columns:
+            merged['allowed_evaporation'] = merged.apply(lambda row: get_tolerance(row['product'], row['invoiced_volume']), axis=1)
+        else:
+            merged['allowed_evaporation'] = 0
+
+        # Determine if variance is beyond allowed evaporation (Leakage)
+        merged['volume_discrepancy_flag'] = merged['volume_variance'] > merged['allowed_evaporation']
+
+        # Re-add missing columns that were accidentally removed
+        merged['invoice_missing'] = merged['invoice_id'].isna() if 'invoice_id' in merged.columns else True
         merged['diff_kes'] = merged['invoiced_kes'] - merged['paid_kes']
         merged['diff_abs'] = merged['diff_kes'].abs()
 
         conditions = [
             merged['invoice_missing'],
             (merged['paid_kes'] == 0) & (~merged['invoice_missing']),
+            merged['volume_discrepancy_flag'],
             (merged['diff_kes'] > UNDERPAYMENT_THRESHOLD),
             (merged['diff_kes'] < -UNDERPAYMENT_THRESHOLD)
         ]
-        choices = ['Missing Invoice', 'Missing Payment', 'Underpayment', 'Overpayment']
+        choices = ['Missing Invoice', 'Missing Payment', 'Volume Discrepancy', 'Underpayment', 'Overpayment']
         merged['break_type'] = np.select(conditions, choices, default='Reconciled')
 
         # Leakage
         merged['leakage_kes'] = 0
         merged.loc[merged['break_type'] == 'Missing Invoice', 'leakage_kes'] = merged['dispatched_kes']
         merged.loc[merged['break_type'] == 'Missing Payment', 'leakage_kes'] = merged['invoiced_kes']
+        
+        # Calculate KES leakage for Volume Discrepancy (rough approximation using average price per liter if available, or just value proportional to variance)
+        # For simplicity, if volume_variance > 0, we can estimate leakage_kes = (volume_variance / metered_volume) * dispatched_kes
+        vol_disc_mask = merged['break_type'] == 'Volume Discrepancy'
+        # avoid division by zero
+        safe_metered = np.where(merged['metered_volume'] > 0, merged['metered_volume'], 1)
+        merged.loc[vol_disc_mask, 'leakage_kes'] = (merged['volume_variance'] / safe_metered) * merged['dispatched_kes']
+        
         merged.loc[merged['break_type'] == 'Underpayment', 'leakage_kes'] = merged['diff_kes']
         merged.loc[merged['break_type'] == 'Overpayment', 'leakage_kes'] = merged['diff_abs']
 
@@ -274,7 +321,7 @@ def run_reconciliation_on_dataframes(
 
         # Status
         merged['status'] = 'Reconciled'
-        merged.loc[merged['break_type'].isin(['Missing Invoice', 'Missing Payment']), 'status'] = 'Critical'
+        merged.loc[merged['break_type'].isin(['Missing Invoice', 'Missing Payment', 'Volume Discrepancy']), 'status'] = 'Critical'
         merged.loc[(merged['break_type'] == 'Underpayment') & (merged['age_days'] > CRITICAL_AGE_DAYS), 'status'] = 'Critical'
         merged.loc[(merged['break_type'] == 'Underpayment') & (merged['age_days'] <= CRITICAL_AGE_DAYS), 'status'] = 'Pending'
         merged.loc[merged['break_type'] == 'Overpayment', 'status'] = 'Review Required'

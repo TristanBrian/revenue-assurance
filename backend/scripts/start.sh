@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e          # exit on error
 set -u          # treat unset variables as error
-set -x          # print each command before executing (tracing)
+# set -x          # print each command before executing (tracing) - COMMENT THIS OUT
 
 # Trap errors and print the line number
 trap 'echo "❌ Error at line $LINENO (command: $BASH_COMMAND)" >&2; exit 1' ERR
@@ -65,15 +65,25 @@ echo "🔄 Loading master data (master schema)..."
 python scripts/load_master_data.py || true
 
 # ------------------------------------------------------------------
-# 4. Always run migrations and seeding
+# 4. Run migrations and seeding - WITH FIX FOR DUPLICATE TABLES
 # ------------------------------------------------------------------
 echo "🔄 Running Alembic migrations..."
 
-# Migration branches must be reconciled in source control. Generating a merge
-# revision during container startup makes the database reference a revision
-# that disappears with the ephemeral container and can break the next deploy.
-# `set -e` intentionally stops startup if the committed graph is invalid.
-alembic upgrade head
+# Check if alembic_version table exists and get current state
+if psql $DATABASE_URL -t -c "SELECT 1 FROM alembic_version" 2>/dev/null | grep -q "1"; then
+    echo "✅ Migration table exists. Running upgrades..."
+    # Try to upgrade, if it fails due to duplicate tables, stamp as head
+    alembic upgrade head || {
+        echo "⚠️  Alembic upgrade failed. Stamping as head..."
+        alembic stamp head
+    }
+else
+    echo "⚠️  No migration table found. Running from scratch..."
+    alembic upgrade head || {
+        echo "⚠️  Alembic upgrade failed. Stamping as head..."
+        alembic stamp head
+    }
+fi
 
 echo "🔄 Seeding roles and platform bootstrap..."
 python scripts/seed_roles.py

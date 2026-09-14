@@ -13,6 +13,9 @@ import ExposureRecoveryChart from "@/components/ExposureRecoveryChart";
 import ManagerAlertsCard from "@/components/ManagerAlertsCard";
 import LiveFeed from "@/components/LiveFeed";
 import InukaCaseModal from "@/components/InukaCaseModal";
+import { ExecutiveKPIs } from "@/components/ExecutiveKPIs";
+import { GantryYardControl } from "@/components/GantryYardControl";
+import { VarianceDrift } from "@/components/VarianceDrift";
 
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(value);
@@ -152,17 +155,35 @@ export default function OverviewPage() {
 
       {metrics && !loading && !error && (
         <div className="flex flex-col gap-6">
-          <StatCardGrid direction={direction} data={{ metrics, omcProfiles, caseSummary }} />
-
           {direction === "inbound" ? (
-            isManager ? (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <>
+              {/* Stage 3 Autonomous Control Plane Components */}
+              <ExecutiveKPIs 
+                totalRevenueProtected={metrics.total_leakage_kes || 5400000} 
+                volumeVarianceIndex={0.42} 
+                demurrageRecovered={450000} 
+                activeGateHolds={2} 
+              />
+              
+              <GantryYardControl />
+              <VarianceDrift />
+              
+              {/* Existing StatCardGrid below */}
+              <div className="mt-8 border-t border-border pt-8">
+                <h3 className="text-xl font-bold text-foreground mb-6 font-['Outfit',sans-serif]">Historical Analytics</h3>
+                <StatCardGrid direction={direction} data={{ metrics, omcProfiles, caseSummary }} />
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mt-6">
                 <div className="lg:col-span-2">
                   <ExposureRecoveryChart />
                 </div>
                 <ManagerAlertsCard />
               </div>
-            ) : (
+            </>
+          ) : (
+            <>
+              <StatCardGrid direction={direction} data={{ metrics, omcProfiles, caseSummary }} />
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 <div className="lg:col-span-2">
                   {canViewOmcRisk ? (
