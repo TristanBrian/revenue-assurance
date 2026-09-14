@@ -1,5 +1,5 @@
 import React from 'react';
-import { StatCard } from './StatCard';
+import StatCard from './StatCard';
 
 interface ExecutiveKPIsProps {
   totalRevenueProtected: number;
@@ -17,29 +17,32 @@ export function ExecutiveKPIs({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
       <StatCard
-        title="Total Revenue Protected"
+        label="Total Revenue Protected"
         value={`KES ${(totalRevenueProtected / 1000000).toFixed(2)}M`}
-        trend={{ value: 12.5, isPositive: true }}
-        icon="shield-check"
+        note="+12.5% vs prior"
+        notePill={true}
+        tone="high"
       />
       <StatCard
-        title="Volume Variance Index"
+        label="Volume Variance Index"
         value={`${volumeVarianceIndex.toFixed(2)}%`}
-        trend={{ value: 0.1, isPositive: false }}
-        icon="chart-bar"
+        note="-0.1% vs prior"
+        notePill={true}
+        tone="critical"
       />
       <StatCard
-        title="Auto Demurrage Recovered"
+        label="Auto Demurrage Recovered"
         value={`KES ${(demurrageRecovered / 1000).toFixed(1)}K`}
-        trend={{ value: 8.4, isPositive: true }}
-        icon="clock"
+        note="+8.4% vs prior"
+        notePill={true}
+        tone="high"
       />
       <StatCard
-        title="Active Gate-Holds"
-        value={activeGateHolds}
-        trend={{ value: 2, isPositive: false }}
-        icon="lock-closed"
-        highlight={activeGateHolds > 0}
+        label="Active Gate-Holds"
+        value={activeGateHolds.toString()}
+        note="Requires attention"
+        notePill={false}
+        tone={activeGateHolds > 0 ? "critical" : "neutral"}
       />
     </div>
   );

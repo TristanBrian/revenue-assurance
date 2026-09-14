@@ -249,61 +249,7 @@ export default function OverviewPage() {
                   </div>
                 </div>
               </div>
-            )
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-              <section className="lg:col-span-2 bg-card border border-border rounded-xl p-5 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-sm font-bold text-foreground">Priority review queue</h2>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Critical cases requiring evidence review</p>
-                  </div>
-                  <Link href="/dashboard/outbound/anomalies" className="text-xs font-medium text-muted-foreground hover:text-foreground">View by pillar</Link>
-                </div>
-                {priorityCases.length === 0 ? (
-                  <p className="text-sm text-muted-foreground italic py-8 text-center">No critical cases require review.</p>
-                ) : (
-                  <div className="divide-y divide-border">
-                    {priorityCases.map((item) => (
-                      <button type="button" key={item.case_id} onClick={() => setSelectedCase(item)} className="flex w-full items-center justify-between gap-4 py-3 text-left first:pt-0 last:pb-0 hover:bg-muted/20">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground truncate">{item.title}</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">{item.pillar_id || "Unassigned pillar"} · {item.beneficiary_id || "Unknown beneficiary"}</p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-mono font-semibold text-status-critical">{formatKes(item.amount_at_risk)}</p>
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Open case</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              <section className="bg-card border border-border rounded-xl p-5 shadow-sm">
-                <h2 className="text-sm font-bold text-foreground">Exposure by control</h2>
-                <div className="flex flex-col gap-3 mt-4">
-                  {breakTypes.map((b) => {
-                    const value = Number(metrics[b.key] ?? 0);
-                    return (
-                      <div key={b.key} className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground font-medium">{b.label}</span>
-                          <span className="font-mono font-semibold text-foreground">{formatKesCompact(value)}</span>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${Math.round((value / maxBreakLeak) * 100)}%`, backgroundColor: b.color }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="border-t border-border pt-3 mt-5 flex items-center justify-between">
-                  <span className="text-[11px] text-muted-foreground">Source data quality</span>
-                  <span className="text-xs font-bold text-status-low">{qualityScore === null ? "—" : `${qualityScore.toFixed(1)}%`}</span>
-                </div>
-              </section>
-            </div>
+            </>
           )}
         </div>
       )}
