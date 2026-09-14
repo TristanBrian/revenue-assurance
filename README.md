@@ -1,14 +1,14 @@
-# 💰 FlowGuard – KPC Revenue Assurance + Inuka Governance
+# 💰 Reconova – Enterprise Intelligence System
 
 [![CI](https://github.com/TristanBrian/revenue-assurance/actions/workflows/ci.yml/badge.svg)](https://github.com/TristanBrian/revenue-assurance/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/badge/coverage-71%25-brightgreen)](https://github.com/TristanBrian/revenue-assurance)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub stars](https://img.shields.io/github/stars/TristanBrian/revenue-assurance)](https://github.com/TristanBrian/revenue-assurance)
 [![Deployed on Fly.io](https://img.shields.io/badge/deployed-Fly.io-9cf)](https://revenue-assurance.fly.dev/)
-[![Hackathon 2](https://img.shields.io/badge/Hackathon-2-orange)](https://github.com/TristanBrian/revenue-assurance)
+[![Version 2.0.0](https://img.shields.io/badge/version-2.0.0-blue)](https://github.com/TristanBrian/revenue-assurance)
 
 **One Engine – Two Missions**  
-Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka Foundation – using the same battle‑tested data fabric.
+Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka Foundation – using **Reconova**, an Enterprise Intelligence System built on a battle‑tested data fabric (evolution of FlowGuard v1.0.0).
 
 ---
 
@@ -17,7 +17,7 @@ Reconcile fuel revenue for KPC **and** govern beneficiary stipends for the Inuka
 - [Live Demo & Logins](#live-demo--logins)
 - [The Linkup: Hackathon 1 → Hackathon 2](#the-linkup-hackathon-1--hackathon-2)
 - [Hackathon 2 Deliverables](#hackathon-2-deliverables)
-- [Why FlowGuard?](#why-flowguard)
+- [Why Reconova?](#why-reconova)
 - [Key Features](#key-features)
 - [Architecture](#architecture)
 - [Quantified Impact](#quantified-impact)
@@ -79,7 +79,7 @@ We **did not rewrite**. We **extended** the same ETL, reconciliation, fraud dete
 
 ## 📦 Hackathon 2 Deliverables – How We Met Every One
 
-| Deliverable | How FlowGuard Delivers |
+| Deliverable | How Reconova Delivers |
 |-------------|------------------------|
 | **1. Upgraded Data Fabric** | ETL pipeline extended to ingest outbound CSVs (officers, beneficiaries, attendance, stipends, disbursements). Same data quality gates (dedup, currency cleaning, date standardisation, referential integrity). |
 | **2. Application/Analytics Package** | Full dashboard with direction toggle (`inbound`/`outbound`/`all`), anomaly table, fraud graph, E‑Billing status, alert inbox, CSV upload/export, and a multilingual AI chatbot. |
@@ -89,7 +89,7 @@ We **did not rewrite**. We **extended** the same ETL, reconciliation, fraud dete
 
 ---
 
-## 🎯 Why FlowGuard?
+## 🎯 Why Reconova?
 
 - **For KPC:** Stops fuel revenue leakage – every dispatch must be invoiced and paid.
 - **For Inuka Foundation:** Protects beneficiary stipends – every attendance must be authorised and disbursed correctly.

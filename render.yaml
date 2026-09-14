@@ -8,8 +8,9 @@ services:
     runtime: docker
     repo: https://github.com/TristanBrian/revenue-assurance.git
     plan: free
-    rootDir: backend
-    dockerfilePath: backend/Dockerfile
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeployTrigger: checksPass
     healthCheckPath: /health
 
     # ========================================================================
@@ -33,12 +34,21 @@ services:
 
       # KRA Integration
       - key: KRA_ICMS_ENDPOINT
-        value: https://api.kra.go.ke/icms/v2/invoices
+        sync: false
 
       - key: KRA_ICMS_API_KEY
-        generateValue: true
+        sync: false
 
       # App config
+      - key: APP_NAME
+        value: Reconova
+
+      - key: APP_TAGLINE
+        value: Enterprise Intelligence System
+
+      - key: APP_VERSION
+        value: 2.0.0
+
       - key: MATERIALITY_THRESHOLD
         value: "100000"
 
@@ -50,4 +60,8 @@ services:
 
       # ✅ CORS – allow your Vercel frontend
       - key: CORS_ORIGINS
-        value: https://flowguardd.vercel.app,https://*.vercel.app,https://*.onrender.com
+        value: https://flowguardd.vercel.app
+      - key: BOOTSTRAP_DEMO_DATA
+        value: "false"
+      - key: INUKA_STREAM_SIMULATOR
+        value: "false"

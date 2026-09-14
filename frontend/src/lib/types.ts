@@ -600,3 +600,44 @@ export interface HeatmapData {
 }
 
 export interface InukaStreamStatus { mode: string; pillars: string[]; events_received: number; last_event_at: string | null; source_contract: string; }
+
+export interface GantryLane {
+  lane_id: number;
+  lane_name: string;
+  status: "green" | "yellow" | "red";
+  current_truck_id: string;
+  omc_name: string;
+  product_code: string;
+  meter_volume_l: number;
+  invoiced_volume_l: number;
+  dwell_time_mins: number;
+  free_time_limit_mins: number;
+  automated_hold_reason: string | null;
+  gate_clearance: "ISSUED" | "WARNING" | "HOLD_TRIGGERED";
+}
+
+export interface GantrySummary {
+  total_lanes: number;
+  clean_count: number;
+  warning_count: number;
+  hold_count: number;
+  volume_variance_index_pct: number;
+  automated_demurrage_recovered_kes: number;
+  active_gate_holds_count: number;
+}
+
+export interface ReportVerificationResponse {
+  status: "VERIFIED" | "UNKNOWN" | "ALTERED";
+  filename: string;
+  file_hash: string;
+  signature: string;
+  audit_match?: {
+    log_id: string;
+    created_at: string;
+    report_type: string;
+    rows_exported: number;
+    contains_sensitive_omc_pii: boolean;
+  } | null;
+}
+
+export type AuditVerifyResponse = import("./api").AuditVerifyResult;

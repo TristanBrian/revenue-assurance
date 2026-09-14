@@ -3,6 +3,7 @@ Main RAG service: retrieval + generation.
 """
 
 from typing import Dict
+from app.config import settings
 from app.services.rag.vector_store import get_vector_store
 from app.services.rag.loader import load_documents_from_url, get_all_chunks
 from app.services.rag.config import OLLAMA_MODEL, TOP_K
@@ -16,7 +17,7 @@ def get_llm():
         _llm = OllamaLLM(model=OLLAMA_MODEL)
     return _llm
 
-def answer_question(question: str, k: int = TOP_K) -> Dict:
+def ask_question(question: str, k: int = TOP_K) -> Dict:
     store = get_vector_store()
     chunks = store.search(question, k)
     if not chunks:
@@ -27,7 +28,7 @@ def answer_question(question: str, k: int = TOP_K) -> Dict:
         }
 
     context = "\n\n---\n\n".join(chunks)
-    prompt = f"""You are the FlowGuard Analyst – an expert assistant for the FlowGuard platform (KPC + Inuka).
+    prompt = f"""You are the {settings.app_name} Analyst – an expert assistant for the {settings.app_name} platform ({settings.app_tagline}, formerly {settings.app_name_legacy}).
 
 Based on the following context, answer the user's question concisely and professionally.
 If the context does not contain the answer, say "I don't have that information in my knowledge base."

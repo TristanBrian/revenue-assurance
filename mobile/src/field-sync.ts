@@ -16,8 +16,8 @@ export type VerificationDraft = {
   updated_at: string;
 };
 
-const taskName = "FLOWGUARD_VERIFICATION_SYNC";
-const queueFile = `${FileSystem.documentDirectory ?? ""}flowguard-verification-queue.json`;
+const taskName = "RECONOVA_VERIFICATION_SYNC";
+const queueFile = `${FileSystem.documentDirectory ?? ""}reconova-verification-queue.json`;
 
 async function readQueue(): Promise<VerificationDraft[]> {
   try {

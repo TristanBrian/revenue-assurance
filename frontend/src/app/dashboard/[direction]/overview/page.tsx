@@ -3,19 +3,20 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ApiError, getInukaCases, getMetrics, getOmcRiskProfile } from "@/lib/api";
-import type { InukaCaseSummary, InukaRiskCase, Metrics, OmcRiskProfile as OmcRiskProfileEntry } from "@/lib/types";
+import { ApiError, getInukaCases, getMetrics, getOmcRiskProfile, getGantryLanes } from "@/lib/api";
+import type { InukaCaseSummary, InukaRiskCase, Metrics, OmcRiskProfile as OmcRiskProfileEntry, GantryLane, GantrySummary } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { useMateriality } from "@/context/MaterialityContext";
 import type { WorkspaceDirection } from "@/lib/workspace";
 import StatCardGrid from "@/components/StatCardGrid";
 import ExposureRecoveryChart from "@/components/ExposureRecoveryChart";
 import ManagerAlertsCard from "@/components/ManagerAlertsCard";
-import LiveFeed from "@/components/LiveFeed";
 import InukaCaseModal from "@/components/InukaCaseModal";
-import { ExecutiveKPIs } from "@/components/ExecutiveKPIs";
-import { GantryYardControl } from "@/components/GantryYardControl";
-import { VarianceDrift } from "@/components/VarianceDrift";
+import ExecutiveKpiGrid from "@/components/ExecutiveKpiGrid";
+import GantryYardGrid from "@/components/GantryYardGrid";
+import VolumeDriftChart from "@/components/VolumeDriftChart";
+import DemurrageLeaderboard from "@/components/DemurrageLeaderboard";
+import CryptographicAuditTool from "@/components/CryptographicAuditTool";
 
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(value);
@@ -25,11 +26,6 @@ function formatKesCompact(value: number): string {
   if (value >= 1e9) return `KES ${(value / 1e9).toFixed(2)}B`;
   if (value >= 1e6) return `KES ${(value / 1e6).toFixed(2)}M`;
   return formatKes(value);
-}
-
-function RiskDot({ level }: { level: "Low" | "Medium" | "High" }) {
-  const color = level === "High" ? "bg-status-critical" : level === "Medium" ? "bg-status-medium" : "bg-status-low";
-  return <span className={`w-2 h-2 rounded-full shrink-0 ${color}`} />;
 }
 
 // Inbound break-type breakdown — labels/colors/keys exactly as the
@@ -66,16 +62,32 @@ export default function OverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [gantryLanes, setGantryLanes] = useState<GantryLane[]>([]);
+  const [gantrySummary, setGantrySummary] = useState<GantrySummary | null>(null);
+
   const canViewMetrics = user?.permissions.includes("view_metrics") ?? false;
   const canViewOmcRisk = direction === "inbound" && (user?.permissions.includes("view_omc_risk_profile") ?? false);
-  const canViewLiveFeed = user?.permissions.includes("view_live_feed") ?? false;
-  const isManager = user?.roles.includes("manager") ?? false;
+
+  const fetchGantryLanesData = async () => {
+    try {
+      const res = await getGantryLanes();
+      if (res && res.lanes) {
+        setGantryLanes(res.lanes);
+        setGantrySummary(res.summary);
+      }
+    } catch {
+      setGantryLanes([]);
+      setGantrySummary(null);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
+
+    fetchGantryLanesData();
 
     const promises: Promise<unknown>[] = [
       canViewMetrics ? getMetrics(direction === "outbound" ? 100000 : materiality, direction) : Promise.resolve(null),
@@ -109,7 +121,6 @@ export default function OverviewPage() {
     };
   }, [user, materiality, direction, canViewMetrics, canViewOmcRisk]);
 
-  const sortedOmcs = [...omcProfiles].sort((a, b) => b.leakage_kes - a.leakage_kes).slice(0, 5);
   const breakTypes = direction === "inbound" ? INBOUND_BREAK_TYPES : OUTBOUND_BREAK_TYPES;
   const maxBreakLeak = metrics ? Math.max(...breakTypes.map((b) => Number(metrics[b.key] ?? 0)), 1) : 1;
 

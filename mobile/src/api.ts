@@ -6,7 +6,8 @@ const base = String(
   process.env.EXPO_PUBLIC_API_URL ?? Constants.expoConfig?.extra?.apiUrl ?? "http://localhost:8000"
 ).replace(/\/$/, "");
 
-const key = "flowguard_access_token";
+const key = "reconova_access_token";
+const legacyKey = "flowguard_access_token";
 const memoryStore: Record<string, string> = {};
 
 async function getItem(k: string): Promise<string | null> {
@@ -94,14 +95,14 @@ async function req<T>(path: string, init: RequestInit = {}, auth = true): Promis
   h.set("Accept", "application/json");
   if (init.body) h.set("Content-Type", "application/json");
   if (auth) {
-    const t = await getItem(key);
+    const t = (await getItem(key)) ?? (await getItem(legacyKey));
     if (t) h.set("Authorization", "Bearer " + t);
   }
   let r: Response;
   try {
     r = await fetch(base + path, { ...init, headers: h });
   } catch {
-    throw new Error("Cannot reach FlowGuard at " + base + ". Check the API URL and network.");
+    throw new Error("Cannot reach Reconova at " + base + ". Check the API URL and network.");
   }
   const b = await r.json().catch(() => null);
   if (!r.ok) throw new Error(b?.Message ?? "Request failed (" + r.status + ")");
@@ -121,8 +122,11 @@ export async function login(email: string, password: string) {
 }
 
 export const me = () => req<User>("/api/auth/me");
-export const session = async () => !!(await getItem(key));
-export const logout = () => deleteItem(key);
+export const session = async () => !!((await getItem(key)) ?? (await getItem(legacyKey)));
+export const logout = async () => {
+  await deleteItem(key);
+  await deleteItem(legacyKey);
+};
 
 export async function metrics(d: Direction) {
   if (process.env.EXPO_PUBLIC_PREVIEW_MODE === "true") return { total_paid_kes: 1_204_780_000, total_leakage_kes: 218_030_000, reconciliation_rate: 82.1, anomaly_count: 726, critical_count: 726, pending_count: 41, review_count: 20 };
@@ -151,7 +155,7 @@ export async function fraudGraph(direction: "inbound" | "outbound") {
 export const readAlert = (id: string) => req("/api/alerts/" + encodeURIComponent(id) + "/read", { method: "POST" });
 
 export async function submitFieldVerification(payload: FieldVerificationPayload): Promise<void> {
-  await req("/api/inuka/stream/events", { method: "POST", body: JSON.stringify({ event_type: "verification.captured", pillar: payload.pillar, beneficiary_id: payload.beneficiary_id, source_system: "flowguard-mobile-field-app", occurred_at: payload.captured_at, payload }) });
+  await req("/api/inuka/stream/events", { method: "POST", body: JSON.stringify({ event_type: "verification.captured", pillar: payload.pillar, beneficiary_id: payload.beneficiary_id, source_system: "reconova-mobile-field-app", occurred_at: payload.captured_at, payload }) });
 }
 
 export async function ask(message: string) {

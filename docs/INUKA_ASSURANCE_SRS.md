@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-This document defines the business, data, control, API, and user-interface requirements for the Inuka Program Assurance portal. Inuka is a separate operational domain within the FlowGuard platform. It protects training-program funds and beneficiary payments; it does not use the KPC fuel-revenue concepts used by the inbound revenue portal.
+This document defines the business, data, control, API, and user-interface requirements for the Inuka Program Assurance portal. Inuka is a separate operational domain within the Reconova (Enterprise Intelligence System, formerly FlowGuard) platform. It protects training-program funds and beneficiary payments; it does not use the KPC fuel-revenue concepts used by the inbound revenue portal.
 
 The objective is not to label beneficiaries as fraudulent from a single attendance row. The objective is to establish an evidence-backed eligibility and payment chain, identify control breaks, and give an Inuka manager an explainable investigation queue.
 
@@ -59,7 +59,7 @@ Reference sources: [KPC Corporate Social Investment](https://www.kpc.co.ke/corpo
 
 ## 4. Domain separation
 
-FlowGuard remains one platform with shared security and audit infrastructure, but it has two bounded assurance domains:
+Reconova remains one platform with shared security and audit infrastructure, but it has two bounded assurance domains:
 
 ```text
 Inbound revenue assurance: dispatch → invoice → payment

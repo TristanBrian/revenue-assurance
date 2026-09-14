@@ -977,3 +977,12 @@ export async function getRecordHistory(targetType: string, targetId: string): Pr
   const res = await authFetch(new URL(`/api/audit/history/${targetType}/${targetId}`, API_URL));
   return unwrap(res);
 }
+
+export async function getGantryLanes(): Promise<{
+  status: string;
+  lanes: import("./types").GantryLane[];
+  summary: import("./types").GantrySummary;
+}> {
+  const res = await authFetch(new URL("/api/reconcile/gantry-lanes", API_URL));
+  return unwrap(res);
+}
