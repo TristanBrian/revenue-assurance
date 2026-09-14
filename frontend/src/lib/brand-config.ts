@@ -23,8 +23,8 @@ export interface BrandConfig {
 
 export const BRAND_CONFIG: BrandConfig = {
   companyName: "Kenya Pipeline Company",
-  systemName: "FlowGuard Revenue Assurance",
-  shortName: "FlowGuard",
+  systemName: "Reconova Revenue Assurance",
+  shortName: "Reconova",
   logoUrl: "/svg/kpc-logo-transparent.svg",
   primaryColor: "#B3312C",     // Red primary accent
   secondaryColor: "#1F1B19",   // Warm near-black surface
@@ -37,7 +37,7 @@ export const BRAND_CONFIG: BrandConfig = {
   mutedText: "#736C67",
   borderColor: "#E8E3DE",
   landing: {
-    bgImage: process.env.NEXT_PUBLIC_LANDING_BG_IMAGE || "/images/flowguard-landing-hero.png",
+    bgImage: process.env.NEXT_PUBLIC_LANDING_BG_IMAGE || "/images/reconova-landing-hero.png",
     cardBlur: "backdrop-blur-lg",
   },
 };

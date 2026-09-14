@@ -6,7 +6,7 @@ import Image from "next/image";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { BRAND_CONFIG } from "@/lib/brand-config";
-import FlowGuardHeroIllustration from "@/components/FlowGuardHeroIllustration";
+import ReconovaHeroIllustration from "@/components/FlowGuardHeroIllustration";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -54,7 +54,7 @@ export default function LoginPage() {
           sizes="100vw"
           className="object-cover opacity-[0.34] mix-blend-screen"
         />
-        <FlowGuardHeroIllustration className="absolute inset-0 h-full w-full object-cover opacity-[0.14] mix-blend-screen" />
+        <ReconovaHeroIllustration className="absolute inset-0 h-full w-full object-cover opacity-[0.14] mix-blend-screen" />
         <div
           className="absolute inset-0 opacity-[0.06]"
           style={{

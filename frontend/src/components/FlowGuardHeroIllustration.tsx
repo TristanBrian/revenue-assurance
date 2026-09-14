@@ -1,10 +1,10 @@
 import React from "react";
 
-export default function FlowGuardHeroIllustration({
+export default function ReconovaHeroIllustration({
   width = "100%",
   height = "100%",
   className = "",
-  title = "FlowGuard — Revenue Assurance for Kenya’s Petroleum Distribution",
+  title = "Reconova — Revenue Assurance for Kenya’s Petroleum Distribution",
 }) {
   const id = React.useId();
 

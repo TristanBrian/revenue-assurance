@@ -23,7 +23,7 @@ Never commit `.env` or paste its contents into logs. Configure these through the
 | --- | --- |
 | `DATABASE_URL` | Dedicated persistent PostgreSQL database; never ephemeral SQLite in production |
 | `SECRET_KEY` | Strong random signing secret, shared across instances; rotate with a session-reset plan |
-| `CORS_ORIGINS` | Exact comma-separated frontend HTTPS origins, e.g. `https://flowguardd.vercel.app`; embedded wildcards are not supported |
+| `CORS_ORIGINS` | Exact comma-separated frontend HTTPS origins, e.g. `https://reconova.vercel.app`; embedded wildcards are not supported |
 | `PORT` | 8000 on Fly; Render supplies/configures its port |
 | `NEXT_PUBLIC_API_URL` | Backend HTTPS origin, set in Vercel **before building**, with no `/api` suffix |
 | `INUKA_STREAM_SIMULATOR` | `false` for production; `true` only for a dedicated synthetic demo |

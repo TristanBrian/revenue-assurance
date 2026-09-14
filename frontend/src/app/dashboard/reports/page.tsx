@@ -363,7 +363,7 @@ function ReportsContent() {
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 border-b border-[#e8e3de] dark:border-[#33302c]">
         <div>
           <span className="text-xs font-extrabold text-[#b3312c] dark:text-[#ec835a] uppercase tracking-wider">
-            FlowGuard Revenue Assurance & Governance Center
+            Reconova Revenue Assurance & Governance Center
           </span>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#26221f] dark:text-[#f5f2ef] mt-1">
             Reports & Audit Center

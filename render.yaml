@@ -60,7 +60,7 @@ services:
 
       # ✅ CORS – allow your Vercel frontend
       - key: CORS_ORIGINS
-        value: https://flowguardd.vercel.app
+        value: https://reconova.vercel.app
       - key: BOOTSTRAP_DEMO_DATA
         value: "false"
       - key: INUKA_STREAM_SIMULATOR

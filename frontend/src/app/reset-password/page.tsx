@@ -16,7 +16,7 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { BRAND_CONFIG } from "@/lib/brand-config";
-import FlowGuardHeroIllustration from "@/components/FlowGuardHeroIllustration";
+import ReconovaHeroIllustration from "@/components/FlowGuardHeroIllustration";
 import type { TermsBundle } from "@/lib/types";
 
 // Two modes, one screen (spec: consent bundled into the reset screen, not
@@ -108,7 +108,7 @@ export default function ResetPasswordPage() {
   return (
     <div className="relative flex min-h-screen flex-col items-center overflow-y-auto bg-background p-4 font-sans text-foreground sm:p-6">
       <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
-        <FlowGuardHeroIllustration className="h-full w-full object-cover opacity-[0.08] mix-blend-multiply" />
+        <ReconovaHeroIllustration className="h-full w-full object-cover opacity-[0.08] mix-blend-multiply" />
       </div>
 
       <header className="relative z-10 flex w-full flex-col items-center gap-3 pt-4 text-center">

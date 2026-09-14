@@ -94,13 +94,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
-    setSidebarCollapsed(window.localStorage.getItem("flowguard_sidebar_collapsed") === "true");
+    setSidebarCollapsed(window.localStorage.getItem("reconova_sidebar_collapsed") === "true");
   }, []);
 
   function toggleSidebar() {
     setSidebarCollapsed((current) => {
       const next = !current;
-      window.localStorage.setItem("flowguard_sidebar_collapsed", String(next));
+      window.localStorage.setItem("reconova_sidebar_collapsed", String(next));
       return next;
     });
   }
