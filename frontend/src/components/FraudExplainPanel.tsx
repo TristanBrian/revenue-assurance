@@ -25,7 +25,7 @@ interface ChatEntry {
   text: string;
 }
 
-export default function FraudExplainPanel({ anomalyId }: { anomalyId: string }) {
+export default function FraudExplainPanel({ anomalyId, direction = "inbound" }: { anomalyId: string; direction?: "inbound" | "outbound" }) {
   const [explanation, setExplanation] = useState<FraudExplainData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export default function FraudExplainPanel({ anomalyId }: { anomalyId: string }) 
     setExplanation(null);
     setChatHistory([]);
 
-    explainAnomalyScore(anomalyId)
+    explainAnomalyScore(anomalyId, direction)
       .then((data) => {
         if (!cancelled) setExplanation(data);
       })
@@ -62,7 +62,7 @@ export default function FraudExplainPanel({ anomalyId }: { anomalyId: string }) 
     return () => {
       cancelled = true;
     };
-  }, [anomalyId]);
+  }, [anomalyId, direction]);
 
   async function sendChat() {
     const message = chatInput.trim();
@@ -71,7 +71,7 @@ export default function FraudExplainPanel({ anomalyId }: { anomalyId: string }) 
     setChatHistory((h) => [...h, { from: "user", text: message }]);
     setChatSending(true);
     try {
-      const reply = await fraudChat(message, anomalyId);
+      const reply = await fraudChat(message, anomalyId, direction);
       setChatHistory((h) => [...h, { from: "assistant", text: reply }]);
     } catch (err) {
       setChatHistory((h) => [

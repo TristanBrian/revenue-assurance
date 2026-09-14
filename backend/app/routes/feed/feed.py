@@ -1,6 +1,6 @@
 # backend/app/routes/feed/feed.py
 from fastapi import APIRouter, Depends, Query
-from app.core.dependencies import require_permission
+from app.core.dependencies import require_workspace_permission
 from app.services.feed.feed import get_feed, update_feed
 from app.services.reconciliation.reconciliation import run_reconciliation
 from app.schemas.feed.feed import FeedResponse
@@ -14,7 +14,7 @@ router = APIRouter()
 @router.get("/feed", response_model=FeedResponse)
 def live_feed(
     limit: int = Query(20, description="Number of recent anomalies to return"),
-    _=Depends(require_permission("view_live_feed")),
+    _=Depends(require_workspace_permission("view_live_feed", "inbound")),
 ):
     """
     Returns the latest anomalies for the live feed.

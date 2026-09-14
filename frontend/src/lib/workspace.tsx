@@ -34,7 +34,8 @@ export const DIRECTION_LABEL: Record<WorkspaceDirection, string> = {
  * - `inuka_manager` role -> outbound only.
  * - Everyone else with `view_outgoing_data` -> both. */
 export function getAllowedDirections(user: AuthUser | null): WorkspaceDirection[] {
-  if (!user) return ["inbound"];
+  if (!user || user.roles.includes("system_admin")) return [];
+  if (user.roles.includes("depot_supervisor")) return ["inbound"];
   if (user.roles.includes("inuka_manager")) return ["outbound"];
   if (!user.permissions.includes("view_outgoing_data")) return ["inbound"];
   return ["inbound", "outbound"];
@@ -46,7 +47,7 @@ export function getDefaultDirection(user: AuthUser | null): WorkspaceDirection {
   // defaults to "inbound" even when both are available — same default
   // the old context used ("all" leaned inbound-first in practice, since
   // every inbound page was the pre-existing default landing page).
-  return allowed.includes("inbound") ? "inbound" : allowed[0];
+  return allowed.includes("inbound") ? "inbound" : (allowed[0] ?? "inbound");
 }
 
 export function isDirectionAllowed(user: AuthUser | null, direction: string): direction is WorkspaceDirection {
@@ -128,6 +129,7 @@ export const navItems: NavItem[] = [
     label: { inbound: "Dashboard", outbound: "Assurance Overview" },
     route: (d) => `/dashboard/${d}/overview`,
     icon: ICONS.overview,
+    anyOf: ["view_metrics"],
   },
   {
     id: "anomalies",
@@ -146,7 +148,7 @@ export const navItems: NavItem[] = [
   },
   {
     id: "leakage",
-    label: "Leakage Explorer",
+    label: { inbound: "Leakage Explorer", outbound: "Payout Exposure" },
     anyOf: ["view_heatmap"],
     // Confirmed live both directions — /heatmap?direction=outbound really
     // does return Beneficiary x Pillar density (see
@@ -172,12 +174,29 @@ export const navItems: NavItem[] = [
     icon: ICONS.audit,
   },
   {
-    id: "extra",
-    label: { inbound: "E-Billing", outbound: "Beneficiaries" },
-    anyOf: ["manage_ebilling", "view_anomaly_table"],
-    badgeKey: "ebilling",
-    route: (d) => `/dashboard/${d}/extra`,
-    icon: ICONS.extra,
+    id: "operations", label: "Depot Operations", anyOf: ["view_metrics"],
+    directions: ["inbound"], route: (d) => `/dashboard/${d}/operations`, icon: ICONS.overview,
+  },
+  {
+    id: "billing", label: "E-Billing", anyOf: ["manage_ebilling"],
+    directions: ["inbound"], badgeKey: "ebilling",
+    route: (d) => `/dashboard/${d}/billing`, icon: ICONS.extra,
+  },
+  {
+    id: "upload", label: "Data Import", anyOf: ["upload_csv"],
+    directions: ["inbound"], route: (d) => `/dashboard/${d}/upload`, icon: ICONS.reports,
+  },
+  {
+    id: "beneficiaries", label: "Beneficiaries", anyOf: ["view_anomaly_table"],
+    directions: ["outbound"], route: (d) => `/dashboard/${d}/beneficiaries`, icon: ICONS.extra,
+  },
+  {
+    id: "programs", label: "Programs & Pillars", anyOf: ["view_metrics"],
+    directions: ["outbound"], route: (d) => `/dashboard/${d}/programs`, icon: ICONS.leakage,
+  },
+  {
+    id: "officers", label: "Field Officers", anyOf: ["view_metrics"],
+    directions: ["outbound"], route: (d) => `/dashboard/${d}/officers`, icon: ICONS.risk,
   },
   {
     id: "reports",
@@ -190,6 +209,7 @@ export const navItems: NavItem[] = [
     id: "audit",
     label: "Audit Trail",
     anyOf: ["view_audit"],
+    directions: ["inbound"],
     route: () => `/dashboard/audit`,
     icon: ICONS.audit,
   },
@@ -229,11 +249,18 @@ export function activeNavItemId(pathname: string): string | null {
   if (pathname.startsWith("/dashboard/review-queue")) return "review-queue";
   const match = pathname.match(/^\/dashboard\/(inbound|outbound)\/([^/]+)/);
   if (!match) return null;
-  const segment = match[2];
+  const segment = match[2] === "extra" ? (match[1] === "inbound" ? "billing" : "beneficiaries") : match[2];
   return navItems.find((i) => i.id === segment)?.id ?? null;
 }
 
 export function directionFromPathname(pathname: string): WorkspaceDirection | null {
   const match = pathname.match(/^\/dashboard\/(inbound|outbound)(\/|$)/);
   return (match?.[1] as WorkspaceDirection | undefined) ?? null;
+}
+
+/** One policy for links and direct workspace URLs. API authorization remains authoritative. */
+export function canAccessModule(user: AuthUser | null, item: NavItem, direction: WorkspaceDirection): boolean {
+  return !!user && isDirectionAllowed(user, direction)
+    && (!item.directions || item.directions.includes(direction))
+    && (!item.anyOf || item.anyOf.some((code) => user.permissions.includes(code)));
 }

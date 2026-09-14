@@ -90,7 +90,7 @@ export default function StatCard({
           </span>
         )}
       </div>
-      <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mt-2">{value}</span>
+      <span className="text-2xl xl:text-4xl font-extrabold tracking-tight text-foreground mt-2">{value}</span>
 
       {typeof progress === "number" ? (
         <div className="mt-2.5 h-2 w-full rounded-full bg-muted overflow-hidden">

@@ -59,9 +59,9 @@ describe("EbillingPanel Component", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getEbillingStatus).mockResolvedValue(mockStatus as any);
-    vi.mocked(getEbillingMonitor).mockResolvedValue(mockMonitor as any);
-    vi.mocked(getEbillingLogs).mockResolvedValue(mockLogs as any);
+    vi.mocked(getEbillingStatus).mockResolvedValue(mockStatus as Awaited<ReturnType<typeof getEbillingStatus>>);
+    vi.mocked(getEbillingMonitor).mockResolvedValue(mockMonitor as Awaited<ReturnType<typeof getEbillingMonitor>>);
+    vi.mocked(getEbillingLogs).mockResolvedValue(mockLogs as Awaited<ReturnType<typeof getEbillingLogs>>);
   });
 
   it("renders status cards and logs table after fetching data", async () => {
@@ -84,7 +84,7 @@ describe("EbillingPanel Component", () => {
       expect(screen.getByText(/KRA iCMS E-Billing Gateway/i)).toBeInTheDocument();
     });
 
-    const syncBtn = screen.getByRole("button", { name: /Trigger E-Billing Sync/i });
+    const syncBtn = screen.getByRole("button", { name: /Sync Pending Invoices/i });
     fireEvent.click(syncBtn);
 
     await waitFor(() => {

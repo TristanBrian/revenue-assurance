@@ -8,16 +8,16 @@ export interface BrandConfig {
   systemName: string;
   shortName: string;
   logoUrl: string | null;
-  primaryColor: string;       // Red Accent (#B3312C)
-  secondaryColor: string;     // Warm Near-Black (#1F1B19)
-  deepBlueColor: string;      // Brand Dark Surface (#1F1B19)
-  accentColor: string;        // Red Accent (#B3312C)
-  highlightColor: string;     // Red Accent (#B3312C)
-  bgColor: string;            // Off-White (#F7F6F4)
-  textColor: string;          // Near-Black (#26221F)
-  mutedSurface: string;       // (#F1EDE9)
-  mutedText: string;          // (#736C67)
-  borderColor: string;        // (#E8E3DE)
+  primaryColor: string;
+  secondaryColor: string;
+  deepBlueColor: string;
+  accentColor: string;
+  highlightColor: string;
+  bgColor: string;
+  textColor: string;
+  mutedSurface: string;
+  mutedText: string;
+  borderColor: string;
   landing: LandingConfig;
 }
 
@@ -26,16 +26,16 @@ export const BRAND_CONFIG: BrandConfig = {
   systemName: "Reconova Revenue Assurance",
   shortName: "Reconova",
   logoUrl: "/svg/kpc-logo-transparent.svg",
-  primaryColor: "#B3312C",     // Red primary accent
-  secondaryColor: "#1F1B19",   // Warm near-black surface
-  deepBlueColor: "#1F1B19",    // Warm near-black surface
-  accentColor: "#B3312C",      // Red accent
-  highlightColor: "#B3312C",
-  bgColor: "#F7F6F4",
-  textColor: "#26221F",
-  mutedSurface: "#F1EDE9",
-  mutedText: "#736C67",
-  borderColor: "#E8E3DE",
+  primaryColor: "#047857",
+  secondaryColor: "#0A192F",
+  deepBlueColor: "#0A192F",
+  accentColor: "#047857",
+  highlightColor: "#047857",
+  bgColor: "#F3F6FB",
+  textColor: "#10233E",
+  mutedSurface: "#E9EFF6",
+  mutedText: "#51627A",
+  borderColor: "#D8E2EE",
   landing: {
     bgImage: process.env.NEXT_PUBLIC_LANDING_BG_IMAGE || "/images/reconova-landing-hero.png",
     cardBlur: "backdrop-blur-lg",

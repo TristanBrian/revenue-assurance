@@ -6,6 +6,7 @@ import { ApiError, downloadExportWithFields, getAnomalies, getEbillingLogs, getM
 import { useMateriality } from "@/context/MaterialityContext";
 import { reportsConfig, anomaliesConfig } from "@/config/direction-config";
 import type { WorkspaceDirection } from "@/lib/workspace";
+import { useAuth } from "@/lib/auth-context";
 import RequirePermission from "@/components/RequirePermission";
 import ConsentModal from "@/components/ConsentModal";
 import FieldSelectorModal from "@/components/FieldSelectorModal";
@@ -37,12 +38,13 @@ function statusTone(status: string): string {
 
 function ReportsContent({ direction }: { direction: WorkspaceDirection }) {
   const { materiality } = useMateriality();
+  const { user } = useAuth();
   const config = reportsConfig[direction];
   const anomalyLabels = anomaliesConfig[direction];
   const REPORTS: Array<{ id: ReportType; label: string; description: string }> = [
     { id: "operational", label: "Operational exceptions", description: `Missing ${anomalyLabels.secondaryRecordLabel.toLowerCase()} and underpayment breaks.` },
     { id: "financial", label: "Financial settlement", description: `${anomalyLabels.secondaryRecordLabel}, ${anomalyLabels.paymentRecordLabel.toLowerCase()}, overpayment, and outstanding-value checks.` },
-    ...(config.showEbillingLogs ? [{ id: "icms" as const, label: "iCMS synchronisation", description: "Invoice delivery status, retries, and integration errors." }] : []),
+    ...(config.showEbillingLogs && user?.permissions.includes("manage_ebilling") ? [{ id: "icms" as const, label: "iCMS synchronisation", description: "Invoice delivery status, retries, and integration errors." }] : []),
   ];
 
   const [reportType, setReportType] = useState<ReportType>("operational");

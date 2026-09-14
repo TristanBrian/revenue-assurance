@@ -800,15 +800,16 @@ export async function retryEbillingSync(invoiceId: string): Promise<RetrySyncRes
   return unwrap<RetrySyncResult>(res);
 }
 
-export async function explainAnomalyScore(anomalyId: string): Promise<FraudExplainData> {
+export async function explainAnomalyScore(anomalyId: string, direction: Direction = "inbound"): Promise<FraudExplainData> {
   const url = new URL(`/api/fraud/explain/${encodeURIComponent(anomalyId)}`, API_URL);
+  url.searchParams.set("direction", direction);
   const res = await authFetch(url);
   const body = await unwrap<{ status: string; data: FraudExplainData }>(res);
   return body.data;
 }
 
-export async function fraudChat(message: string, anomalyId?: string): Promise<string> {
-  const res = await authFetch(new URL("/api/fraud/chat", API_URL), {
+export async function fraudChat(message: string, anomalyId?: string, direction: Direction = "inbound"): Promise<string> {
+  const res = await authFetch(new URL(`/api/fraud/chat?direction=${direction}`, API_URL), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, anomaly_id: anomalyId }),

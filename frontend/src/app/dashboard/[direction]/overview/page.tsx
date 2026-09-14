@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ApiError, getInukaCases, getMetrics, getOmcRiskProfile, getGantryLanes } from "@/lib/api";
-import type { InukaCaseSummary, InukaRiskCase, Metrics, OmcRiskProfile as OmcRiskProfileEntry, GantryLane, GantrySummary } from "@/lib/types";
+import { ApiError, getInukaCases, getMetrics, getOmcRiskProfile } from "@/lib/api";
+import type { InukaCaseSummary, InukaRiskCase, Metrics, OmcRiskProfile as OmcRiskProfileEntry } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import { useMateriality } from "@/context/MaterialityContext";
 import type { WorkspaceDirection } from "@/lib/workspace";
@@ -12,11 +12,6 @@ import StatCardGrid from "@/components/StatCardGrid";
 import ExposureRecoveryChart from "@/components/ExposureRecoveryChart";
 import ManagerAlertsCard from "@/components/ManagerAlertsCard";
 import InukaCaseModal from "@/components/InukaCaseModal";
-import ExecutiveKpiGrid from "@/components/ExecutiveKpiGrid";
-import GantryYardGrid from "@/components/GantryYardGrid";
-import VolumeDriftChart from "@/components/VolumeDriftChart";
-import DemurrageLeaderboard from "@/components/DemurrageLeaderboard";
-import CryptographicAuditTool from "@/components/CryptographicAuditTool";
 
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(value);
@@ -62,24 +57,11 @@ export default function OverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [gantryLanes, setGantryLanes] = useState<GantryLane[]>([]);
-  const [gantrySummary, setGantrySummary] = useState<GantrySummary | null>(null);
-
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const canViewMetrics = user?.permissions.includes("view_metrics") ?? false;
+  const canReview = user?.permissions.includes("view_anomaly_table") ?? false;
   const canViewOmcRisk = direction === "inbound" && (user?.permissions.includes("view_omc_risk_profile") ?? false);
-
-  const fetchGantryLanesData = async () => {
-    try {
-      const res = await getGantryLanes();
-      if (res && res.lanes) {
-        setGantryLanes(res.lanes);
-        setGantrySummary(res.summary);
-      }
-    } catch {
-      setGantryLanes([]);
-      setGantrySummary(null);
-    }
-  };
 
   useEffect(() => {
     if (!user) return;
@@ -87,13 +69,16 @@ export default function OverviewPage() {
     setLoading(true);
     setError(null);
 
-    fetchGantryLanesData();
+    setMetrics(null);
+    setCaseSummary(null);
+    setPriorityCases([]);
+    setOmcProfiles([]);
 
     const promises: Promise<unknown>[] = [
       canViewMetrics ? getMetrics(direction === "outbound" ? 100000 : materiality, direction) : Promise.resolve(null),
       canViewOmcRisk ? getOmcRiskProfile(materiality, direction) : Promise.resolve(null),
-      direction === "outbound" ? getInukaCases({ page: 1, pageSize: 5, status: "Critical" }).catch(() => null) : Promise.resolve(null),
-      direction === "outbound" ? getInukaCases({ page: 1, pageSize: 1 }).then((r) => r.summary).catch(() => null) : Promise.resolve(null),
+      direction === "outbound" && canReview ? getInukaCases({ page: 1, pageSize: 5, status: "Critical" }) : Promise.resolve(null),
+      direction === "outbound" && canReview ? getInukaCases({ page: 1, pageSize: 1 }).then((r) => r.summary) : Promise.resolve(null),
     ];
 
     Promise.all(promises)
@@ -107,6 +92,7 @@ export default function OverviewPage() {
         if (riskResult) setOmcProfiles(riskResult as OmcRiskProfileEntry[]);
         if (priorityResult) setPriorityCases((priorityResult as { cases: InukaRiskCase[] }).cases);
         if (summaryResult) setCaseSummary(summaryResult as InukaCaseSummary);
+        setUpdatedAt(new Date());
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -119,7 +105,7 @@ export default function OverviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [user, materiality, direction, canViewMetrics, canViewOmcRisk]);
+  }, [user, materiality, direction, canViewMetrics, canViewOmcRisk, canReview, refreshKey]);
 
   const breakTypes = direction === "inbound" ? INBOUND_BREAK_TYPES : OUTBOUND_BREAK_TYPES;
   const maxBreakLeak = metrics ? Math.max(...breakTypes.map((b) => Number(metrics[b.key] ?? 0)), 1) : 1;
@@ -141,6 +127,7 @@ export default function OverviewPage() {
           <div className="flex items-center gap-2.5 rounded-md border border-border bg-card px-3 py-1.5">
             <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Materiality</span>
             <input
+              aria-label="Minimum material exposure in KES"
               type="range"
               min="0"
               max="1000000"
@@ -154,6 +141,12 @@ export default function OverviewPage() {
         )}
       </header>
 
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <p className="text-muted-foreground" role="status">{loading ? "Updating workspace…" : updatedAt ? `Updated ${updatedAt.toLocaleTimeString("en-KE")} · ${direction === "inbound" ? "Invoice and payment reconciliation" : "Program disbursement controls"}` : "Awaiting data"}</p>
+        <button type="button" onClick={() => setRefreshKey((key) => key + 1)} disabled={loading} className="rounded-lg border border-border bg-card px-4 py-2 font-medium hover:bg-muted disabled:opacity-50">Refresh overview</button>
+      </div>
+
+
       {error && (
         <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-4 text-sm text-status-critical">{error}</div>
       )}
@@ -166,40 +159,26 @@ export default function OverviewPage() {
 
       {metrics && !loading && !error && (
         <div className="flex flex-col gap-6">
-          {/* Executive Control Plane KPI Summary Cards */}
-          {direction === "inbound" && (
-            <ExecutiveKpiGrid
-              totalRevenueProtectedKes={metrics.total_paid_kes ?? 0}
-              gantrySummary={gantrySummary}
-            />
-          )}
-
           <StatCardGrid direction={direction} data={{ metrics, omcProfiles, caseSummary }} />
+      <div className="grid gap-3 sm:grid-cols-3">
+        {(direction === "inbound" ? [
+          { href: "operations", title: "Depot operations", detail: "Loading lanes and metering readiness", permission: "view_metrics" },
+          { href: "anomalies", title: "Review exceptions", detail: "Investigate invoice and payment breaks", permission: "view_anomaly_table" },
+          { href: "reports", title: "Reports & evidence", detail: "Export and verify assurance reports", permission: "export_reports" },
+        ] : [
+          { href: "anomalies", title: "Review program cases", detail: "Prioritize beneficiary payout exceptions", permission: "view_anomaly_table" },
+          { href: "beneficiaries", title: "Beneficiaries", detail: "Trace identity and disbursement records", permission: "view_anomaly_table" },
+          { href: "programs", title: "Programs & pillars", detail: "Explore delivery and program exposure", permission: "view_metrics" },
+        ]).filter((item) => user?.permissions.includes(item.permission)).map((item) => <Link key={item.href} href={`/dashboard/${direction}/${item.href}`} className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/60 hover:bg-primary/5"><span className="flex justify-between font-semibold">{item.title}<span aria-hidden="true">↗</span></span><p className="mt-1 text-sm text-muted-foreground">{item.detail}</p></Link>)}
+      </div>
 
           {direction === "inbound" ? (
             <div className="flex flex-col gap-6">
-              <p className="text-sm text-amber-500" role="status">Gantry lanes are a demo preview; no physical gate controls or demurrage invoices are connected. {gantryLanes.length === 0 ? "Gantry data unavailable." : ""}</p>
-              <GantryYardGrid
-                lanes={gantryLanes}
-                onRefresh={fetchGantryLanesData}
-                loading={loading}
-              />
-
-              {/* Drift Charts & Demurrage Leaderboard */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <VolumeDriftChart />
-                <DemurrageLeaderboard profiles={omcProfiles} />
-              </div>
-
-              {/* Cryptographic Audit & Report Verification Tool */}
-              <CryptographicAuditTool />
-
-              {/* Original Detailed Metrics & Breakdown */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 <div className="lg:col-span-2">
-                  <ExposureRecoveryChart />
+                  <ExposureRecoveryChart key={refreshKey} />
                 </div>
-                <ManagerAlertsCard />
+                {canReview && <ManagerAlertsCard key={refreshKey} />}
               </div>
             </div>
           ) : (

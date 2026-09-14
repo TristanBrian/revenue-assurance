@@ -16,7 +16,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, require_permission, enforce_reconciliation_scope
+from app.core.dependencies import require_workspace_permission, get_db, require_permission, enforce_reconciliation_scope
 from app.models.auth.user import User
 from app.schemas.fraud.detective import OmcRiskDetail
 from app.schemas.fraud.graph import CommunityOut, FraudGraphResponse, NetworkResponse, OmcDepotEdge, OmcDepotNode
@@ -136,7 +136,7 @@ def fraud_graph(
 # ============================================================================
 
 @router.get("/network", response_model=NetworkResponse)
-def get_network(user: User = Depends(require_permission("view_fraud_graph"))):
+def get_network(user: User = Depends(require_workspace_permission("view_fraud_graph", "inbound"))):
     g = graph_engine.build_omc_depot_graph(get_engine())
     nodes = [OmcDepotNode(id=n, type=d.get("type", "unknown")) for n, d in g.nodes(data=True)]
     edges = [
@@ -153,12 +153,12 @@ def get_network(user: User = Depends(require_permission("view_fraud_graph"))):
 
 
 @router.get("/communities", response_model=list[CommunityOut])
-def get_communities(user: User = Depends(require_permission("view_fraud_graph"))):
+def get_communities(user: User = Depends(require_workspace_permission("view_fraud_graph", "inbound"))):
     return graph_engine.detect_risk_communities(get_engine())
 
 
 @router.get("/omc/{omc_id}", response_model=OmcRiskDetail)
-def get_omc_detail(omc_id: str, user: User = Depends(require_permission("view_fraud_graph"))):
+def get_omc_detail(omc_id: str, user: User = Depends(require_workspace_permission("view_fraud_graph", "inbound"))):
     engine = get_engine()
     try:
         features = detective_service.get_omc_risk(engine, omc_id)

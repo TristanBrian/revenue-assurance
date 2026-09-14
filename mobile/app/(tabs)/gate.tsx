@@ -22,7 +22,7 @@ export default function GateControl() {
     const now = new Date().toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     setCheckInTime(now);
     setStatus("IDLE");
-    Alert.alert("Truck Checked In", `Truck ${truckId.trim().toUpperCase()} checked in at gate. Entry time: ${now}`);
+    Alert.alert("Preview check-in", `Truck ${truckId.trim().toUpperCase()} recorded in this preview only. Entry time: ${now}`);
   }
 
   function handleEvaluateGateStatus() {
@@ -32,15 +32,16 @@ export default function GateControl() {
     }
     const metered = parseFloat(meteredVol);
     const invoiced = parseFloat(invoicedVol);
+    if (!Number.isFinite(metered) || !Number.isFinite(invoiced) || metered < 0 || invoiced <= 0) { Alert.alert("Invalid volumes", "Use a non-negative metered quantity and a positive invoiced quantity."); return; }
     const evapTolerance = invoiced * 0.0015; // 0.15%
 
     if (metered > invoiced + evapTolerance) {
       const excess = metered - invoiced;
       setStatus("GATE_HOLD");
-      setReason(`METER VOLUME EXCEEDS INVOICE VOLUME BY +${excess.toLocaleString()} L. Automatic gate lockout active.`);
+      setReason(`METER VOLUME EXCEEDS INVOICE VOLUME BY +${excess.toLocaleString()} L. Preview recommends a hold. No gate command has been sent.`);
     } else {
       setStatus("PASS");
-      setReason("Metered volume aligns with invoiced volume within 0.15% tolerance. Gate clearance granted.");
+      setReason("Metered volume aligns with invoiced volume within 0.15% tolerance. Preview only; no exit authorization has been issued.");
     }
   }
 
@@ -49,16 +50,16 @@ export default function GateControl() {
       <MobileHeader />
       <ScrollView contentContainerStyle={s.content}>
         <Text style={s.kicker}>DEPOT CONTROL PLANE</Text>
-        <Text style={s.title}>Gate Dwell & Hold Control</Text>
+        <Text style={s.title}>Gate & dwell preview</Text>
         <Text style={s.sub}>
-          Track entry/exit timestamps for demurrage calculation and instantly evaluate volume alignment for gate clearance.
+          Demonstration only. Entries are stored in screen memory; 0.15% is an illustrative tolerance. Use the approved depot process for gate clearance.
         </Text>
 
         {/* Instant Gate-Hold / Release Screen Indicator */}
         {status !== "IDLE" && (
           <View style={[s.statusCard, status === "GATE_HOLD" ? s.cardHold : s.cardPass]}>
             <Text style={s.statusBadge}>{status === "GATE_HOLD" ? "🔴 GATE HOLD" : "🟢 PASS"}</Text>
-            <Text style={s.statusTitle}>{status === "GATE_HOLD" ? "DISPATCH Clearance DENIED" : "DISPATCH CLEARANCE GRANTED"}</Text>
+            <Text style={s.statusTitle}>{status === "GATE_HOLD" ? "PREVIEW: HOLD RECOMMENDED" : "PREVIEW: WITHIN TOLERANCE"}</Text>
             <Text style={s.statusReason}>{reason}</Text>
           </View>
         )}

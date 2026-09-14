@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import React from "react";
 import AnomaliesTable from "../components/AnomaliesTable";
 import { getAnomalies, downloadExport } from "../lib/api";
-import { inboundConfig } from "../config/direction-config";
+import { anomaliesConfig } from "../config/direction-config";
 
 vi.mock("../lib/auth-context", () => ({
   useAuth: () => ({
@@ -64,14 +64,14 @@ describe("AnomaliesTable Component", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getAnomalies).mockResolvedValue(mockAnomaliesResult as any);
+    vi.mocked(getAnomalies).mockResolvedValue(mockAnomaliesResult as Awaited<ReturnType<typeof getAnomalies>>);
   });
 
   it("renders search input, filter selects, and multi-format export buttons", async () => {
     render(
       <AnomaliesTable
         direction="inbound"
-        config={inboundConfig.anomalies}
+        config={anomaliesConfig.inbound}
         title="Test Anomalies Title"
       />
     );
@@ -91,7 +91,7 @@ describe("AnomaliesTable Component", () => {
     render(
       <AnomaliesTable
         direction="inbound"
-        config={inboundConfig.anomalies}
+        config={anomaliesConfig.inbound}
       />
     );
 
@@ -111,7 +111,7 @@ describe("AnomaliesTable Component", () => {
     render(
       <AnomaliesTable
         direction="inbound"
-        config={inboundConfig.anomalies}
+        config={anomaliesConfig.inbound}
       />
     );
 

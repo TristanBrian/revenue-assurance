@@ -54,7 +54,7 @@ def inuka_stream_events(limit: int = Query(25, ge=1, le=100), user: User = Depen
 
 
 @router.post("/stream/events")
-def ingest_inuka_stream_event(payload: StreamEventRequest, user: User = Depends(require_permission("view_anomaly_table"))):
+def ingest_inuka_stream_event(payload: StreamEventRequest, user: User = Depends(require_permission("resolve_anomaly"))):
     _user(user)
     allowed = {"Scholarship", "Plus", "Vocational", "Tech"}
     if payload.pillar not in allowed:
@@ -211,7 +211,7 @@ def create_inuka_case_action(
     case_id: str,
     payload: CaseActionRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(require_permission("view_anomaly_table")),
+    user: User = Depends(require_permission("resolve_anomaly")),
 ):
     _user(user)
     case = _find_case(case_id)

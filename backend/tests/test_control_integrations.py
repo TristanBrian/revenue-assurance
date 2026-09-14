@@ -2,10 +2,25 @@
 Unit test suite for Autonomous Control Plane Actions & Enterprise Integration Architecture (Sections 4 & 5).
 """
 
+import pytest
+from types import SimpleNamespace
+from app.core.dependencies import get_current_user
 from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
+
+@pytest.fixture(autouse=True)
+def authorized_operator():
+    previous = app.dependency_overrides.copy()
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(
+        roles=[SimpleNamespace(name="revenue_assurance")],
+        has_permission=lambda code: code in {"view_metrics", "manage_ebilling", "upload_csv", "view_outgoing_data"},
+    )
+    yield
+    app.dependency_overrides.clear()
+    app.dependency_overrides.update(previous)
+
 
 
 def test_gate_lockout_check_pass():
@@ -19,7 +34,9 @@ def test_gate_lockout_check_pass():
     }
     response = client.post("/api/v1/control/lockout-check", json=payload)
     assert response.status_code == 200
-    data = response.json()
+    data = response.json()["Data"]
+    assert data["simulation"] is True
+    assert data["authoritative_gate_decision"] is False
     assert data["status"] == "PASS"
     assert data["lockout_triggered"] is False
 
@@ -35,7 +52,7 @@ def test_gate_lockout_check_hold():
     }
     response = client.post("/api/v1/control/lockout-check", json=payload)
     assert response.status_code == 200
-    data = response.json()
+    data = response.json()["Data"]
     assert data["status"] == "GATE_HOLD"
     assert data["lockout_triggered"] is True
     assert data["variance_l"] == 6500.0
@@ -53,11 +70,8 @@ def test_icms_adjustment_note():
         "resolution_notes": "Volume discrepancy resolved after meter recalibration.",
     }
     response = client.post("/api/v1/control/icms-adjustment-note", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["success"] is True
-    assert data["status"] == "SUBMITTED_TO_ICMS"
-    assert data["tax_adjustment_kes"] > 0
+    assert response.status_code == 501
+    assert response.json().get("Data") is None
 
 
 def test_demurrage_invoice():
@@ -73,11 +87,8 @@ def test_demurrage_invoice():
         "demurrage_rate_per_hour_kes": 2500.0,
     }
     response = client.post("/api/v1/control/demurrage-invoice", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["billable_demurrage_minutes"] == 45
-    assert data["total_demurrage_kes"] == 1875.0
-    assert data["status"] == "ISSUED_TO_SAP"
+    assert response.status_code == 501
+    assert response.json().get("Data") is None
 
 
 def test_sap_idoc_integration():
@@ -98,10 +109,8 @@ def test_sap_idoc_integration():
         ],
     }
     response = client.post("/api/v1/integrations/sap/idoc", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "IDOC_PROCESSED_SUCCESS"
-    assert data["total_value_kes"] == 4947000.0
+    assert response.status_code == 501
+    assert response.json().get("Data") is None
 
 
 def test_scada_meter_pulse():
@@ -116,7 +125,12 @@ def test_scada_meter_pulse():
         "sensor_status": "NORMAL",
     }
     response = client.post("/api/v1/integrations/scada/meter-pulse", json=payload)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "TELEMETRY_RECORDED"
-    assert data["metered_volume_l"] == 34000.0
+    assert response.status_code == 501
+    assert response.json().get("Data") is None
+
+
+@pytest.mark.parametrize("field,value", [("metered_volume_l", -1), ("invoiced_volume_l", 0), ("invoiced_volume_l", -1), ("allowed_evaporation_pct", -1), ("allowed_evaporation_pct", 101)])
+def test_lockout_rejects_invalid_input(field, value):
+    payload = {"dispatch_id": "DSP-1", "truck_id": "DEMO", "omc_name": "Demo", "metered_volume_l": 100, "invoiced_volume_l": 100, "allowed_evaporation_pct": 0}
+    payload[field] = value
+    assert client.post("/api/v1/control/lockout-check", json=payload).status_code == 422

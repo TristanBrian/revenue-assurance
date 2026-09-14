@@ -48,7 +48,7 @@ describe("CsvUploadPanel Component", () => {
     const mockResult = { metrics: {}, anomalies: [] };
     vi.mocked(reconcileUploadWithProgress).mockImplementation(async (_files, _mat, onProgress) => {
       if (onProgress) onProgress(100);
-      return mockResult as any;
+      return mockResult as unknown as Awaited<ReturnType<typeof reconcileUploadWithProgress>>;
     });
 
     const { container } = render(<CsvUploadPanel materiality={100000} onUploaded={mockOnUploaded} />);

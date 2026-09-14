@@ -1,5 +1,7 @@
 "use client";
 
+import { useAuth } from "@/lib/auth-context";
+import { activeNavItemId, canAccessModule, navItems } from "@/lib/workspace";
 import StatCard from "./StatCard";
 import { usePermissionToggleStat } from "@/hooks/usePermissionToggleStat";
 import { overviewConfig, type OverviewStatData } from "@/config/direction-config";
@@ -23,6 +25,7 @@ interface StatCardGridProps {
  * coincidence of both configs currently having 4 entries).
  */
 export default function StatCardGrid({ direction, data }: StatCardGridProps) {
+  const { user } = useAuth();
   const slots = overviewConfig[direction];
   const slot0 = usePermissionToggleStat(slots[0]);
   const slot1 = usePermissionToggleStat(slots[1]);
@@ -30,7 +33,7 @@ export default function StatCardGrid({ direction, data }: StatCardGridProps) {
   const slot3 = usePermissionToggleStat(slots[3]);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {[slot0, slot1, slot2, slot3].map((slot, i) => (
         <StatCard
           key={i}
@@ -40,7 +43,7 @@ export default function StatCardGrid({ direction, data }: StatCardGridProps) {
           notePill={slot.notePill}
           progress={slot.progress?.(data)}
           tone={slot.tone?.(data)}
-          href={slot.href}
+          href={slot.href && navItems.some((item) => item.id === activeNavItemId(slot.href!) && canAccessModule(user, item, direction)) ? slot.href : undefined}
         />
       ))}
     </div>

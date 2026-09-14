@@ -12,6 +12,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { BRAND_CONFIG } from "@/lib/brand-config";
 import {
   navItems,
+  canAccessModule,
   REVIEW_QUEUE_ITEM,
   navLabel,
   activeNavItemId,
@@ -86,11 +87,13 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   // hamburger button) and at lg+ (always docked — see the aside's own
   // classes, which force it open there regardless of this state). One
   // piece of state, no separate "mobile menu" flag.
+  const [moduleSearch, setModuleSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     setSidebarOpen(false);
+    setModuleSearch("");
   }, [pathname]);
 
   useEffect(() => {
@@ -106,11 +109,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    let cancelled = false;
+    setAnomalyCount(0); setCriticalCount(0); setHighRiskCount(0); setFailedSyncCount(0); setDepotAlerts(null);
     if (!user) return;
 
     if (user.permissions.includes("view_metrics")) {
       getMetrics(direction === "outbound" ? 0 : materiality, direction)
         .then((data) => {
+          if (cancelled) return;
           setAnomalyCount(data.metrics.anomaly_count);
           setCriticalCount(data.metrics.critical_count);
         })
@@ -118,8 +124,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     }
 
     if (direction === "inbound" && user.permissions.includes("view_omc_risk_profile")) {
-      getOmcRiskProfile(materiality)
+      getOmcRiskProfile(materiality, "inbound")
         .then((profiles) => {
+          if (cancelled) return;
           setHighRiskCount(profiles.filter((p) => p.risk_level === "High").length);
         })
         .catch(() => {});
@@ -127,15 +134,16 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
     if (direction === "inbound" && user.permissions.includes("manage_ebilling")) {
       getEbillingStatus()
-        .then((status) => setFailedSyncCount(status.failed_count))
+        .then((status) => { if (!cancelled) setFailedSyncCount(status.failed_count); })
         .catch(() => {});
     }
 
     if (direction === "inbound" && user.permissions.includes("view_depot_alerts")) {
       getDepotAlerts()
-        .then((data) => setDepotAlerts({ depotId: data.depot_id, criticalCount: data.critical_count, items: data.items }))
+        .then((data) => { if (!cancelled) setDepotAlerts({ depotId: data.depot_id, criticalCount: data.critical_count, items: data.items }); })
         .catch(() => {});
     }
+    return () => { cancelled = true; };
   }, [user, materiality, direction]);
 
   function handleLogout() {
@@ -147,12 +155,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const visibleItems = [
     ...(canSwitchWorkspace ? [REVIEW_QUEUE_ITEM] : []),
     ...navItems,
-  ].filter((item) => {
-    if (isAdmin) return false;
-    if (item.anyOf && !item.anyOf.some((code) => user?.permissions.includes(code))) return false;
-    if (item.directions && !item.directions.includes(direction)) return false;
-    return true;
-  });
+  ].filter((item) => canAccessModule(user, item, direction));
 
   const canSeeAllAlerts = user?.permissions.includes("view_anomaly_table") ?? false;
   const canSeeDepotAlerts = user?.permissions.includes("view_depot_alerts") ?? false;
@@ -171,8 +174,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       : isInukaManager
         ? "Programme review"
         : "Operations";
-  const SEARCH_RELEVANT_PATHS = ["overview", "anomalies", "leakage"];
-  const showSearch = !isAdmin && activeItemId != null && SEARCH_RELEVANT_PATHS.includes(activeItemId);
+  const showSearch = !isAdmin;
 
   function switchWorkspace(target: WorkspaceDirection) {
     router.push(switchDirectionUrl(activeItemId, target));
@@ -251,6 +253,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             {(["inbound", "outbound"] as const).map((d) => (
               <button
                 key={d}
+                aria-pressed={direction === d}
                 type="button"
                 onClick={() => switchWorkspace(d)}
                 className={`rounded-md px-2.5 py-2 text-xs font-bold transition-colors ${
@@ -264,7 +267,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             ))}
           </div>
         )}
-        <nav className="flex flex-col gap-1">
+        <nav aria-label="Workspace modules" className="flex flex-col gap-1 overflow-y-auto min-h-0 pb-4">
           {isAdmin && (
             <Link
               href="/dashboard/admin"
@@ -290,6 +293,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             return (
               <Link
                 key={item.id}
+                aria-current={active ? "page" : undefined}
                 href={href}
                 title={sidebarCollapsed ? navLabel(item, direction) : undefined}
                 className={`group relative flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-semibold transition-colors ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""} ${
@@ -341,7 +345,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-card focus:p-4">Skip to main content</a>
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         <header className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6 border-b border-border bg-background/80 backdrop-blur-md shrink-0 sticky top-0 z-30">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <button
@@ -356,17 +361,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             </button>
 
             {showSearch ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground max-w-md w-full">
-                <div className="flex items-center gap-2 w-full rounded-md border border-border bg-muted/60 px-3 py-2 text-sm">
-                  <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z" />
-                  </svg>
-                  <span className="truncate text-xs sm:text-sm">{isInukaWorkspace ? "Search beneficiaries, officers, payouts…" : "Search anomalies, OMCs, invoices…"}</span>
-                </div>
+              <div className="relative w-full max-w-md">
+                <input aria-label="Find a workspace module" value={moduleSearch} onChange={(event) => setModuleSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") setModuleSearch(""); }} placeholder="Find a module…" className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm" />
+                {moduleSearch && <div className="absolute top-full z-50 mt-2 w-full rounded-xl border border-border bg-popover p-2 shadow-xl">
+                  {visibleItems.filter((item) => navLabel(item, direction).toLowerCase().includes(moduleSearch.toLowerCase())).map((item) => <Link key={item.id} onClick={() => setModuleSearch("")} href={item.route(direction)} className="block rounded-lg px-3 py-2 text-sm hover:bg-muted">{navLabel(item, direction)}</Link>)}
+                  {!visibleItems.some((item) => navLabel(item, direction).toLowerCase().includes(moduleSearch.toLowerCase())) && <p className="p-3 text-sm text-muted-foreground">No matching modules in this workspace.</p>}
+                </div>}
               </div>
-            ) : (
-              <div />
-            )}
+            ) : <p className="truncate text-sm font-medium text-muted-foreground">{isAdmin ? "Administration" : workspaceLabel}</p>}
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
@@ -486,16 +488,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                   <p className="truncate text-xs sm:text-sm font-medium text-muted-foreground">{workspaceDescription}</p>
                 </div>
               </div>
-              {canSwitchWorkspace && (
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground sm:text-right">
-                  Switch workspace to change the dataset and controls shown.
-                </p>
-              )}
+
             </div>
           </div>
         )}
 
-        <main className="flex-1 min-h-0 overflow-y-auto overflow-x-auto bg-background p-4 md:p-6">{children}</main>
+        <main id="main-content" className="flex-1 min-h-0 overflow-y-auto overflow-x-auto bg-background p-4 md:p-6">{children}</main>
       </div>
     </div>
   );

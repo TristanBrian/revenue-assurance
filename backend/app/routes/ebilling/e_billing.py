@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, BackgroundTasks
 from sqlalchemy.orm import Session
-from app.core.dependencies import get_db, require_permission
+from app.core.dependencies import require_workspace_permission, get_db, require_permission
 from app.models.auth.user import User
 from app.services.audit.audit_service import log_action
 from app.services.ebilling.e_billing import (
@@ -81,7 +81,7 @@ def _get_anomalies(materiality: float = 100000):
 # ============================================================================
 
 @router.get("/e-billing/status", response_model=EBillingStatusResponse)
-async def ebilling_status(_=Depends(require_permission("manage_ebilling"))):
+async def ebilling_status(_=Depends(require_workspace_permission("manage_ebilling", "inbound"))):
     """
     Get E-Billing integration status – uses the service function which matches the schema.
     """
@@ -94,7 +94,7 @@ async def ebilling_status(_=Depends(require_permission("manage_ebilling"))):
 
 
 @router.get("/e-billing/pending", response_model=EBillingPendingResponse)
-async def ebilling_pending(_=Depends(require_permission("manage_ebilling"))):
+async def ebilling_pending(_=Depends(require_workspace_permission("manage_ebilling", "inbound"))):
     """
     Get list of pending invoice IDs (capped at 100) from cached anomalies.
     """
@@ -115,7 +115,7 @@ async def ebilling_pending(_=Depends(require_permission("manage_ebilling"))):
 
 
 @router.get("/e-billing/reconcile", response_model=EBillingReconciliationResponse)
-async def ebilling_reconcile(_=Depends(require_permission("manage_ebilling"))):
+async def ebilling_reconcile(_=Depends(require_workspace_permission("manage_ebilling", "inbound"))):
     """
     Get E-Billing reconciliation dashboard data from cached anomalies.
     """
@@ -151,7 +151,7 @@ async def ebilling_reconcile(_=Depends(require_permission("manage_ebilling"))):
 
 
 @router.get("/e-billing/monitor", response_model=EBillingMonitorResponse)
-async def ebilling_monitor(_=Depends(require_permission("manage_ebilling"))):
+async def ebilling_monitor(_=Depends(require_workspace_permission("manage_ebilling", "inbound"))):
     """
     Get failure rate monitoring (enhanced with cached anomaly status).
     """
@@ -178,7 +178,7 @@ async def ebilling_monitor(_=Depends(require_permission("manage_ebilling"))):
 def sync_ebilling(
     invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending."),
     db: Session = Depends(get_db),
-    user: User = Depends(require_permission("manage_ebilling")),
+    user: User = Depends(require_workspace_permission("manage_ebilling", "inbound")),
 ):
     try:
         result = sync_invoices_to_ebilling(invoice_ids)
@@ -201,7 +201,7 @@ async def sync_ebilling_async(
     background_tasks: BackgroundTasks,
     invoice_ids: list[str] = Query(None, description="Optional list of invoice IDs. If empty, syncs all pending."),
     db: Session = Depends(get_db),
-    user: User = Depends(require_permission("manage_ebilling")),
+    user: User = Depends(require_workspace_permission("manage_ebilling", "inbound")),
 ):
     try:
         task_id = str(uuid.uuid4())
@@ -226,7 +226,7 @@ async def sync_ebilling_async(
 
 
 @router.get("/e-billing/task/{task_id}", response_model=EBillingTaskStatus)
-async def get_task(task_id: str, _=Depends(require_permission("manage_ebilling"))):
+async def get_task(task_id: str, _=Depends(require_workspace_permission("manage_ebilling", "inbound"))):
     status = get_task_status(task_id)
     if status.get("status") == "not_found":
         raise HTTPException(status_code=404, detail="Task not found")
@@ -236,7 +236,7 @@ async def get_task(task_id: str, _=Depends(require_permission("manage_ebilling")
 @router.get("/e-billing/logs", response_model=EBillingLogsResponse)
 async def ebilling_logs(
     limit: int = Query(50, description="Number of log entries to return", ge=1, le=100),
-    _=Depends(require_permission("manage_ebilling")),
+    _=Depends(require_workspace_permission("manage_ebilling", "inbound")),
 ):
     try:
         logs = get_ebilling_sync_logs(limit)
@@ -250,7 +250,7 @@ async def ebilling_logs(
 def retry_ebilling(
     invoice_id: str,
     db: Session = Depends(get_db),
-    user: User = Depends(require_permission("manage_ebilling")),
+    user: User = Depends(require_workspace_permission("manage_ebilling", "inbound")),
 ):
     try:
         result = retry_failed_sync(invoice_id)
@@ -287,7 +287,7 @@ async def kra_webhook(payload: dict = Body(...)):
 async def ebilling_logs_paginated(
     page: int = Query(1, description="Page number", ge=1),
     page_size: int = Query(20, description="Items per page", ge=1, le=100),
-    _=Depends(require_permission("manage_ebilling")),
+    _=Depends(require_workspace_permission("manage_ebilling", "inbound")),
 ):
     try:
         result = get_ebilling_sync_logs_paginated(page, page_size)
@@ -301,7 +301,7 @@ async def ebilling_logs_paginated(
 async def ebilling_pending_paginated(
     page: int = Query(1, description="Page number", ge=1),
     page_size: int = Query(20, description="Items per page", ge=1, le=100),
-    _=Depends(require_permission("manage_ebilling")),
+    _=Depends(require_workspace_permission("manage_ebilling", "inbound")),
 ):
     try:
         result = get_pending_invoices_paginated(page, page_size)
@@ -312,7 +312,7 @@ async def ebilling_pending_paginated(
 
 
 @router.post("/e-billing/cache/refresh", response_model=EBillingCacheRefreshResponse)
-async def refresh_ebilling_cache(_=Depends(require_permission("manage_ebilling"))):
+async def refresh_ebilling_cache(_=Depends(require_workspace_permission("manage_ebilling", "inbound"))):
     try:
         invalidate_total_count_cache()
         return {'status': 'success', 'message': 'Cache invalidated'}

@@ -53,35 +53,12 @@ PERMISSIONS = [
 # | Fraud Graph               | N | N | Y | Y |
 # | Outbound (stipend) data   | N | Y | Y | Y (outbound only) |
 #
-# Depot Supervisor and Revenue Assurance/Manager see inbound (fuel revenue)
-# data; Inuka Manager sees outbound (stipend/disbursement) data — enforced
-# by the frontend's direction toggle (dashboard/layout.tsx), since these
-# view_* permission codes are shared across both directions (see the
-# ROLE_PERMISSIONS comment above for why view_outgoing_data alone isn't a
-# backend-side direction lock).
-#
-# system_admin is scoped ONLY to user/permission control, not
-# revenue-assurance features — deliberately NOT given view_outgoing_data
-# either (Stage 2): that boundary predates the outbound work and granting
-# view_outgoing_data alone wouldn't let system_admin see anything anyway
-# (every route still gates primarily on view_metrics/view_anomaly_table/
-# etc.; view_outgoing_data only matters to a role that already has one of
-# those). Depot Supervisor also deliberately excluded — inbound-only by
-# design (uploads dispatch/invoice/payment CSVs, nothing outbound to see).
-#
-# Inuka Manager (Stage 2): outbound-only, read-only mirror of Manager —
-# same view_*/export_reports shape, minus manage_alerts (Manager-specific
-# broadcast capability) and view_audit (not part of the spec's outbound
-# scope), and explicitly WITHOUT resolve_anomaly — "read-only" per the
-# spec means it can view and export outbound anomalies but never resolve
-# them. Its view_* permissions are the SAME codes inbound roles use
-# (view_metrics, view_anomaly_table, ...) since there's no separate
-# "view_outbound_metrics" etc. — view_outgoing_data is what actually
-# scopes it to outbound data; the frontend additionally hard-locks its
-# direction toggle to outbound (see dashboard/layout.tsx) rather than
-# relying on the backend to refuse an explicit direction=inbound request,
-# since nothing here stops a mixed-permission role from requesting any
-# direction it already has the base view_* permission for.
+# Workspace scope is enforced on the server by enforce_reconciliation_scope
+# and require_workspace_permission, and mirrored by frontend module policy.
+# Depot supervisors are Oil-only. Inuka managers are Inuka-only and read-only.
+# Manager and Revenue Assurance can switch datasets with view_outgoing_data.
+# Only resolve_anomaly permits case mutations; only manage_ebilling permits billing.
+# System administrators administer identities and permissions, not business data.
 # | Feature                | Depot Supervisor | Manager | Revenue Assurance |
 # |-------------------------|:---:|:---:|:---:|
 # | Live Feed                | Y | Y | Y |

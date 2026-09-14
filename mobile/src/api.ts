@@ -158,6 +158,6 @@ export async function submitFieldVerification(payload: FieldVerificationPayload)
   await req("/api/inuka/stream/events", { method: "POST", body: JSON.stringify({ event_type: "verification.captured", pillar: payload.pillar, beneficiary_id: payload.beneficiary_id, source_system: "reconova-mobile-field-app", occurred_at: payload.captured_at, payload }) });
 }
 
-export async function ask(message: string) {
-  return (await req<{ reply: string }>("/api/fraud/chat", { method: "POST", body: JSON.stringify({ message, anomaly_id: null }) })).reply;
+export async function ask(message: string, direction: "inbound" | "outbound" = "inbound") {
+  return (await req<{ reply: string }>(`/api/fraud/chat?direction=${direction}`, { method: "POST", body: JSON.stringify({ message, anomaly_id: null }) })).reply;
 }

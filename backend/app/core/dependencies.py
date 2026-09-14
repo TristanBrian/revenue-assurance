@@ -111,4 +111,14 @@ def enforce_reconciliation_scope(user: User, direction: str) -> str:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inuka accounts are restricted to outbound reconciliation")
     if "depot_supervisor" in role_names and direction != "inbound":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Depot Supervisor accounts are restricted to inbound reconciliation")
+    if direction in {"outbound", "all"} and not user.has_permission("view_outgoing_data"):
+        raise HTTPException(status_code=403, detail="Missing required permission: view_outgoing_data")
     return direction
+
+
+def require_workspace_permission(permission_code: str, direction: str):
+    """Authorize both the operation and its dataset, including direct API calls."""
+    def _check(user: User = Depends(require_permission(permission_code))) -> User:
+        enforce_reconciliation_scope(user, direction)
+        return user
+    return _check

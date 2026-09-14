@@ -2,53 +2,39 @@
 
 @variant dark (&:where(.dark, .dark *));
 
-/* ============================================================================
-   Design tokens
-   Surface/ink scale matches the reference app (sentinel-liard-beta.vercel.app)
-   pixel-for-pixel: shadcn's "neutral" palette — white/near-black cards on a
-   barely-off-white page, black-on-white primary buttons, hairline borders.
-   Status/categorical colors are the dataviz skill's validated palette
-   (references/palette.md) — chosen so severity is never carried by hue alone
-   (every status color ships with an icon + label) and so adjacent categorical
-   colors clear CVD/contrast gates in both modes, not eyeballed.
-   ============================================================================ */
+/* Shared Oil / Inuka design tokens. Semantic status labels accompany color. */
 
 :root {
-  /* Pixel-sampled from the "Direction 3 — Softer Modern SaaS" reference
-     mockup (warm off-white surfaces, warm near-black ink, single red
-     accent) — not the cooler pure-gray/pure-black scale this used to be. */
-  --background: #f7f6f4;
-  --foreground: #26221f;
-  --card: #ffffff;
-  --card-foreground: #26221f;
-  --popover: #ffffff;
-  --popover-foreground: #26221f;
-  --primary: #b3312c;
-  --primary-foreground: #ffffff;
-  --secondary: #f1ede9;
-  --secondary-foreground: #26221f;
-  --muted: #f1ede9;
-  --muted-foreground: #736c67;
-  --accent: #f1ede9;
-  --accent-foreground: #26221f;
-  --border: #e8e3de;
-  --input: #e8e3de;
-  --ring: #b3312c;
+  color-scheme: light;
 
-  /* Sidebar — same reference, sampled directly from its sidebar: a warm
-     near-black (not pure #000) with a reddish-dark active-item highlight
-     and the same #B3312C brand red used everywhere else. Fixed regardless
-     of light/dark mode, same as the reference's own dark sidebar. */
-  --sidebar: #1f1b19;
-  --sidebar-foreground: #f5f2ef;
-  --sidebar-muted-foreground: #b2aeac;
-  --sidebar-border: #322019;
-  --sidebar-accent: #3f201e;
-  --sidebar-primary: #b3312c;
+  --background: #f3f6fb;
+  --foreground: #10233e;
+  --card: #ffffff;
+  --card-foreground: #10233e;
+  --popover: #ffffff;
+  --popover-foreground: #10233e;
+  --primary: #047857;
+  --primary-foreground: #ffffff;
+  --secondary: #e9eff6;
+  --secondary-foreground: #10233e;
+  --muted: #e9eff6;
+  --muted-foreground: #51627a;
+  --accent: #e9eff6;
+  --accent-foreground: #10233e;
+  --border: #d8e2ee;
+  --input: #d8e2ee;
+  --ring: #047857;
+
+
+  --sidebar: #0a192f;
+  --sidebar-foreground: #eaf1fb;
+  --sidebar-muted-foreground: #a9b9ce;
+  --sidebar-border: #25364e;
+  --sidebar-accent: #18394a;
+  --sidebar-primary: #047857;
   --sidebar-primary-foreground: #ffffff;
 
-  /* Status palette (fixed, never themed) — dataviz skill reference palette.
-     Never carries meaning alone: every use pairs the color with an icon/label. */
+
   --status-critical: #d03b3b;
   --status-critical-bg: #fdecec;
   --status-high: #ec835a;
@@ -60,11 +46,11 @@
   --status-info: #2a78d6;
   --status-info-bg: #eaf2fc;
 
-  /* Chart chrome (dataviz skill) */
+
   --chart-surface: #fcfcfb;
   --chart-ink: #0b0b0b;
   --chart-ink-secondary: #52514e;
-  --chart-ink-muted: #898781;
+  --chart-ink-muted: #8297b1;
   --chart-gridline: #e1e0d9;
   --chart-1: #2a78d6;
   --chart-2: #eb6834;
@@ -73,33 +59,33 @@
 }
 
 .dark {
-  /* No dark variant in the reference — same warm undertone, inverted, with
-     the brand red held byte-identical to light mode rather than re-tuned. */
-  --background: #171310;
-  --foreground: #f5f2ef;
-  --card: #221d1a;
-  --card-foreground: #f5f2ef;
-  --popover: #221d1a;
-  --popover-foreground: #f5f2ef;
-  --primary: #b3312c;
-  --primary-foreground: #ffffff;
-  --secondary: #2a2725;
-  --secondary-foreground: #f5f2ef;
-  --muted: #2a2725;
-  --muted-foreground: #b2aeac;
-  --accent: #2a2725;
-  --accent-foreground: #f5f2ef;
-  --border: #33302c;
-  --input: #33302c;
-  --ring: #b3312c;
+  color-scheme: dark;
 
-  --sidebar: #1f1b19;
-  --sidebar-foreground: #f5f2ef;
-  --sidebar-muted-foreground: #b2aeac;
-  --sidebar-border: #322019;
-  --sidebar-accent: #3f201e;
-  --sidebar-primary: #b3312c;
-  --sidebar-primary-foreground: #ffffff;
+  --background: #091426;
+  --foreground: #eaf1fb;
+  --card: #102139;
+  --card-foreground: #eaf1fb;
+  --popover: #102139;
+  --popover-foreground: #eaf1fb;
+  --primary: #34d399;
+  --primary-foreground: #06271f;
+  --secondary: #1b304b;
+  --secondary-foreground: #eaf1fb;
+  --muted: #1b304b;
+  --muted-foreground: #a9b9ce;
+  --accent: #1b304b;
+  --accent-foreground: #eaf1fb;
+  --border: #2c415c;
+  --input: #2c415c;
+  --ring: #34d399;
+
+  --sidebar: #0a192f;
+  --sidebar-foreground: #eaf1fb;
+  --sidebar-muted-foreground: #a9b9ce;
+  --sidebar-border: #25364e;
+  --sidebar-accent: #18394a;
+  --sidebar-primary: #34d399;
+  --sidebar-primary-foreground: #06271f;
 
   --status-critical: #e66767;
   --status-critical-bg: #2a1414;
@@ -107,16 +93,16 @@
   --status-high-bg: #2a1d13;
   --status-medium: #e0ab3b;
   --status-medium-bg: #2a2312;
-  --status-low: #4fc652;
+  --status-low: #34d399;
   --status-low-bg: #12261a;
   --status-info: #3987e5;
   --status-info-bg: #12203a;
 
-  --chart-surface: #1a1a19;
+  --chart-surface: #102139;
   --chart-ink: #ffffff;
-  --chart-ink-secondary: #c3c2b7;
-  --chart-ink-muted: #898781;
-  --chart-gridline: #2c2c2a;
+  --chart-ink-secondary: #b4c5da;
+  --chart-ink-muted: #8297b1;
+  --chart-gridline: #2c415c;
   --chart-1: #3987e5;
   --chart-2: #d95926;
   --chart-3: #199e70;
@@ -254,4 +240,18 @@ label, .field-label {
   font-family: var(--font-inter), Inter, "Segoe UI", Roboto, Arial, sans-serif;
   font-size: 0.875rem; /* 14px */
   font-weight: 500;
+}
+
+/* Consistent reading and keyboard interaction across the assurance workspaces. */
+:where(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+:where(button, a) { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled), select { cursor: pointer; }
+main { scroll-behavior: smooth; }
+main :is(.text-\[10px\], .text-\[11px\]) { font-size: 0.75rem; line-height: 1.5; }
+main table { font-size: 0.875rem; }
+main th { font-weight: 600; }
+main td, main th { padding-top: 0.8rem; padding-bottom: 0.8rem; }
+main tbody tr:hover { background: color-mix(in srgb, var(--primary) 5%, transparent); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }

@@ -87,3 +87,24 @@ Until the operational steps above are implemented, present them as planned work 
 - Actual startup script smoke test: HTTP 200 with PostgreSQL connected and synthetic bootstrap disabled. Empty operational tables still require validated data ingestion; the background graph refresh logs missing dispatch data on an empty database.
 - Final frontend lint and TypeScript checks passed without errors or warnings.
 - Live Fly/Render/Vercel deployment, device testing, browser end-to-end tests, load testing and real ERP/SCADA/KRA connections have not been verified here.
+
+## Workspace and access alignment — September 2026
+
+The executive overview now shows a single four-card summary and a decision-focused chart/queue. Depot lane previews and variance analytics live in **Oil → Depot Operations**. Oil has dedicated **E-Billing** and **Data Import** routes. Inuka has **Beneficiaries**, **Programs & Pillars**, **Field Officers**, **Consent & Privacy**, and its own case queue. Shared analytics and exports receive an explicit workspace. Report verification remains under Reports; the audit trail remains available to permitted Oil oversight roles.
+
+Navigation and direct workspace URLs share the same module policy. Oil-only APIs now enforce the same boundary, including legacy OMC/depot endpoints and integration stubs. Outbound access requires `view_outgoing_data`; Inuka managers stay outbound-only, depot supervisors inbound-only. Case writes and Inuka stream ingestion require `resolve_anomaly`; read-only managers can inspect and export but cannot record actions. Existing roles need no new permissions for this change. Mobile mirrors these restrictions, resets to overview when switching workspaces, and labels the gate calculation as a non-authoritative preview.
+
+The standalone `/api/v1/control` and `/api/v1/integrations` prototypes previously fabricated ERP acknowledgements. They now require scoped authentication. Unimplemented SAP/KRA issuance and SCADA persistence return **501**, with no fake invoice, receipt or telemetry ID. The lockout calculator is explicitly a simulation, validates finite positive invoice quantities, and requires a supplied tolerance. It cannot authorize a physical gate release.
+
+### Stage 3 acceptance checklist for both workspaces
+
+| Deliverable | Evidence available | Acceptance still required |
+| --- | --- | --- |
+| Executive control plane | Separate Oil/Inuka overviews, scoped modules, accessible lane inspector, module search, refresh, mobile responsive layout | Business owners validate metric definitions and source data against their ledger |
+| Quality and resilience | Build/lint/unit/API permission tests; CI PostgreSQL migration checks; DB readiness health check | Successful live pipeline run, external uptime monitor and approved notification delivery |
+| Autonomous linkup | Existing reconciliation/case workflow and simulated billing foundations | Persisted yard events, versioned product/contract policies, idempotent invoice outbox, authenticated telemetry and real delivery receipts |
+| Quantified ROI | Measurement worksheet in this document; exposure and payment values identified separately | Signed baseline/pilot dataset, costs, confirmed prevented losses and collected demurrage; no invented savings |
+| Handover | RUNBOOK.md and WORKSPACE_GUIDE.md with role matrix, navigation, failure semantics and release checks | Named Em-Tech/KPC owners, incident contacts, approved RPO/RTO and witnessed restore drill |
+| Pitch | Six-slide deck and ten-minute demonstration outline | Rehearsal with the deployed system and honest disclosure of simulations |
+
+Do not present Stage 3 as production complete until the acceptance column is satisfied. Inuka is a separate program assurance workflow; physical petroleum, gate, demurrage and KRA features belong only to Oil.

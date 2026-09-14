@@ -4,7 +4,8 @@ Handles automated gate lockout checks, KRA iCMS tax adjustment notes, and automa
 """
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Query, status
+from app.core.dependencies import require_workspace_permission
+from fastapi import Depends, APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/v1/control", tags=["Autonomous Control Plane Actions"])
@@ -14,9 +15,9 @@ class LockoutCheckRequest(BaseModel):
     dispatch_id: str = Field(..., description="Unique dispatch or manifest ID")
     truck_id: str = Field(..., description="Truck registration plate")
     omc_name: str = Field(..., description="Oil Marketing Company name")
-    metered_volume_l: float = Field(..., description="Physical loading arm metered volume in Litres")
-    invoiced_volume_l: float = Field(..., description="Invoiced volume in Litres")
-    allowed_evaporation_pct: float = Field(default=0.15, description="Evaporation tolerance threshold (%)")
+    metered_volume_l: float = Field(..., ge=0, allow_inf_nan=False, description="Physical loading arm metered volume in Litres")
+    invoiced_volume_l: float = Field(..., gt=0, allow_inf_nan=False, description="Invoiced volume in Litres")
+    allowed_evaporation_pct: float = Field(..., ge=0, le=5, allow_inf_nan=False, description="Evaporation tolerance threshold (%)")
 
 
 class LockoutCheckResponse(BaseModel):
@@ -30,6 +31,8 @@ class LockoutCheckResponse(BaseModel):
     lockout_triggered: bool
     reason: str
     action_required: str
+    simulation: bool = True
+    authoritative_gate_decision: bool = False
 
 
 class IcmsAdjustmentNoteRequest(BaseModel):
@@ -77,7 +80,7 @@ class DemurrageInvoiceResponse(BaseModel):
 
 
 @router.post("/lockout-check", response_model=LockoutCheckResponse)
-def check_gate_lockout(req: LockoutCheckRequest):
+def check_gate_lockout(req: LockoutCheckRequest, user=Depends(require_workspace_permission("view_metrics", "inbound"))):
     """
     Automated Gate Lockout API.
     Blocks dispatch clearance if metered_volume > invoiced_volume + allowed_evaporation.
@@ -91,12 +94,12 @@ def check_gate_lockout(req: LockoutCheckRequest):
         gate_status = "GATE_HOLD"
         excess = req.metered_volume_l - max_permitted
         reason = f"Metered volume ({req.metered_volume_l:,.0f} L) exceeds invoiced volume ({req.invoiced_volume_l:,.0f} L) by {variance:,.0f} L (excess beyond {req.allowed_evaporation_pct}% evaporation tolerance: {excess:,.0f} L)."
-        action = "Automated gate barrier lockout active. Dispatch supervisor authorization required."
+        action = "Preview only: proposed hold. No physical gate command was sent."
     else:
         lockout = False
         gate_status = "PASS"
         reason = f"Metered volume ({req.metered_volume_l:,.0f} L) within invoiced threshold ({req.invoiced_volume_l:,.0f} L)."
-        action = "Automated gate clearance granted. Vehicle authorized to exit gantry."
+        action = "Preview only: volume is within the supplied tolerance. This is not exit authorization."
 
     return LockoutCheckResponse(
         status=gate_status,
@@ -113,57 +116,18 @@ def check_gate_lockout(req: LockoutCheckRequest):
 
 
 @router.post("/icms-adjustment-note", response_model=IcmsAdjustmentNoteResponse)
-def issue_icms_adjustment_note(req: IcmsAdjustmentNoteRequest):
+def issue_icms_adjustment_note(req: IcmsAdjustmentNoteRequest, user=Depends(require_workspace_permission("manage_ebilling", "inbound"))):
     """
     Automated KRA iCMS Tax Adjustment Note.
     Triggers an automated API request to KRA iCMS to issue a Credit/Debit Note when volume discrepancies are resolved.
     """
-    if req.adjusted_volume_l <= 0:
-        raise HTTPException(status_code=400, detail="Adjusted volume must be positive")
-
-    vat_rate = 0.16
-    base_amount = req.adjusted_volume_l * req.unit_price_kes
-    tax_adjustment = base_amount * vat_rate
-    import uuid
-    from datetime import datetime, timezone
-
-    note_id = f"KRA-{req.note_type[:3]}-{uuid.uuid4().hex[:8].upper()}"
-    ack_number = f"ACK-iCMS-{uuid.uuid4().hex[:10].upper()}"
-
-    return IcmsAdjustmentNoteResponse(
-        success=True,
-        adjustment_note_id=note_id,
-        kra_ack_number=ack_number,
-        note_type=req.note_type,
-        tax_adjustment_kes=round(tax_adjustment, 2),
-        status="SUBMITTED_TO_ICMS",
-        timestamp=datetime.now(timezone.utc).isoformat(),
-    )
+    raise HTTPException(status_code=501, detail="KRA adjustment submission is not configured. No tax note has been issued.")
 
 
 @router.post("/demurrage-invoice", response_model=DemurrageInvoiceResponse)
-def generate_demurrage_invoice(req: DemurrageInvoiceRequest):
+def generate_demurrage_invoice(req: DemurrageInvoiceRequest, user=Depends(require_workspace_permission("manage_ebilling", "inbound"))):
     """
     Automated Demurrage Invoice Generator.
     Triggers an API call drafting/issuing a SAP/KPC invoice for demurrage the moment a truck exits past free-time SLA.
     """
-    import uuid
-    from datetime import datetime, timezone
-
-    billable_minutes = max(0, req.dwell_time_minutes - req.free_time_sla_minutes)
-    billable_hours = billable_minutes / 60.0
-    total_kes = round(billable_hours * req.demurrage_rate_per_hour_kes, 2)
-
-    inv_id = f"DEM-{uuid.uuid4().hex[:8].upper()}"
-    sap_doc = f"SAP-900{uuid.uuid4().hex[:6].upper()}"
-
-    return DemurrageInvoiceResponse(
-        invoice_id=inv_id,
-        sap_doc_number=sap_doc,
-        truck_id=req.truck_id,
-        omc_name=req.omc_name,
-        billable_demurrage_minutes=billable_minutes,
-        total_demurrage_kes=total_kes,
-        status="ISSUED_TO_SAP",
-        issued_at=datetime.now(timezone.utc).isoformat(),
-    )
+    raise HTTPException(status_code=501, detail="SAP demurrage issuance requires persisted yard events and an approved contract adapter. No invoice has been issued.")

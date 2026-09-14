@@ -451,7 +451,7 @@ export default function AnomaliesTable({ direction, config, scopeParams, title, 
                 )}
 
                 <div className="flex flex-col gap-3 border-t border-zinc-200 dark:border-zinc-800 pt-6">
-                  <FraudExplainPanel anomalyId={selectedAnomaly.dispatch_id} />
+                  <FraudExplainPanel anomalyId={selectedAnomaly.dispatch_id} direction={direction} />
                 </div>
 
                 <div className="flex flex-col gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
@@ -459,7 +459,7 @@ export default function AnomaliesTable({ direction, config, scopeParams, title, 
                     <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Review action</h3>
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">Record what was done next so the case can move between teams without losing context.</p>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_1fr]">
+                  {canResolve ? <>                  <div className="grid gap-3 sm:grid-cols-[minmax(0,12rem)_1fr]">
                     <select value={caseAction} onChange={(event) => setCaseAction(event.target.value)} className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950">
                       <option value="acknowledge">Acknowledge</option>
                       <option value="request_evidence">Request evidence</option>
@@ -471,6 +471,7 @@ export default function AnomaliesTable({ direction, config, scopeParams, title, 
                   <button type="button" onClick={recordCaseAction} disabled={savingCaseAction} className="self-start rounded-lg bg-zinc-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200">
                     {savingCaseAction ? "Recording…" : "Record action"}
                   </button>
+</> : <p className="text-sm text-muted-foreground">Your role has read-only access to this case.</p>}
                   {caseActionMessage && <p className="text-xs text-zinc-500 dark:text-zinc-400">{caseActionMessage}</p>}
                   {caseHistory.length > 0 && (
                     <div className="rounded-lg border border-zinc-200 dark:border-zinc-800">

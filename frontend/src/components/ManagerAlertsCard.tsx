@@ -31,7 +31,7 @@ export default function ManagerAlertsCard() {
 
   useEffect(() => {
     let cancelled = false;
-    getAnomalies(materiality, 1, LIMIT, { status: "Critical" })
+    getAnomalies(materiality, 1, LIMIT, { status: "Critical" }, "inbound")
       .then((data) => {
         if (cancelled) return;
         setItems(data.anomalies);
@@ -58,7 +58,7 @@ export default function ManagerAlertsCard() {
           <p className="mt-0.5 text-[11px] text-muted-foreground">Across every depot</p>
         </div>
         <Link
-          href="/dashboard/anomalies"
+          href="/dashboard/inbound/anomalies"
           className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           View all
@@ -89,7 +89,7 @@ export default function ManagerAlertsCard() {
           {items.map((a) => (
             <Link
               key={a.dispatch_id}
-              href="/dashboard/anomalies"
+              href="/dashboard/inbound/anomalies"
               className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0 transition-colors hover:bg-accent/40 -mx-1 px-1 rounded"
             >
               <div className="flex items-start gap-2.5 min-w-0">

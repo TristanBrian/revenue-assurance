@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { getDefaultDirection, isDirectionAllowed } from "@/lib/workspace";
+import { getDefaultDirection, isDirectionAllowed, activeNavItemId, navItems, canAccessModule } from "@/lib/workspace";
 
 /**
  * Route guard for the whole /dashboard/[direction]/* segment — the route-
@@ -24,9 +24,13 @@ export default function DirectionLayout({ children }: { children: React.ReactNod
   const params = useParams<{ direction: string }>();
   const router = useRouter();
   const direction = params.direction;
+  const pathname = usePathname();
+  const item = navItems.find((module) => module.id === activeNavItemId(pathname));
+  const moduleAllowed = !!item && isDirectionAllowed(user, direction) && canAccessModule(user, item, direction);
 
   useEffect(() => {
     if (loading) return;
+    if (!user) { router.replace("/login"); return; }
     if (user?.roles.includes("system_admin")) {
       router.replace("/dashboard/admin");
       return;
@@ -44,5 +48,6 @@ export default function DirectionLayout({ children }: { children: React.ReactNod
     );
   }
 
+  if (!moduleAllowed) return <section className="rounded-xl border border-border bg-card p-8" role="alert"><h1 className="text-xl font-bold">Module unavailable</h1><p className="mt-2 text-sm text-muted-foreground">This module is outside your workspace or role permissions. Choose an available module from the navigation.</p></section>;
   return <>{children}</>;
 }

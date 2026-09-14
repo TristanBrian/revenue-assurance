@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Truck, Clock, ShieldAlert, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+import AccessibleDialog from "./AccessibleDialog";
 import type { GantryLane } from "@/lib/types";
 
 interface GantryYardGridProps {
@@ -20,7 +21,7 @@ export default function GantryYardGrid({ lanes, onRefresh, loading = false }: Ga
           bg: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30",
           dot: "bg-emerald-500 animate-pulse",
           label: "Green: Clean",
-          desc: "Meter matched invoice. Gate clearance issued.",
+          desc: "Meter matched invoice. Sample clearance recorded.",
           icon: CheckCircle2,
         };
       case "yellow":
@@ -28,7 +29,7 @@ export default function GantryYardGrid({ lanes, onRefresh, loading = false }: Ga
           bg: "bg-amber-500/10 text-amber-500 border-amber-500/30",
           dot: "bg-amber-500 animate-ping",
           label: "Yellow: Demurrage Warning",
-          desc: "Dwell time approaching free-time limit (45 mins).",
+          desc: `Dwell time approaching the ${lane.free_time_limit_mins}-minute free-time limit.`,
           icon: AlertTriangle,
         };
       case "red":
@@ -37,7 +38,7 @@ export default function GantryYardGrid({ lanes, onRefresh, loading = false }: Ga
           bg: "bg-rose-500/10 text-rose-500 border-rose-500/30",
           dot: "bg-rose-500 animate-pulse",
           label: "Red: Hold / Leakage",
-          desc: "Meter volume ≠ Invoice volume. Automated hold triggered.",
+          desc: "Meter volume ≠ Invoice volume. Sample hold indicated.",
           icon: ShieldAlert,
         };
     }
@@ -50,19 +51,19 @@ export default function GantryYardGrid({ lanes, onRefresh, loading = false }: Ga
           <div className="flex items-center gap-2">
             <Truck className="w-5 h-5 text-primary" />
             <h3 className="text-xl font-extrabold text-foreground tracking-tight">
-              Live Depot & Gantry Yard Control Visualization
+              Loading lanes
             </h3>
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 font-medium">
-            Real-time loading lane status (Gantry Lanes 1–6) & automated gate clearance holds
+            Select a lane to inspect its sample meter, invoice and dwell-time records.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-xs sm:text-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
             <span className="flex items-center gap-1.5 text-emerald-500 font-bold bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              Clean (Clean Gate)
+              Matched
             </span>
             <span className="flex items-center gap-1.5 text-amber-500 font-bold bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20">
               <span className="w-2 h-2 rounded-full bg-amber-500" />
@@ -70,7 +71,7 @@ export default function GantryYardGrid({ lanes, onRefresh, loading = false }: Ga
             </span>
             <span className="flex items-center gap-1.5 text-rose-500 font-bold bg-rose-500/10 px-2.5 py-1 rounded border border-rose-500/20">
               <span className="w-2 h-2 rounded-full bg-rose-500" />
-              Hold Triggered
+              Hold preview
             </span>
           </div>
 
@@ -95,10 +96,12 @@ export default function GantryYardGrid({ lanes, onRefresh, loading = false }: Ga
           const delta = lane.meter_volume_l - lane.invoiced_volume_l;
 
           return (
-            <div
+            <button
+              type="button"
+              aria-label={`Inspect ${lane.lane_name}: ${statusInfo.label}`}
               key={lane.lane_id}
               onClick={() => setSelectedLane(lane)}
-              className={`p-4 rounded-xl border transition-all duration-200 cursor-pointer hover:scale-[1.01] ${
+              className={`text-left min-w-0 p-4 rounded-xl border transition-all duration-200 cursor-pointer hover:scale-[1.01] ${
                 lane.status === "red"
                   ? "border-rose-500/40 bg-rose-500/5 shadow-rose-500/5"
                   : lane.status === "yellow"
@@ -157,14 +160,14 @@ export default function GantryYardGrid({ lanes, onRefresh, loading = false }: Ga
                   <span>{lane.automated_hold_reason}</span>
                 </div>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
 
       {/* Selected Lane Inspector Modal */}
       {selectedLane && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <AccessibleDialog label={`${selectedLane.lane_name} inspector`} onClose={() => setSelectedLane(null)}>
           <div className="bg-card border border-border rounded-xl max-w-md w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-border">
               <div>
@@ -172,6 +175,7 @@ export default function GantryYardGrid({ lanes, onRefresh, loading = false }: Ga
                 <p className="text-xs text-muted-foreground">Truck {selectedLane.current_truck_id} • {selectedLane.omc_name}</p>
               </div>
               <button
+                aria-label="Close lane inspector"
                 onClick={() => setSelectedLane(null)}
                 className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground text-sm font-bold"
               >
@@ -200,7 +204,7 @@ export default function GantryYardGrid({ lanes, onRefresh, loading = false }: Ga
               <div className="flex justify-between p-2 rounded bg-muted/40">
                 <span className="text-muted-foreground">Volume Variance Delta:</span>
                 <span className={`font-mono font-bold ${selectedLane.meter_volume_l - selectedLane.invoiced_volume_l > 0 ? "text-rose-500" : "text-emerald-500"}`}>
-                  {selectedLane.meter_volume_l - selectedLane.invoiced_volume_l > 0 ? `+${(selectedLane.meter_volume_l - selectedLane.invoiced_volume_l).toLocaleString()} Liters` : "0 Liters (Matched)"}
+                  {`${selectedLane.meter_volume_l - selectedLane.invoiced_volume_l > 0 ? "+" : ""}${(selectedLane.meter_volume_l - selectedLane.invoiced_volume_l).toLocaleString()} Liters`}
                 </span>
               </div>
 
@@ -212,7 +216,7 @@ export default function GantryYardGrid({ lanes, onRefresh, loading = false }: Ga
               {selectedLane.automated_hold_reason && (
                 <div className="p-3 rounded border border-rose-500/30 bg-rose-500/10 text-rose-400 font-medium">
                   <div className="font-bold mb-1 flex items-center gap-1">
-                    <ShieldAlert className="w-4 h-4" /> Automated Hold Triggered
+                    <ShieldAlert className="w-4 h-4" /> Automated Hold preview
                   </div>
                   <p>{selectedLane.automated_hold_reason}</p>
                 </div>
@@ -228,7 +232,7 @@ export default function GantryYardGrid({ lanes, onRefresh, loading = false }: Ga
               </button>
             </div>
           </div>
-        </div>
+        </AccessibleDialog>
       )}
     </div>
   );

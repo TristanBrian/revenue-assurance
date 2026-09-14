@@ -6,7 +6,8 @@ and SCADA Telemetry Webhook ingestion for real-time loading meter pulses across 
 
 from typing import List, Optional
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Header, status
+from app.core.dependencies import require_workspace_permission
+from fastapi import Depends, APIRouter, HTTPException, Header, status
 from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/api/v1/integrations", tags=["KPC Enterprise Integration Architecture"])
@@ -59,43 +60,18 @@ class ScadaMeterPulseResponse(BaseModel):
 
 
 @router.post("/sap/idoc", response_model=SapIdocResponse)
-def receive_sap_idoc(payload: SapInvoicePayload, x_sap_client: Optional[str] = Header("100")):
+def receive_sap_idoc(payload: SapInvoicePayload, x_sap_client: Optional[str] = Header("100"), user=Depends(require_workspace_permission("manage_ebilling", "inbound"))):
     """
     SAP ERP Integration Adapter (SAP SD / MM).
     REST/OData interface stub mimicking SAP IDocs for automated sync of Invoices, Delivery Orders, and Credit Notes.
     """
-    import uuid
-    total_val = sum(i.volume_litres * i.unit_price_kes for i in payload.items)
-    doc_num = f"SAP-DOC-{uuid.uuid4().hex[:8].upper()}"
-
-    return SapIdocResponse(
-        status="IDOC_PROCESSED_SUCCESS",
-        idoc_num=payload.sap_idoc_num,
-        sap_billing_document=doc_num,
-        total_value_kes=round(total_val, 2),
-        acknowledged_at=datetime.now(timezone.utc).isoformat(),
-    )
+    raise HTTPException(status_code=501, detail="SAP IDoc persistence and processing are not configured. No document has been processed.")
 
 
 @router.post("/scada/meter-pulse", response_model=ScadaMeterPulseResponse)
-def ingest_scada_meter_pulse(payload: ScadaMeterPulsePayload):
+def ingest_scada_meter_pulse(payload: ScadaMeterPulsePayload, user=Depends(require_workspace_permission("upload_csv", "inbound"))):
     """
     SCADA & Loading Meter Telemetry Adapter.
     Supports MQTT / REST webhook ingestion of real-time flow meter pulses directly from depot gantries (Mombasa, Nakuru, Eldoret, Kisumu).
     """
-    import uuid
-    valid_depots = ["Mombasa", "Nakuru", "Eldoret", "Kisumu", "Nairobi"]
-    if not any(d.lower() in payload.depot_id.lower() for d.raw in [payload.depot_id] for d in valid_depots):
-        # Allow any formatted depot string while logging
-        pass
-
-    telemetry_id = f"TEL-{uuid.uuid4().hex[:8].upper()}"
-
-    return ScadaMeterPulseResponse(
-        status="TELEMETRY_RECORDED",
-        telemetry_id=telemetry_id,
-        depot_id=payload.depot_id,
-        gantry_lane=payload.gantry_lane,
-        metered_volume_l=payload.accumulated_volume_l,
-        recorded_at=datetime.now(timezone.utc).isoformat(),
-    )
+    raise HTTPException(status_code=501, detail="SCADA persistence is not configured. No telemetry has been recorded.")

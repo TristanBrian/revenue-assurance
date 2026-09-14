@@ -13,7 +13,7 @@ import io
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.core.dependencies import require_permission
+from app.core.dependencies import require_workspace_permission, require_permission
 from app.models.auth.user import User
 from app.schemas.fraud.detective import OmcRiskFeatures
 from app.services.fraud import detective_service
@@ -23,14 +23,14 @@ router = APIRouter()  # prefix="/api/detective" and tags supplied by main.py's i
 
 
 @router.get("/risk-features", response_model=list[OmcRiskFeatures])
-async def list_risk_features(user: User = Depends(require_permission("view_risk_analytics"))):
+async def list_risk_features(user: User = Depends(require_workspace_permission("view_risk_analytics", "inbound"))):
     """The primary "give me the raw table" endpoint — every OMC's risk features."""
     df = detective_service.get_all_omc_risk_features(get_engine())
     return df.to_dict(orient="records")
 
 
 @router.get("/risk-features/export")
-async def export_risk_features(user: User = Depends(require_permission("view_risk_analytics"))):
+async def export_risk_features(user: User = Depends(require_workspace_permission("view_risk_analytics", "inbound"))):
     """Same data as CSV — for an analyst who wants to open findings in
     Excel or load them into their own pandas/plotting script outside this
     app. Same StreamingResponse pattern as /reconcile/export; bypasses
@@ -47,7 +47,7 @@ async def export_risk_features(user: User = Depends(require_permission("view_ris
 
 
 @router.get("/risk-features/{omc_id}", response_model=OmcRiskFeatures)
-async def get_risk_features(omc_id: str, user: User = Depends(require_permission("view_risk_analytics"))):
+async def get_risk_features(omc_id: str, user: User = Depends(require_workspace_permission("view_risk_analytics", "inbound"))):
     try:
         return detective_service.get_omc_risk(get_engine(), omc_id)
     except ValueError:

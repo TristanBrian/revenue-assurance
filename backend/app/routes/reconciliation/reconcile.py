@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from app.core.dependencies import get_db, require_permission, enforce_reconciliation_scope
+from app.core.dependencies import require_workspace_permission, get_db, require_permission, enforce_reconciliation_scope
 from app.models.auth.user import User
 from app.services.reconciliation.reconciliation import (
     run_reconciliation,
@@ -74,7 +74,7 @@ def _anomaly_exists(dispatch_id: str, direction: str) -> bool:
 @router.get("/reconcile/trend")
 def reconcile_trend(
     days: int = Query(30, description="Rolling window size in days", ge=1, le=90),
-    _: User = Depends(require_permission("view_metrics")),
+    _: User = Depends(require_workspace_permission("view_metrics", "inbound")),
 ):
     try:
         return {"days": days, "series": get_exposure_recovery_trend(days=days)}
@@ -84,7 +84,7 @@ def reconcile_trend(
 
 
 @router.get("/reconcile/depot-alerts")
-def reconcile_depot_alerts(user: User = Depends(require_permission("view_depot_alerts"))):
+def reconcile_depot_alerts(user: User = Depends(require_workspace_permission("view_depot_alerts", "inbound"))):
     if not user.depot_id:
         raise HTTPException(status_code=409, detail="No depot assigned to this account yet.")
     try:
@@ -95,7 +95,7 @@ def reconcile_depot_alerts(user: User = Depends(require_permission("view_depot_a
 
 
 @router.get("/reconcile/depot-risk")
-def reconcile_depot_risk(_: User = Depends(require_permission("view_heatmap"))):
+def reconcile_depot_risk(_: User = Depends(require_workspace_permission("view_heatmap", "inbound"))):
     try:
         return {"depots": get_depot_risk_summary()}
     except Exception as e:
@@ -104,7 +104,7 @@ def reconcile_depot_risk(_: User = Depends(require_permission("view_heatmap"))):
 
 
 @router.get("/reconcile/omc-depot-map")
-def reconcile_omc_depot_map(_: User = Depends(require_permission("view_heatmap"))):
+def reconcile_omc_depot_map(_: User = Depends(require_workspace_permission("view_heatmap", "inbound"))):
     try:
         return {"omcs": get_omc_depot_map()}
     except Exception as e:
@@ -115,7 +115,7 @@ def reconcile_omc_depot_map(_: User = Depends(require_permission("view_heatmap")
 @router.get("/reconcile/gantry-lanes")
 def reconcile_gantry_lanes(
     db: Session = Depends(get_db),
-    _: User = Depends(require_permission("view_metrics")),
+    _: User = Depends(require_workspace_permission("view_metrics", "inbound")),
 ):
     """
     Returns synthetic demo loading status for Gantry Lanes 1 to 6.
@@ -516,7 +516,7 @@ def reconcile_upload(
     materiality: float = Query(100000, description="Minimum leakage amount to flag (KSh)"),
     page: int = Query(1, description="Page number", ge=1),
     page_size: int = Query(20, description="Items per page", ge=1, le=100),
-    user: User = Depends(require_permission("upload_csv")),
+    user: User = Depends(require_workspace_permission("upload_csv", "inbound")),
 ):
     try:
         # --- Read CSVs ---
@@ -640,7 +640,7 @@ def reconcile_upload(
 # ============================================================================
 
 @router.get("/reconcile/template/{file_type}")
-async def download_template(file_type: str, _: User = Depends(require_permission("upload_csv"))):
+async def download_template(file_type: str, _: User = Depends(require_workspace_permission("upload_csv", "inbound"))):
     if file_type not in ["dispatches", "invoices", "payments"]:
         raise HTTPException(400, "Invalid file type.")
     if file_type == "dispatches":
@@ -708,7 +708,7 @@ def create_anomaly_action(
     payload: AnomalyActionRequest,
     direction: str = Query("all", description="inbound | outbound | all"),
     db: Session = Depends(get_db),
-    user: User = Depends(require_permission("view_anomaly_table")),
+    user: User = Depends(require_permission("resolve_anomaly")),
 ):
     enforce_reconciliation_scope(user, direction)
     if not _anomaly_exists(dispatch_id, direction):
@@ -729,7 +729,7 @@ def create_anomaly_action(
 # ============================================================================
 
 @router.post("/reconcile/sync", response_model=SyncAnomaliesResponse)
-def sync_anomalies(db: Session = Depends(get_db), user: User = Depends(require_permission("manage_ebilling"))):
+def sync_anomalies(db: Session = Depends(get_db), user: User = Depends(require_workspace_permission("manage_ebilling", "inbound"))):
     try:
         result = run_reconciliation()
         pending = [a for a in result.get('anomalies', []) if a.get('ebilling_status') == 'Pending']
@@ -755,7 +755,7 @@ async def update_anomaly(
                     "Feeds the fraud-scoring layer's retraining loop.",
     ),
     db: Session = Depends(get_db),
-    user: User = Depends(require_permission("resolve_anomaly")),
+    user: User = Depends(require_workspace_permission("resolve_anomaly", "inbound")),
 ):
     try:
         result = update_anomaly_status(
