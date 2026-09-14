@@ -12,9 +12,9 @@ import StatCardGrid from "@/components/StatCardGrid";
 import ExposureRecoveryChart from "@/components/ExposureRecoveryChart";
 import ManagerAlertsCard from "@/components/ManagerAlertsCard";
 import InukaCaseModal from "@/components/InukaCaseModal";
-import ExecutiveKPIs from "@/components/ExecutiveKPIs";
-import GantryYardControl from "@/components/GantryYardControl";
-import VarianceDrift from "@/components/VarianceDrift";
+import { ExecutiveKPIs } from "@/components/ExecutiveKPIs";
+import { GantryYardControl } from "@/components/GantryYardControl";
+import { VarianceDrift } from "@/components/VarianceDrift";
 import LiveFeed from "@/components/LiveFeed";
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(value);
@@ -59,6 +59,7 @@ export default function OverviewPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [omcProfiles, setOmcProfiles] = useState<OmcRiskProfileEntry[]>([]);
   const [caseSummary, setCaseSummary] = useState<InukaCaseSummary | null>(null);
+  const [priorityCases, setPriorityCases] = useState<InukaRiskCase[]>([]);
   const [selectedCase, setSelectedCase] = useState<InukaRiskCase | null>(null);
   const [qualityScore, setQualityScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,6 +70,7 @@ export default function OverviewPage() {
   const canViewMetrics = user?.permissions.includes("view_metrics") ?? false;
   const canReview = user?.permissions.includes("view_anomaly_table") ?? false;
   const canViewOmcRisk = direction === "inbound" && (user?.permissions.includes("view_omc_risk_profile") ?? false);
+  const canViewLiveFeed = user?.permissions.includes("view_live_feed") ?? false;
 
   useEffect(() => {
     if (!user) return;
@@ -116,6 +118,7 @@ export default function OverviewPage() {
 
   const breakTypes = direction === "inbound" ? INBOUND_BREAK_TYPES : OUTBOUND_BREAK_TYPES;
   const maxBreakLeak = metrics ? Math.max(...breakTypes.map((b) => Number(metrics[b.key] ?? 0)), 1) : 1;
+  const sortedOmcs = [...omcProfiles].sort((a, b) => b.leakage_kes - a.leakage_kes);
 
   const eyebrow = direction === "inbound" ? "KPC ORDER-TO-CASH" : "INUKA PROGRAM ASSURANCE";
   const title = direction === "inbound" ? "Executive Dashboard" : "Inuka Disbursement Assurance";
