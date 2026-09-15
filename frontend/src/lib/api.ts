@@ -39,7 +39,7 @@ import type {
   UpdateUserPayload,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 // Plain (non-HttpOnly) cookie, set client-side after login — readable by
 // proxy.ts for the redirect-if-missing check, and by authFetch below to
@@ -146,7 +146,7 @@ async function parseErrorDetail(res: Response): Promise<string> {
 
 /** fetch() wrapper that attaches the bearer token when one is present. Every
  * authenticated call below routes through this instead of raw fetch(). */
-async function authFetch(input: string | URL, init: RequestInit = {}): Promise<Response> {
+export async function authFetch(input: string | URL, init: RequestInit = {}): Promise<Response> {
   const token = getAuthToken();
   const headers = new Headers(init.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);

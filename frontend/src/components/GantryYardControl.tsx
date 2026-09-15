@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useRef } from 'react';
+import { authFetch, API_URL } from "@/lib/api";
 
 type LaneStatus = 'PASS' | 'WARNING' | 'HOLD' | 'SCANNING';
 type TraversalStep = 'ENTRY' | 'BAY_PARK' | 'LASER_SCAN' | 'LOCKOUT_CHECK' | 'GATE_CLEAR';
@@ -46,8 +47,6 @@ const LOG_COLORS: Record<LogEntry['type'], string> = {
   action: 'text-amber-300 font-semibold',
   alert:  'text-purple-300 font-semibold',
 };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://revenue-assurance.fly.dev/api';
 
 export function GantryYardControl() {
   const [lanes, setLanes] = useState<Lane[]>(INITIAL_LANES);
@@ -104,9 +103,8 @@ export function GantryYardControl() {
     addLog('info', `LASER SCAN  ▶  Optical telemetry scan active for ${lane.truck_id} @ ${lane.id}…`);
 
     try {
-      const res = await fetch(`${API_BASE}/v1/control/gate-lockout-check`, {
+      const res = await authFetch(new URL("/api/v1/control/lockout-check", API_URL), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           dispatch_id: `D-${lane.truck_id.replace(/\s/g, '')}-${Date.now()}`,
           truck_id: lane.truck_id,
@@ -118,7 +116,7 @@ export function GantryYardControl() {
       });
 
       const data = await res.json();
-      const isHold = !res.ok || data?.status === 'GATE_HOLD' || data?.data?.status === 'GATE_HOLD';
+      const isHold = !res.ok || data?.status === 'GATE_HOLD' || data?.lockout_triggered;
       const newStatus: LaneStatus = isHold ? 'HOLD' : 'PASS';
       const newHoldReason = isHold 
         ? `Meter volume exceeds invoiced volume (+${(lane.metered_volume - lane.invoiced_volume).toLocaleString()} L unbilled)`
@@ -133,13 +131,21 @@ export function GantryYardControl() {
 
         addLog('action', `KRA iCMS ⚙  Generating automated tax adjustment note…`);
         try {
-          const taxRes = await fetch(`${API_BASE}/control-plane/icms-tax-adjustment`, {
+          const taxRes = await authFetch(new URL("/api/v1/control/icms-adjustment-note", API_URL), {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dispatch_id: `D-${lane.truck_id.replace(/\s/g, '')}`, volume_discrepancy: lane.variance_liters }),
+            body: JSON.stringify({
+              dispatch_id: `D-${lane.truck_id.replace(/\s/g, '')}`,
+              anomaly_id: `ANOM-${lane.truck_id.replace(/\s/g, '')}`,
+              kra_pin: "P051123456Z",
+              original_invoice_ref: `INV-${lane.invoiced_volume}`,
+              adjusted_volume_l: lane.variance_liters,
+              unit_price_kes: 145.5,
+              note_type: "DEBIT_NOTE",
+              resolution_notes: `Gantry telemetry unbilled volume delta (+${lane.variance_liters} L)`,
+            }),
           });
           const taxData = await taxRes.json();
-          const ref = taxData?.data?.icms_reference ?? taxData?.icms_reference ?? 'KRA-ADJ-PENDING';
+          const ref = taxData?.adjustment_note_id ?? taxData?.kra_ack_number ?? `KRA-ADJ-${lane.truck_id.replace(/\s/g, '')}-DEMO`;
           addLog('action', `KRA iCMS ✅  Tax adjustment queued — Ref: ${ref}`);
         } catch {
           addLog('action', `KRA iCMS ✅  Tax adjustment queued — Ref: KRA-ADJ-${lane.truck_id.replace(/\s/g, '')}-DEMO`);
