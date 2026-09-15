@@ -77,3 +77,5 @@ backend/flowguard.egg-info/
 CLAUDE.md
 .claude
 node_modules
+.vercel
+.env*

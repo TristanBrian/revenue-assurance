@@ -51,9 +51,9 @@ export default function RootLayout({
         <Script id="theme-init" strategy="beforeInteractive">
           {THEME_INIT_SCRIPT}
         </Script>
-        {process.env.NEXT_PUBLIC_ENABLE_CHATBASE === "true" && <Script id="chatbase-init" strategy="afterInteractive">
+        <Script id="chatbase-init" strategy="afterInteractive">
           {CHATBASE_INIT_SCRIPT}
-        </Script>}
+        </Script>
         <ThemeProvider>
           <AuthProvider>
             <DirectionProvider>  {/* <-- ADD THIS */}

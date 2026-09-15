@@ -40,23 +40,6 @@ function BellIcon() {
   );
 }
 
-const THEME_ICONS: Record<"light" | "dark" | "system", React.ReactNode> = {
-  light: (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.364 17.636l-.707.707M17.636 17.636l.707-.707M6.364 6.364l.707-.707M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
-  ),
-  dark: (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-    </svg>
-  ),
-  system: (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-    </svg>
-  ),
-};
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading, logout } = useAuth();
@@ -80,7 +63,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const [criticalCount, setCriticalCount] = useState<number>(0);
   const [highRiskCount, setHighRiskCount] = useState<number>(0);
   const [failedSyncCount, setFailedSyncCount] = useState<number>(0);
-  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false); // kept for type-safety
+
   const [depotAlerts, setDepotAlerts] = useState<{ depotId: string; criticalCount: number; items: Anomaly[] } | null>(null);
   const [depotAlertsOpen, setDepotAlertsOpen] = useState(false);
   // Drives the sidebar both below lg (fixed overlay drawer, toggled by the
@@ -435,38 +419,23 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               </div>
             )}
 
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setThemeMenuOpen((o) => !o)}
-                onBlur={() => setTimeout(() => setThemeMenuOpen(false), 150)}
-                title="Theme"
-                className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              >
-                {THEME_ICONS[theme]}
-              </button>
-              {themeMenuOpen && (
-                <div className="absolute right-0 mt-1 w-36 rounded-md border border-border bg-popover shadow-lg py-1 z-40">
-                  {(["light", "dark", "system"] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => {
-                        setTheme(mode);
-                        setThemeMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-xs sm:text-sm capitalize transition-colors ${
-                        theme === mode
-                          ? "text-foreground font-semibold bg-accent"
-                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                      }`}
-                    >
-                      {THEME_ICONS[mode]}
-                      {mode}
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div className="flex items-center rounded-full border border-border bg-muted p-0.5 gap-0.5 text-xs font-semibold shadow-sm">
+              {([["light", "☀️"], ["dark", "🌙"], ["system", "🖥"]] as const).map(([mode, icon]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setTheme(mode)}
+                  title={`${mode} mode`}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full transition-all duration-200 capitalize ${
+                    theme === mode
+                      ? "bg-background text-foreground shadow"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <span>{icon}</span>
+                  <span className="hidden sm:inline">{mode}</span>
+                </button>
+              ))}
             </div>
           </div>
         </header>
