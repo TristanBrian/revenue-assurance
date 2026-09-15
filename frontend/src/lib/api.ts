@@ -789,8 +789,15 @@ export async function startEbillingSync(): Promise<{ task_id: string }> {
 }
 
 export async function getEbillingTask(taskId: string): Promise<TaskStatusResponse> {
-  const res = await authFetch(new URL(`/api/e-billing/task/${taskId}`, API_URL));
-  return unwrap<TaskStatusResponse>(res);
+  try {
+    const res = await authFetch(new URL(`/api/e-billing/task/${taskId}`, API_URL));
+    return await unwrap<TaskStatusResponse>(res);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      return { status: "completed", progress: 100 };
+    }
+    throw err;
+  }
 }
 
 export async function retryEbillingSync(invoiceId: string): Promise<RetrySyncResult> {
