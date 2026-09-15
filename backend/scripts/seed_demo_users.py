@@ -25,7 +25,9 @@ from app.core.password_policy import normalize_email
 from app.core.security import hash_password
 from app.models.auth.role import Role
 from app.models.auth.user import User
+from app.models.reconciliation.anomaly_resolution import AnomalyResolution
 from app.utils.db_connection import SessionLocal
+from datetime import datetime, timezone
 
 DEMO_PASSWORD = "demo-pass-123"
 
@@ -74,6 +76,37 @@ def seed():
                 user.roles = [role]
             db.commit()
             print(f"Reset password/role/depot: {email}")
+    finally:
+        db.close()
+
+    # Give the Revenue Assurance demo account a small, stable working set.
+    # This is intentionally best-effort: a fresh identity-only database may
+    # not have ETL tables yet, but user seeding must still succeed.
+    db = SessionLocal()
+    try:
+        ra = db.query(User).filter(User.email == "revenue_assurance@kpc-demo.co.ke").first()
+        if ra:
+            try:
+                from app.services.reconciliation.reconciliation import run_combined_reconciliation
+                cases = run_combined_reconciliation(direction="inbound", materiality=0).get("anomalies", [])
+                open_cases = [c for c in cases if c.get("status") != "Reconciled"][:25]
+                now = datetime.now(timezone.utc)
+                for case in open_cases:
+                    dispatch_id = case.get("dispatch_id")
+                    if not dispatch_id:
+                        continue
+                    state = db.query(AnomalyResolution).filter(AnomalyResolution.dispatch_id == dispatch_id).first()
+                    if state is None:
+                        db.add(AnomalyResolution(dispatch_id=dispatch_id, status="Assigned", assigned_to_user_id=ra.id, assigned_at=now, updated_at=now))
+                    elif state.assigned_to_user_id is None and not state.escalated:
+                        state.assigned_to_user_id = ra.id
+                        state.assigned_at = now
+                        state.updated_at = now
+                db.commit()
+                print(f"Seeded {len(open_cases)} Revenue Assurance review assignments")
+            except Exception as assignment_err:
+                db.rollback()
+                print(f"Skipped review assignments (data may not be loaded yet): {assignment_err}")
     finally:
         db.close()
 

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.core.dependencies import require_workspace_permission, get_db, require_permission, enforce_reconciliation_scope
 from app.models.auth.user import User
+from app.models.reconciliation.anomaly_resolution import AnomalyResolution
 from app.services.reconciliation.reconciliation import (
     run_reconciliation,
     run_reconciliation_on_dataframes,
@@ -460,6 +461,57 @@ def reconcile_anomalies(
     except Exception as e:
         logger.error(f"Reconciliation anomalies failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/reconcile/review-queue", response_model=AnomalyTableResponse)
+def review_queue(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user: User = Depends(require_permission("view_review_queue")),
+    db: Session = Depends(get_db),
+):
+    """Return only the operational cases this signed-in user is allowed to review.
+
+    Scope is deliberately calculated here, after authentication, rather than in
+    the browser: officers get assigned cases, managers get unassigned or
+    escalated cases, and depot supervisors get their own depot. System admins
+    have no review-queue permission and therefore cannot reach this endpoint.
+    """
+    role_names = {role.name for role in user.roles}
+    if "system_admin" in role_names or not (role_names & {"revenue_assurance", "manager", "depot_supervisor"}):
+        raise HTTPException(status_code=403, detail="This account has no operational review queue")
+    if "depot_supervisor" in role_names and not user.depot_id:
+        raise HTTPException(status_code=409, detail="No depot assigned to this account yet.")
+
+    try:
+        result = run_combined_reconciliation(direction="inbound", materiality=0)
+        anomalies = [a for a in result.get("anomalies", []) if a.get("status") != "Reconciled"]
+        states = {r.dispatch_id: r for r in db.query(AnomalyResolution).all()}
+
+        if "depot_supervisor" in role_names:
+            anomalies = [a for a in anomalies if a.get("depot") == user.depot_id]
+            scope = f"Cases for {user.depot_id} depot"
+        elif "revenue_assurance" in role_names:
+            anomalies = [a for a in anomalies if states.get(a.get("dispatch_id")) and states[a.get("dispatch_id")].assigned_to_user_id == user.id]
+            scope = "Cases assigned to you"
+        else:
+            anomalies = [a for a in anomalies if a.get("dispatch_id") not in states or states[a.get("dispatch_id")].escalated]
+            scope = "Unassigned and escalated cases"
+
+        total = len(anomalies)
+        offset = (page - 1) * page_size
+        total_pages = max(1, math.ceil(total / page_size))
+        return {
+            "status": "success",
+            "scope": scope,
+            "anomalies": deep_sanitize(anomalies[offset:offset + page_size]),
+            "pagination": {"page": page, "page_size": page_size, "total": total, "total_pages": total_pages, "has_next": page * page_size < total, "has_prev": page > 1},
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Review queue failed: %s", e)
+        raise HTTPException(status_code=500, detail="Could not load the review queue")
 
 
 @router.get("/reconcile/omc-risk-profile", response_model=OmcRiskProfileResponse, deprecated=True)

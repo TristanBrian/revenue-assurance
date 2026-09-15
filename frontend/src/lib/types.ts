@@ -235,6 +235,7 @@ export interface OmcDepotMapResult {
 export interface AnomalyTableResult {
   anomalies: Anomaly[];
   pagination: Pagination;
+  scope?: string;
 }
 
 // GET /api/reconcile/omc-risk-profile — its own feature (view_omc_risk_profile).

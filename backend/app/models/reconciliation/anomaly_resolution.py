@@ -16,7 +16,8 @@ longer exists in the current dispatches table.
 """
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Text
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.utils.db_connection import Base
 
@@ -27,6 +28,10 @@ class AnomalyResolution(Base):
     dispatch_id = Column(Text, primary_key=True)
     status = Column(Text, nullable=False)
     notes = Column(Text, nullable=True)
+    assigned_to_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    escalated = Column(Boolean, nullable=False, default=False)
+    assigned_at = Column(DateTime, nullable=True)
+    escalated_at = Column(DateTime, nullable=True)
     updated_at = Column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),

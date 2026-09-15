@@ -20,8 +20,20 @@ export const DIRECTION_LABEL: Record<WorkspaceDirection, string> = {
   outbound: "Inuka Programs",
 };
 
+// Inuka remains implemented for a controlled future rollout, but the current
+// Hackathon 3 product is Oil Revenue Assurance. Keep this opt-in at build time
+// so production cannot expose the second data domain accidentally.
+export const INUKA_WORKSPACE_ENABLED =
+  process.env.NEXT_PUBLIC_ENABLE_INUKA_WORKSPACE === "true";
+
 export function getAllowedDirections(user: AuthUser | null): WorkspaceDirection[] {
   if (!user || user.roles.includes("system_admin")) return [];
+  if (!INUKA_WORKSPACE_ENABLED) {
+    // Do not turn an Inuka-only identity into an Oil identity when the
+    // optional workspace is disabled for this release.
+    if (user.roles.includes("inuka_manager")) return [];
+    return ["inbound"];
+  }
   if (user.roles.includes("depot_supervisor")) return ["inbound"];
   if (user.roles.includes("inuka_manager")) return ["outbound"];
   if (!user.permissions.includes("view_outgoing_data")) return ["inbound"];
@@ -193,7 +205,7 @@ export const navItems: NavItem[] = [
 export const REVIEW_QUEUE_ITEM: NavItem = {
   id: "review-queue",
   label: "My Review Queue",
-  anyOf: ["view_anomaly_table"],
+  anyOf: ["view_review_queue"],
   directions: ["inbound"],
   route: (d) => `/dashboard/${d}/review-queue`,
   icon: ICONS.reviewQueue,
@@ -217,6 +229,7 @@ export function activeNavItemId(pathname: string): string | null {
   const match = pathname.match(/^\/dashboard\/(inbound|outbound)\/([^/]+)/);
   if (!match) return null;
   const segment = match[2] === "extra" ? (match[1] === "inbound" ? "billing" : "beneficiaries") : match[2];
+  if (segment === "review-queue") return "review-queue";
   return navItems.find((i) => i.id === segment)?.id ?? null;
 }
 
