@@ -35,12 +35,7 @@ async def chatbot_query(
             "answer": "I can help with FlowGuard navigation, reconciliation, anomaly review, reports, and access. For a case-specific decision, open the relevant case and use its evidence panel.",
             "context": [],
         }
-    return {
-        "Success": 1,
-        "Message": "Success",
-        "Data": result,
-        "Timestamp": "2026-08-22T00:00:00Z",
-    }
+    return {"status": "success", "reply": result.get("answer", "I could not prepare a response right now.")}
 
 @router.post("/chatbot/ingest-url")
 async def ingest_document_url(
