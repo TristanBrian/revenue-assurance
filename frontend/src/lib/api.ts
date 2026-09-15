@@ -814,20 +814,14 @@ export async function explainAnomalyScore(anomalyId: string, direction: Directio
     console.warn(`[explainAnomalyScore] Remote API returned error for ${anomalyId}, using fallback:`, err);
     return {
       anomaly_id: anomalyId,
-      direction: direction,
-      composite_score: 0.88,
-      risk_tier: "HIGH",
-      rule_score: 0.85,
-      xgb_score: 0.92,
-      iforest_score: -0.74,
-      model_weights: { rule: 0.4, xgb: 0.4, iforest: 0.2 },
+      fraud_score: 88,
+      fraud_tier: "Likely Fraud",
       base_value: 0.15,
-      top_shap_contributions: [
-        { feature_name: "volume_variance_liters", feature_value: 6500, shap_value: 0.38, direction: "INCREASES_RISK" },
-        { feature_name: "dwell_time_minutes", feature_value: 68, shap_value: 0.24, direction: "INCREASES_RISK" },
-        { feature_name: "unbilled_tax_kes", feature_value: 945750, shap_value: 0.18, direction: "INCREASES_RISK" },
+      contributors: [
+        { feature: "volume_variance_liters", value: 6500, contribution: 0.38, direction: "toward_fraud" },
+        { feature: "dwell_time_minutes", value: 68, contribution: 0.24, direction: "toward_fraud" },
+        { feature: "unbilled_tax_kes", value: 945750, contribution: 0.18, direction: "toward_fraud" },
       ],
-      summary_text: `Anomaly ${anomalyId} flagged due to unbilled volumetric delta (+6,500 L) and prolonged gantry dwell duration (68 mins).`,
     };
   }
 }
