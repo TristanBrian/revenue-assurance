@@ -8,15 +8,7 @@
  * "which direction(s) can this user reach" from, so they can never
  * disagree with each other.
  *
- * Replaces the old client-state DirectionContext's locking rules
- * (view_outgoing_data / inuka_manager — see backend/scripts/seed_roles.py's
- * ROLE_PERMISSIONS comment for the backend-side rationale) with the same
- * rules expressed as route-reachability instead of a hidden toggle value.
- * Also drops the old context's third "all" (merged) state entirely — this
- * app now only ever shows one real workspace at a time, per direction.
- *
- * .tsx (not .ts): nav item icons are inline SVG JSX, same convention the
- * old dashboard/layout.tsx used for its own NAV_ITEMS.
+ * .tsx (not .ts): nav item icons are inline SVG JSX.
  */
 import type { ReactNode } from "react";
 import type { AuthUser } from "./types";
@@ -28,11 +20,6 @@ export const DIRECTION_LABEL: Record<WorkspaceDirection, string> = {
   outbound: "Inuka Programs",
 };
 
-/** Which direction(s) this user is allowed to view. Mirrors the locking
- * rules the old DirectionContext enforced:
- * - No `view_outgoing_data` permission (e.g. Depot Supervisor) -> inbound only.
- * - `inuka_manager` role -> outbound only.
- * - Everyone else with `view_outgoing_data` -> both. */
 export function getAllowedDirections(user: AuthUser | null): WorkspaceDirection[] {
   if (!user || user.roles.includes("system_admin")) return [];
   if (user.roles.includes("depot_supervisor")) return ["inbound"];
@@ -43,10 +30,6 @@ export function getAllowedDirections(user: AuthUser | null): WorkspaceDirection[
 
 export function getDefaultDirection(user: AuthUser | null): WorkspaceDirection {
   const allowed = getAllowedDirections(user);
-  // inuka_manager's only allowed value is "outbound"; everyone else
-  // defaults to "inbound" even when both are available — same default
-  // the old context used ("all" leaned inbound-first in practice, since
-  // every inbound page was the pre-existing default landing page).
   return allowed.includes("inbound") ? "inbound" : (allowed[0] ?? "inbound");
 }
 
@@ -63,11 +46,7 @@ export interface NavItem {
   label: string | { inbound: string; outbound: string };
   route: (direction: WorkspaceDirection) => string;
   icon: ReactNode;
-  /** Permission code(s) — item hidden unless the user has at least one.
-   * Omitted entirely means "always visible" (e.g. Overview). */
   anyOf?: string[];
-  /** Restricts which direction(s) show this item at all. Omitted means
-   * both. */
   directions?: WorkspaceDirection[];
   badgeKey?: "anomalies" | "high_risk" | "ebilling";
 }
@@ -150,10 +129,6 @@ export const navItems: NavItem[] = [
     id: "leakage",
     label: { inbound: "Leakage Explorer", outbound: "Payout Exposure" },
     anyOf: ["view_heatmap"],
-    // Confirmed live both directions — /heatmap?direction=outbound really
-    // does return Beneficiary x Pillar density (see
-    // backend/app/routes/reconciliation/heatmap.py) — shared, not
-    // inbound-only.
     route: (d) => `/dashboard/${d}/leakage`,
     icon: ICONS.leakage,
   },
@@ -178,7 +153,7 @@ export const navItems: NavItem[] = [
     directions: ["inbound"], route: (d) => `/dashboard/${d}/operations`, icon: ICONS.overview,
   },
   {
-    id: "billing", label: "E-Billing", anyOf: ["manage_ebilling"],
+    id: "billing", label: "KRA iCMS E-Billing", anyOf: ["manage_ebilling"],
     directions: ["inbound"], badgeKey: "ebilling",
     route: (d) => `/dashboard/${d}/billing`, icon: ICONS.extra,
   },
@@ -219,7 +194,7 @@ export const REVIEW_QUEUE_ITEM: NavItem = {
   id: "review-queue",
   label: "My Review Queue",
   anyOf: ["view_anomaly_table"],
-  directions: ["inbound"], // matches today's page — outbound has its own case queue under Anomalies
+  directions: ["inbound"],
   route: () => `/dashboard/review-queue`,
   icon: ICONS.reviewQueue,
 };
@@ -228,10 +203,6 @@ export function navLabel(item: NavItem, direction: WorkspaceDirection): string {
   return typeof item.label === "string" ? item.label : item.label[direction];
 }
 
-/** Given the currently-active nav item id and a target direction, builds
- * the URL to switch to — the workspace switcher's "preserve the current
- * page id where possible" requirement. Falls back to that direction's
- * overview if the current item doesn't exist/apply on the other side. */
 export function switchDirectionUrl(currentItemId: string | null, target: WorkspaceDirection): string {
   const item = navItems.find((i) => i.id === currentItemId);
   if (!item || item.id === "audit" || (item.directions && !item.directions.includes(target))) {
@@ -240,10 +211,6 @@ export function switchDirectionUrl(currentItemId: string | null, target: Workspa
   return item.route(target);
 }
 
-/** Resolves the active nav item id from a pathname like
- * "/dashboard/outbound/anomalies" or "/dashboard/outbound/anomalies/PIL-1"
- * (still "anomalies" — the [groupId] sub-route belongs to the same nav
- * entry) or "/dashboard/audit". */
 export function activeNavItemId(pathname: string): string | null {
   if (pathname === "/dashboard/audit") return "audit";
   if (pathname.startsWith("/dashboard/review-queue")) return "review-queue";
@@ -258,7 +225,6 @@ export function directionFromPathname(pathname: string): WorkspaceDirection | nu
   return (match?.[1] as WorkspaceDirection | undefined) ?? null;
 }
 
-/** One policy for links and direct workspace URLs. API authorization remains authoritative. */
 export function canAccessModule(user: AuthUser | null, item: NavItem, direction: WorkspaceDirection): boolean {
   return !!user && isDirectionAllowed(user, direction)
     && (!item.directions || item.directions.includes(direction))
