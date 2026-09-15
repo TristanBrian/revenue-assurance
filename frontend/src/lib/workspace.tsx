@@ -229,6 +229,7 @@ export function activeNavItemId(pathname: string): string | null {
   const match = pathname.match(/^\/dashboard\/(inbound|outbound)\/([^/]+)/);
   if (!match) return null;
   const segment = match[2] === "extra" ? (match[1] === "inbound" ? "billing" : "beneficiaries") : match[2];
+  if (segment === "review-queue") return "review-queue";
   return navItems.find((i) => i.id === segment)?.id ?? null;
 }
 
