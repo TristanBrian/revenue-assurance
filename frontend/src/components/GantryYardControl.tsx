@@ -213,24 +213,24 @@ export function GantryYardControl() {
   return (
     <div className="flex flex-col gap-6">
       {/* Header Controls Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl bg-slate-900/90 border border-cyan-500/30 shadow-[0_0_25px_rgba(6,182,212,0.12)] backdrop-blur-md">
+      <div className="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl bg-[#102139]/90 border border-[#2c415c] shadow-lg backdrop-blur-md">
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-black text-white font-['Outfit',sans-serif] tracking-tight flex items-center gap-2">
+            <h2 className="text-xl font-black text-slate-100 font-['Outfit',sans-serif] tracking-tight flex items-center gap-2">
               <span className="text-amber-400">🛢️</span> 3D Depot Volumetric Matrix & Autonomous Control Plane
             </h2>
-            <span className="px-3 py-1 text-[10px] font-black uppercase rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 shadow-[0_0_12px_rgba(6,182,212,0.4)] animate-pulse">
+            <span className="px-3 py-1 text-[10px] font-black uppercase rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-400/40 animate-pulse">
               LIVE 3D SIMULATION
             </span>
           </div>
           <p className="text-xs text-slate-300 mt-1 font-medium">
-            Real-time gantry volumetric telemetry, optical gate lockout barriers, and KRA iCMS automated tax adjustments.
+            Real-time gantry volumetric telemetry, optical gate clearance, and KRA iCMS tax sync.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           {/* View Mode Toggle */}
-          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center bg-[#091426] p-1 rounded-xl border border-[#2c415c]">
             <button
               type="button"
               onClick={() => setViewMode('3D_ISOMETRIC')}
@@ -255,11 +255,11 @@ export function GantryYardControl() {
             </button>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono font-bold">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#091426] border border-[#2c415c] text-xs font-mono font-bold">
             <span className="text-rose-400 font-extrabold">{holdCount}</span> <span className="text-slate-400 text-[10px]">HOLD</span>
-            <span className="text-slate-700">|</span>
+            <span className="text-slate-600">|</span>
             <span className="text-amber-400 font-extrabold">{warningCount}</span> <span className="text-slate-400 text-[10px]">WARN</span>
-            <span className="text-slate-700">|</span>
+            <span className="text-slate-600">|</span>
             <span className="text-emerald-400 font-extrabold">{passCount}</span> <span className="text-slate-400 text-[10px]">PASS</span>
           </div>
 
@@ -267,7 +267,7 @@ export function GantryYardControl() {
             type="button"
             onClick={() => runAnimatedPath(selectedLane ?? lanes[1])}
             disabled={isSimulatingPath || scanning !== null}
-            className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+            className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.3)] active:scale-95 transition-all cursor-pointer disabled:opacity-50"
           >
             {isSimulatingPath ? '🚛 Traversal Active…' : `⚡ Run 3D Path (${selectedLane?.id ?? 'Bay 02'})`}
           </button>
@@ -275,22 +275,22 @@ export function GantryYardControl() {
       </div>
 
       {/* 3D Depot Route & Pipeline Visualizer Stage Container */}
-      <div className="relative rounded-3xl bg-slate-950 border-2 border-slate-800/80 p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.8)] overflow-hidden min-h-[420px] flex flex-col justify-between">
-        {/* Glowing Neon Cyber Grid Backdrop */}
+      <div className="relative rounded-3xl bg-[#0c182b] border border-[#2c415c] p-6 sm:p-8 shadow-xl overflow-hidden min-h-[420px] flex flex-col justify-between">
+        {/* Subtle Ambient Grid Backdrop */}
         <div 
-          className="absolute inset-0 opacity-25 pointer-events-none"
+          className="absolute inset-0 opacity-15 pointer-events-none"
           style={{
-            backgroundImage: `linear-gradient(to right, rgba(6, 182, 212, 0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(245, 158, 11, 0.15) 1px, transparent 1px)`,
+            backgroundImage: `linear-gradient(to right, rgba(6, 182, 212, 0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(245, 158, 11, 0.2) 1px, transparent 1px)`,
             backgroundSize: `36px 36px`,
           }}
         />
 
-        {/* Ambient Top & Bottom Neon Beams */}
+        {/* Ambient Top & Bottom Soft Glows */}
         <div className="absolute -top-24 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Top Telemetry Step Progress HUD Bar */}
-        <div className="relative z-10 flex flex-wrap items-center justify-between border-b border-slate-800/80 pb-4 gap-3">
+        <div className="relative z-10 flex flex-wrap items-center justify-between border-b border-[#2c415c] pb-4 gap-3">
           <div className="flex items-center gap-2 text-xs font-mono">
             <span className="text-amber-400 font-black tracking-wider uppercase">DEPOT ROUTE TRAJECTORY:</span>
             {[
@@ -303,8 +303,8 @@ export function GantryYardControl() {
                 key={st.id}
                 className={`px-3 py-1 rounded-lg text-[10px] font-black border transition-all ${
                   currentStep === st.id
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.4)] scale-105'
-                    : 'bg-slate-900/80 text-slate-500 border-slate-800'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-400 shadow-sm scale-105'
+                    : 'bg-[#102139] text-slate-400 border-[#2c415c]'
                 }`}
               >
                 {st.label}
@@ -312,16 +312,16 @@ export function GantryYardControl() {
             ))}
           </div>
 
-          <span className="text-[11px] font-mono text-slate-300 bg-slate-900/90 px-3 py-1.5 rounded-xl border border-cyan-500/30 shadow-inner">
+          <span className="text-[11px] font-mono text-slate-300 bg-[#102139] px-3 py-1.5 rounded-xl border border-[#2c415c]">
             ACTIVE TARGET: <strong className="text-cyan-300 font-extrabold">{selectedLane?.truck_id}</strong> ({selectedLane?.omc})
           </span>
         </div>
 
         {/* Animated 3D Path Track with Glowing Energy Flow */}
         <div className="relative z-10 my-8 py-4">
-          <div className="relative h-4 w-full bg-slate-900/90 rounded-full border border-slate-700/80 overflow-hidden shadow-[inner_0_2px_8px_rgba(0,0,0,0.8)]">
+          <div className="relative h-4 w-full bg-[#091426] rounded-full border border-[#2c415c] overflow-hidden shadow-inner">
             <div 
-              className="h-full bg-gradient-to-r from-cyan-500 via-amber-400 to-emerald-400 transition-all duration-700 rounded-full shadow-[0_0_20px_#f59e0b]"
+              className="h-full bg-gradient-to-r from-cyan-500 via-amber-400 to-emerald-400 transition-all duration-700 rounded-full shadow-[0_0_15px_#f59e0b]"
               style={{ width: `${pathProgress}%` }}
             />
           </div>
@@ -332,10 +332,10 @@ export function GantryYardControl() {
             style={{ left: `${pathProgress}%` }}
             onClick={() => setIsInspectorOpen(true)}
           >
-            <div className="px-2.5 py-1 text-[10px] font-mono font-black rounded-lg bg-slate-950 text-cyan-300 border border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.5)] mb-1 whitespace-nowrap group-hover:scale-110 transition-transform">
+            <div className="px-2.5 py-1 text-[10px] font-mono font-black rounded-lg bg-[#091426] text-cyan-300 border border-cyan-400/60 shadow-md mb-1 whitespace-nowrap group-hover:scale-110 transition-transform">
               🚛 {selectedLane?.truck_id} • {selectedLane?.omc}
             </div>
-            <div className="text-4xl filter drop-shadow-[0_0_16px_rgba(245,158,11,0.9)] animate-bounce">
+            <div className="text-4xl filter drop-shadow-[0_0_12px_rgba(245,158,11,0.8)] animate-bounce">
               🚚
             </div>
           </div>
@@ -362,43 +362,43 @@ export function GantryYardControl() {
                 }}
                 className={`relative group cursor-pointer transition-all duration-300 p-4 rounded-2xl border flex flex-col justify-between min-h-[200px] ${
                   viewMode === '3D_ISOMETRIC'
-                    ? 'hover:-translate-y-2 hover:rotate-x-3 hover:shadow-[0_15px_30px_rgba(0,0,0,0.9)]'
+                    ? 'hover:-translate-y-1.5 hover:rotate-x-2 hover:shadow-2xl'
                     : ''
                 } ${
                   isSelected
-                    ? 'bg-slate-900/95 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.4)] scale-[1.04] z-20'
+                    ? 'bg-[#162c4a] border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)] scale-[1.03] z-20'
                     : isHold
-                    ? 'bg-rose-950/30 border-rose-600/80 hover:border-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.25)]'
-                    : 'bg-slate-900/60 border-slate-800 hover:border-cyan-500/50 hover:bg-slate-900/90'
+                    ? 'bg-rose-950/20 border-rose-600/70 hover:border-rose-400'
+                    : 'bg-[#102139]/80 border-[#2c415c] hover:border-cyan-500/50 hover:bg-[#162c4a]'
                 }`}
               >
                 {/* Laser Scanning Beam Sweep Indicator */}
                 {isScan && (
-                  <div className="absolute inset-x-0 top-0 h-1.5 bg-cyan-400 shadow-[0_0_20px_#22d3ee] animate-bounce z-30" />
+                  <div className="absolute inset-x-0 top-0 h-1.5 bg-cyan-400 shadow-[0_0_15px_#22d3ee] animate-bounce z-30" />
                 )}
 
                 {/* Bay Header & Status Halo */}
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-mono font-black text-slate-200">{lane.id}</span>
                   <div className="flex items-center gap-1.5">
-                    <span className={`w-3 h-3 rounded-full ${
-                      isHold ? 'bg-rose-500 shadow-[0_0_12px_#f43f5e] animate-ping' :
-                      isScan ? 'bg-cyan-400 shadow-[0_0_12px_#22d3ee] animate-pulse' :
-                      lane.status === 'WARNING' ? 'bg-amber-400 shadow-[0_0_10px_#fbbf24]' :
-                      'bg-emerald-400 shadow-[0_0_10px_#34d399]'
+                    <span className={`w-2.5 h-2.5 rounded-full ${
+                      isHold ? 'bg-rose-500 shadow-[0_0_10px_#f43f5e] animate-ping' :
+                      isScan ? 'bg-cyan-400 shadow-[0_0_10px_#22d3ee] animate-pulse' :
+                      lane.status === 'WARNING' ? 'bg-amber-400' :
+                      'bg-emerald-400'
                     }`} />
                     <span className="text-[10px] font-mono font-black uppercase text-slate-300">{lane.status}</span>
                   </div>
                 </div>
 
-                {/* 3D Docking Bay Platform with Headlight Beam */}
-                <div className="my-2 relative flex items-center justify-center h-20 bg-slate-950/90 rounded-xl border border-slate-800 overflow-hidden shadow-inner group-hover:border-slate-700">
+                {/* 3D Docking Bay Platform */}
+                <div className="my-2 relative flex items-center justify-center h-20 bg-[#091426] rounded-xl border border-[#2c415c] overflow-hidden shadow-inner group-hover:border-slate-600">
                   <div className={`absolute left-0 inset-y-0 w-2 transition-colors ${
-                    isHold ? 'bg-rose-500 shadow-[0_0_14px_#f43f5e]' : isPass ? 'bg-emerald-400 shadow-[0_0_12px_#34d399]' : 'bg-amber-400'
+                    isHold ? 'bg-rose-500' : isPass ? 'bg-emerald-400' : 'bg-amber-400'
                   }`} />
-                  <div className="text-3xl select-none filter drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">🚚</div>
-                  <span className="absolute bottom-1 right-2 text.10px] font-mono text-cyan-300 font-black">{lane.truck_id}</span>
-                  <span className="absolute top-1 right-2 text-[9px] font-mono text-slate-500">{lane.omc.slice(0, 10)}</span>
+                  <div className="text-3xl select-none filter drop-shadow-[0_0_6px_rgba(255,255,255,0.2)]">🚚</div>
+                  <span className="absolute bottom-1 right-2 text-[10px] font-mono text-cyan-300 font-black">{lane.truck_id}</span>
+                  <span className="absolute top-1 right-2 text-[9px] font-mono text-slate-400">{lane.omc.slice(0, 10)}</span>
                 </div>
 
                 {/* Volumetric Telemetry & Variance Breakdown */}
@@ -421,7 +421,7 @@ export function GantryYardControl() {
 
         {/* Selected Bay Quick HUD Inspector Trigger Bar */}
         {selectedLane && (
-          <div className="relative z-10 flex flex-wrap items-center justify-between gap-4 mt-6 p-4 rounded-2xl bg-slate-900/90 border border-slate-700 shadow-xl text-xs font-mono">
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-4 mt-6 p-4 rounded-2xl bg-[#102139] border border-[#2c415c] shadow-lg text-xs font-mono">
             <div className="flex flex-wrap items-center gap-4">
               <span className="text-amber-400 font-black flex items-center gap-1.5 text-sm">
                 <span>📍</span> Active Bay: {selectedLane.id} ({selectedLane.truck_id})
@@ -435,7 +435,7 @@ export function GantryYardControl() {
               <button
                 type="button"
                 onClick={() => setIsInspectorOpen(true)}
-                className="px-4 py-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/50 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
+                className="px-4 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm"
               >
                 🔍 Open Inspector Modal
               </button>
@@ -445,10 +445,10 @@ export function GantryYardControl() {
       </div>
 
       {/* Terminal Real-Time Event Audit Log Box */}
-      <div className="flex flex-col bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl min-h-[250px]">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-slate-900/90">
+      <div className="flex flex-col bg-[#0c182b] border border-[#2c415c] rounded-2xl overflow-hidden shadow-xl min-h-[220px]">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[#2c415c] bg-[#102139]">
           <span className="text-xs font-black text-slate-200 uppercase tracking-wider font-mono flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
             ⚡ Real-Time Control Audit & Tax Log Stream
           </span>
           <span className="text-[10px] text-cyan-400 font-mono font-bold">KRA iCMS GATEWAY ONLINE</span>
@@ -456,11 +456,11 @@ export function GantryYardControl() {
 
         <div
           ref={logRef}
-          className="flex-1 overflow-y-auto p-4 space-y-1.5 font-mono text-xs max-h-[260px] bg-slate-950/80"
+          className="flex-1 overflow-y-auto p-4 space-y-1.5 font-mono text-xs max-h-[220px] bg-[#091426]/90"
         >
           {log.map((entry, i) => (
             <div key={i} className="flex gap-3 leading-relaxed">
-              <span className="text-slate-600 shrink-0 select-none">{entry.ts}</span>
+              <span className="text-slate-500 shrink-0 select-none">{entry.ts}</span>
               <span className={LOG_COLORS[entry.type]}>{entry.msg}</span>
             </div>
           ))}
@@ -469,10 +469,10 @@ export function GantryYardControl() {
 
       {/* Rich Inspector Modal Dialog */}
       {isInspectorOpen && selectedLane && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-          <div className="relative w-full max-w-xl bg-slate-900 border-2 border-slate-700 rounded-3xl p-6 sm:p-8 shadow-[0_25px_60px_rgba(0,0,0,0.9)] text-slate-100 font-sans space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-xl bg-[#102139] border border-[#2c415c] rounded-3xl p-6 sm:p-8 shadow-2xl text-slate-100 font-sans space-y-6">
             {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+            <div className="flex items-start justify-between border-b border-[#2c415c] pb-4">
               <div>
                 <h3 className="text-2xl font-black font-['Outfit',sans-serif] text-cyan-400 flex items-center gap-2">
                   <span>🏗️</span> {selectedLane.id} Inspector
@@ -484,21 +484,21 @@ export function GantryYardControl() {
               <button
                 type="button"
                 onClick={() => setIsInspectorOpen(false)}
-                className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center font-black text-lg transition-colors cursor-pointer"
+                className="w-9 h-9 rounded-full bg-[#1b304b] hover:bg-[#253d5e] text-slate-300 flex items-center justify-center font-black text-lg transition-colors cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             {/* Metrics Breakdown Grid */}
-            <div className="grid grid-cols-2 gap-4 text-xs font-mono bg-slate-950 p-5 rounded-2xl border border-slate-800">
+            <div className="grid grid-cols-2 gap-4 text-xs font-mono bg-[#091426] p-5 rounded-2xl border border-[#2c415c]">
               <div className="space-y-1">
                 <span className="text-slate-400 uppercase tracking-wider text-[10px] font-bold">Gate Clearance Status</span>
                 <div>
                   <span className={`inline-block px-3 py-1 rounded-lg font-black text-xs uppercase ${
-                    selectedLane.status === 'HOLD' ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50 shadow-[0_0_10px_rgba(244,63,94,0.3)]' :
-                    selectedLane.status === 'WARNING' ? 'bg-amber-500/30 text-amber-300 border border-amber-500/50' :
-                    'bg-emerald-500/30 text-emerald-300 border border-emerald-500/50'
+                    selectedLane.status === 'HOLD' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
+                    selectedLane.status === 'WARNING' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' :
+                    'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                   }`}>
                     {selectedLane.status === 'HOLD' ? 'HOLD_TRIGGERED' : selectedLane.status}
                   </span>
@@ -510,27 +510,27 @@ export function GantryYardControl() {
                 <p className="font-bold text-base text-cyan-300">{selectedLane.product}</p>
               </div>
 
-              <div className="space-y-1 border-t border-slate-800 pt-3">
+              <div className="space-y-1 border-t border-[#2c415c] pt-3">
                 <span className="text-slate-400 uppercase tracking-wider text-[10px] font-bold">Physical Meter Reading</span>
                 <p className="font-bold text-base text-slate-100">{selectedLane.metered_volume.toLocaleString()} Liters</p>
               </div>
 
-              <div className="space-y-1 border-t border-slate-800 pt-3">
+              <div className="space-y-1 border-t border-[#2c415c] pt-3">
                 <span className="text-slate-400 uppercase tracking-wider text-[10px] font-bold">Billed Commercial Invoice</span>
                 <p className="font-bold text-base text-slate-100">{selectedLane.invoiced_volume.toLocaleString()} Liters</p>
               </div>
 
-              <div className="space-y-1 border-t border-slate-800 pt-3">
+              <div className="space-y-1 border-t border-[#2c415c] pt-3">
                 <span className="text-slate-400 uppercase tracking-wider text-[10px] font-bold">Volume Variance Delta</span>
                 <p className={`font-black text-base ${selectedLane.variance_liters > 50 ? 'text-rose-400' : 'text-emerald-400'}`}>
                   {selectedLane.variance_liters > 0 ? `+${selectedLane.variance_liters.toLocaleString()}` : selectedLane.variance_liters} Liters
                 </p>
               </div>
 
-              <div className="space-y-1 border-t border-slate-800 pt-3">
+              <div className="space-y-1 border-t border-[#2c415c] pt-3">
                 <span className="text-slate-400 uppercase tracking-wider text-[10px] font-bold">Gantry Dwell Duration</span>
                 <p className={`font-bold text-sm ${selectedLane.dwell_time_minutes > selectedLane.free_dwell_limit_minutes ? 'text-amber-400' : 'text-slate-200'}`}>
-                  {selectedLane.dwell_time_minutes} mins <span className="text-[10px] text-slate-500 font-normal">(Free: {selectedLane.free_dwell_limit_minutes}m)</span>
+                  {selectedLane.dwell_time_minutes} mins <span className="text-[10px] text-slate-400 font-normal">(Free: {selectedLane.free_dwell_limit_minutes}m)</span>
                 </p>
               </div>
             </div>
@@ -538,8 +538,8 @@ export function GantryYardControl() {
             {/* Automated Hold / Clearance Preview Banner */}
             <div className={`p-4 rounded-2xl border text-xs font-mono leading-relaxed transition-all ${
               selectedLane.status === 'HOLD'
-                ? 'bg-rose-950/40 border-rose-700/80 text-rose-200 shadow-[0_0_20px_rgba(244,63,94,0.2)]'
-                : 'bg-emerald-950/40 border-emerald-700/80 text-emerald-200 shadow-[0_0_20px_rgba(52,211,153,0.2)]'
+                ? 'bg-rose-950/30 border-rose-700/60 text-rose-200'
+                : 'bg-emerald-950/30 border-emerald-700/60 text-emerald-200'
             }`}>
               <div className="font-black uppercase tracking-wider text-[10px] mb-1.5 flex items-center justify-between">
                 <span>Automated Hold Preview</span>
@@ -563,7 +563,7 @@ export function GantryYardControl() {
                     <button
                       type="button"
                       onClick={() => handleTriggerIcms(selectedLane)}
-                      className="p-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 font-bold transition-all text-left flex items-center gap-2 cursor-pointer shadow-md"
+                      className="p-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold transition-all text-left flex items-center gap-2 cursor-pointer shadow-sm"
                     >
                       <span>⚡</span> Issue KRA iCMS Tax Note
                     </button>
@@ -571,7 +571,7 @@ export function GantryYardControl() {
                     <button
                       type="button"
                       onClick={() => handleTriggerDemurrage(selectedLane)}
-                      className="p-3 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/50 font-bold transition-all text-left flex items-center gap-2 cursor-pointer shadow-md"
+                      className="p-3 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 font-bold transition-all text-left flex items-center gap-2 cursor-pointer shadow-sm"
                     >
                       <span>🧾</span> Auto-Bill Demurrage
                     </button>
@@ -579,7 +579,7 @@ export function GantryYardControl() {
                     <button
                       type="button"
                       onClick={() => handleManualOverride(selectedLane)}
-                      className="col-span-1 sm:col-span-2 p-3 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/50 font-black transition-all text-center flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                      className="col-span-1 sm:col-span-2 p-3 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 font-black transition-all text-center flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                     >
                       <span>🔑</span> Execute Manager Emergency Gate Override
                     </button>
@@ -595,11 +595,11 @@ export function GantryYardControl() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex justify-end pt-4 border-t border-slate-800">
+            <div className="flex justify-end pt-4 border-t border-[#2c415c]">
               <button
                 type="button"
                 onClick={() => setIsInspectorOpen(false)}
-                className="px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-bold transition-colors cursor-pointer"
+                className="px-6 py-2.5 rounded-xl bg-[#1b304b] hover:bg-[#253d5e] text-slate-100 text-xs font-bold transition-colors cursor-pointer"
               >
                 Close Inspector
               </button>
