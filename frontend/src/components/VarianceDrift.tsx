@@ -35,42 +35,42 @@ export function VarianceDrift() {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
       
       {/* Drift Line Chart */}
-      <div className="p-6 bg-[#0A192F]/80 backdrop-blur-md rounded-xl border border-blue-900/50 shadow-2xl">
+      <div className="p-6 bg-[#171310]/80 backdrop-blur-md rounded-xl border border-blue-900/50 shadow-2xl">
         <h3 className="text-xl font-bold text-white mb-6 font-['Outfit',sans-serif]">
           Real-Time Volume Drift (Meter vs Invoice)
         </h3>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={mockDriftData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
-              <XAxis dataKey="time" stroke="#94A3B8" />
-              <YAxis stroke="#94A3B8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f1b19" />
+              <XAxis dataKey="time" stroke="#b2aeac" />
+              <YAxis stroke="#b2aeac" />
               <Tooltip 
-                contentStyle={{ backgroundColor: '#0F172A', border: '1px solid #1E293B', borderRadius: '8px' }}
-                itemStyle={{ color: '#E2E8F0' }}
+                contentStyle={{ backgroundColor: '#171310', border: '1px solid #1f1b19', borderRadius: '8px' }}
+                itemStyle={{ color: '#33302c' }}
               />
               <Legend />
               <Line type="monotone" dataKey="metered" stroke="#10B981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 8 }} />
-              <Line type="monotone" dataKey="invoiced" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 8 }} />
+              <Line type="monotone" dataKey="invoiced" stroke="#ec835a" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 8 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* OMC Leaderboard Bar Chart */}
-      <div className="p-6 bg-[#0A192F]/80 backdrop-blur-md rounded-xl border border-blue-900/50 shadow-2xl">
+      <div className="p-6 bg-[#171310]/80 backdrop-blur-md rounded-xl border border-blue-900/50 shadow-2xl">
         <h3 className="text-xl font-bold text-white mb-6 font-['Outfit',sans-serif]">
           OMC Leaderboard: Discrepancy & Demurrage
         </h3>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={mockOmcData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
-              <XAxis type="number" stroke="#94A3B8" />
-              <YAxis dataKey="name" type="category" stroke="#94A3B8" width={80} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f1b19" />
+              <XAxis type="number" stroke="#b2aeac" />
+              <YAxis dataKey="name" type="category" stroke="#b2aeac" width={80} />
               <Tooltip 
-                contentStyle={{ backgroundColor: '#0F172A', border: '1px solid #1E293B', borderRadius: '8px' }}
-                itemStyle={{ color: '#E2E8F0' }}
+                contentStyle={{ backgroundColor: '#171310', border: '1px solid #1f1b19', borderRadius: '8px' }}
+                itemStyle={{ color: '#33302c' }}
               />
               <Legend />
               <Bar dataKey="discrepancyLiters" name="Volume Discrepancy (L)" fill="#F43F5E" radius={[0, 4, 4, 0]} />

@@ -12,7 +12,7 @@ export default function KpcSupportWidget() {
         <div
           role="dialog"
           aria-label="KPC support"
-          className="w-72 rounded-2xl border border-[#1b3553] bg-[#071a33] p-4 text-white shadow-2xl"
+          className="w-72 rounded-2xl border border-[#33302c] bg-[#171310] p-4 text-white shadow-2xl"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -23,7 +23,7 @@ export default function KpcSupportWidget() {
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close KPC support"
-              className="rounded-md p-1 text-[#b9cce0] hover:bg-[#143b59] hover:text-white"
+              className="rounded-md p-1 text-[#b9cce0] hover:bg-[#2a2725] hover:text-white"
             >
               <span aria-hidden="true">×</span>
             </button>
@@ -44,9 +44,9 @@ export default function KpcSupportWidget() {
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-label="Open KPC support"
-        className="flex items-center gap-2 rounded-full bg-[#b3312c] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-[#071a33]/25 transition hover:bg-[#962723]"
+        className="flex items-center gap-2 rounded-full bg-[#b3312c] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-[#171310]/25 transition hover:bg-[#962723]"
       >
-        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/50 bg-[#071a33] text-[10px] font-black">KPC</span>
+        <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/50 bg-[#171310] text-[10px] font-black">KPC</span>
         <span>Support</span>
       </button>
     </div>
