@@ -102,7 +102,7 @@ services:
 
   alertmanager:
     image: prom/alertmanager:v0.28.1
-    command: ["--config.file=/etc/alertmanager/alertmanager.yml", "--config.expand-env"]
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
     environment:
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
     volumes:
