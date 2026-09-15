@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Superseded by /dashboard/outbound/anomalies. */
-export default function InukaAnomaliesRedirect() {
-  redirect("/dashboard/outbound/anomalies");
+/** Retired while the Inuka workspace is disabled for the Oil-only release. */
+export default function RetiredInukaRoute() {
+  redirect("/dashboard/inbound/anomalies");
 }
