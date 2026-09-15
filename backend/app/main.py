@@ -1,7 +1,9 @@
 from fastapi import FastAPI, Response, Request
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.response_envelope import ResponseEnvelopeMiddleware
 from app.middleware.audit import AuditMiddleware
+from app.middleware.metrics import MetricsMiddleware
 # from app.middleware.masking import BeneficiaryMaskingMiddleware  # <-- REMOVE THIS
 from app.routes.reconciliation import reconcile, heatmap
 from app.routes.ebilling import e_billing
@@ -93,6 +95,7 @@ app.add_middleware(
 
 # Envelope and audit middlewares ONLY
 app.add_middleware(ResponseEnvelopeMiddleware)
+app.add_middleware(MetricsMiddleware)
 # app.add_middleware(BeneficiaryMaskingMiddleware)  # <-- REMOVED - causes Content-Length error
 app.add_middleware(AuditMiddleware)
 
@@ -180,6 +183,11 @@ async def root():
         ]
     }
 
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    """Prometheus scrape endpoint for platform and request telemetry."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 @app.head("/")
 async def head_root():
     return Response(status_code=200)
@@ -227,6 +235,19 @@ async def health_check(response: Response):
         "service": "kpc-revenue-assurance",
         "uptime": round(time.time() - start_time, 2)
     }
+
+@app.get("/health/live")
+async def liveness_check():
+    """Process liveness probe independent of the database."""
+    return {"status": "alive"}
+
+@app.get("/health/ready")
+async def readiness_check(response: Response):
+    """Database-aware readiness probe for orchestrators and load balancers."""
+    result = await health_check(response)
+    if result["status"] != "healthy":
+        response.status_code = 503
+    return result
 
 @app.head("/health")
 async def head_health():
