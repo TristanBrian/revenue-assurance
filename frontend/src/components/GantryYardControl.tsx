@@ -16,7 +16,7 @@ interface Lane {
   metered_volume: number;
   driver: string;
   omc: string;
-  hold_reason?: string;
+  hold_reason: string;
 }
 
 interface LogEntry {
@@ -26,12 +26,12 @@ interface LogEntry {
 }
 
 const INITIAL_LANES: Lane[] = [
-  { id: 'Bay 01', truck_id: 'KCB 123A', status: 'PASS',    dwell_time_minutes: 25, free_dwell_limit_minutes: 45, variance_liters: 0,    product: 'PMS', invoiced_volume: 33000, metered_volume: 33000, driver: 'J. Kamau', omc: 'TotalEnergies' },
+  { id: 'Bay 01', truck_id: 'KCB 123A', status: 'PASS',    dwell_time_minutes: 25, free_dwell_limit_minutes: 45, variance_liters: 0,    product: 'PMS', invoiced_volume: 33000, metered_volume: 33000, driver: 'J. Kamau', omc: 'TotalEnergies', hold_reason: 'All volumetric parameters matched. Barrier arm cleared.' },
   { id: 'Bay 02', truck_id: 'KDD 104B', status: 'HOLD',    dwell_time_minutes: 52, free_dwell_limit_minutes: 45, variance_liters: 6500, product: 'AGO', invoiced_volume: 32000, metered_volume: 38500, driver: 'O. Otieno', omc: 'Lake Oil', hold_reason: 'Meter volume exceeds invoiced volume (+6,500 L unbilled)' },
   { id: 'Bay 03', truck_id: 'KAE 789C', status: 'HOLD',    dwell_time_minutes: 68, free_dwell_limit_minutes: 45, variance_liters: 500,  product: 'PMS', invoiced_volume: 33000, metered_volume: 33500, driver: 'P. Mwangi', omc: 'Rubis Energy', hold_reason: 'Volumetric drift exceeds 0.5% evaporation safety threshold' },
-  { id: 'Bay 04', truck_id: 'KZZ 001Z', status: 'PASS',    dwell_time_minutes: 30, free_dwell_limit_minutes: 45, variance_liters: 0,    product: 'IK',  invoiced_volume: 20000, metered_volume: 20000, driver: 'H. Kiprop', omc: 'Ola Energy' },
+  { id: 'Bay 04', truck_id: 'KZZ 001Z', status: 'PASS',    dwell_time_minutes: 30, free_dwell_limit_minutes: 45, variance_liters: 0,    product: 'IK',  invoiced_volume: 20000, metered_volume: 20000, driver: 'H. Kiprop', omc: 'Ola Energy', hold_reason: 'All volumetric parameters matched. Barrier arm cleared.' },
   { id: 'Bay 05', truck_id: 'KYY 999Y', status: 'HOLD',    dwell_time_minutes: 18, free_dwell_limit_minutes: 45, variance_liters: 1200, product: 'PMS', invoiced_volume: 33000, metered_volume: 34200, driver: 'S. Njoroge', omc: 'Hass Petroleum', hold_reason: 'Unreconciled PMS overhang detected (+1,200 L)' },
-  { id: 'Bay 06', truck_id: 'KXX 888X', status: 'PASS',    dwell_time_minutes: 40, free_dwell_limit_minutes: 45, variance_liters: 0,    product: 'AGO', invoiced_volume: 27000, metered_volume: 27000, driver: 'M. Wanjiku', omc: 'Astrol Aviation' },
+  { id: 'Bay 06', truck_id: 'KXX 888X', status: 'PASS',    dwell_time_minutes: 40, free_dwell_limit_minutes: 45, variance_liters: 0,    product: 'AGO', invoiced_volume: 27000, metered_volume: 27000, driver: 'M. Wanjiku', omc: 'Astrol Aviation', hold_reason: 'All volumetric parameters matched. Barrier arm cleared.' },
 ];
 
 function now() {
@@ -51,7 +51,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'https://revenue-assurance.f
 export function GantryYardControl() {
   const [lanes, setLanes] = useState<Lane[]>(INITIAL_LANES);
   const [log, setLog] = useState<LogEntry[]>([
-    { ts: now(), type: 'info', msg: '🛡️ Autonomous Control Plane v3.3 (3D Depot Matrix Engine) active.' },
+    { ts: now(), type: 'info', msg: '🛡️ Autonomous Control Plane v3.4 (3D Depot Matrix Engine) active.' },
     { ts: now(), type: 'info', msg: '📡 Telemetry link established — KRA iCMS tax gateway connected.' },
   ]);
   const [scanning, setScanning] = useState<string | null>(null);
@@ -118,9 +118,13 @@ export function GantryYardControl() {
       const data = await res.json();
       const isHold = !res.ok || data?.status === 'GATE_HOLD' || data?.data?.status === 'GATE_HOLD';
       const newStatus: LaneStatus = isHold ? 'HOLD' : 'PASS';
+      const newHoldReason = isHold 
+        ? `Meter volume exceeds invoiced volume (+${(lane.metered_volume - lane.invoiced_volume).toLocaleString()} L unbilled)`
+        : 'All volumetric parameters matched. Barrier arm cleared.';
 
-      setLanes(prev => prev.map(l => l.id === lane.id ? { ...l, status: newStatus } : l));
-      setSelectedLane(prev => prev?.id === lane.id ? { ...lane, status: newStatus } : prev);
+      const updatedLane = { ...lane, status: newStatus, hold_reason: newHoldReason };
+      setLanes(prev => prev.map(l => l.id === lane.id ? updatedLane : l));
+      setSelectedLane(updatedLane);
 
       if (isHold) {
         addLog('hold', `HOLD  🔴  ${lane.truck_id} (${lane.omc}) — variance +${lane.variance_liters}L. GATE ARM LOCKED.`);
@@ -154,8 +158,13 @@ export function GantryYardControl() {
     } catch {
       const simulatedHold = lane.variance_liters > 50 || lane.dwell_time_minutes > 45;
       const newStatus: LaneStatus = simulatedHold ? 'HOLD' : 'PASS';
-      setLanes(prev => prev.map(l => l.id === lane.id ? { ...l, status: newStatus } : l));
-      setSelectedLane(prev => prev?.id === lane.id ? { ...lane, status: newStatus } : prev);
+      const newHoldReason = simulatedHold 
+        ? `Meter volume exceeds invoiced volume (+${lane.variance_liters.toLocaleString()} L unbilled)`
+        : 'All volumetric parameters matched. Barrier arm cleared.';
+
+      const updatedLane = { ...lane, status: newStatus, hold_reason: newHoldReason };
+      setLanes(prev => prev.map(l => l.id === lane.id ? updatedLane : l));
+      setSelectedLane(updatedLane);
       if (simulatedHold) {
         addLog('hold', `HOLD  🔴  ${lane.truck_id} — variance +${lane.variance_liters}L detected. GATE ARM LOCKED.`);
         addLog('action', `ACTION ✅  iCMS adjustment queued — Ref: KRA-ADJ-${lane.truck_id.replace(/\s/g, '')}-DEMO`);
@@ -171,12 +180,17 @@ export function GantryYardControl() {
   function handleManualOverride(lane: Lane) {
     const code = prompt(`⚠️ ENTER MANAGER OVERRIDE AUTH CODE for ${lane.truck_id} (${lane.id}):`, "KPC-MGR-9941");
     if (code) {
-      setLanes(prev => prev.map(l => l.id === lane.id ? { ...l, status: 'PASS', variance_liters: 0 } : l));
+      const updated = {
+        ...lane,
+        status: 'PASS' as LaneStatus,
+        variance_liters: 0,
+        hold_reason: 'All volumetric parameters matched. Barrier arm cleared. (Manager Override Issued)',
+      };
+      setLanes(prev => prev.map(l => l.id === lane.id ? updated : l));
       addLog('alert', `OVERRIDE 🔑  Manual Gate Clearance issued by Manager (Auth: ${code}). ${lane.truck_id} unlocked.`);
       if (selectedLane?.id === lane.id) {
-        setSelectedLane({ ...lane, status: 'PASS', variance_liters: 0 });
+        setSelectedLane(updated);
       }
-      setIsInspectorOpen(false);
     }
   }
 
@@ -405,9 +419,9 @@ export function GantryYardControl() {
         </div>
       </div>
 
-      {/* Rich Inspector Modal (Matching User's Specified Layout & Actions) */}
+      {/* Rich Inspector Modal (Production-Ready Clearance & Hold Preview Layout) */}
       {isInspectorOpen && selectedLane && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
           <div className="relative w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl text-slate-100 font-sans space-y-5">
             {/* Modal Header */}
             <div className="flex items-start justify-between border-b border-slate-800 pb-4">
@@ -432,7 +446,7 @@ export function GantryYardControl() {
               <div className="space-y-1">
                 <span className="text-slate-400 uppercase tracking-wider text-[10px]">Gate Clearance Status</span>
                 <div>
-                  <span className={`inline-block px-2 py-0.5 rounded font-extrabold text-xs uppercase ${
+                  <span className={`inline-block px-2.5 py-0.5 rounded font-extrabold text-xs uppercase ${
                     selectedLane.status === 'HOLD' ? 'bg-rose-500/30 text-rose-400 border border-rose-500/50' :
                     selectedLane.status === 'WARNING' ? 'bg-amber-500/30 text-amber-400 border border-amber-500/50' :
                     'bg-emerald-500/30 text-emerald-400 border border-emerald-500/50'
@@ -472,14 +486,23 @@ export function GantryYardControl() {
               </div>
             </div>
 
-            {/* Automated Hold / Status Preview Banner */}
-            <div className={`p-3.5 rounded-xl border text-xs font-mono leading-relaxed ${
+            {/* Automated Hold / Clearance Preview Banner */}
+            <div className={`p-4 rounded-xl border text-xs font-mono leading-relaxed transition-all ${
               selectedLane.status === 'HOLD'
-                ? 'bg-rose-950/40 border-rose-800/80 text-rose-300'
-                : 'bg-emerald-950/40 border-emerald-800/80 text-emerald-300'
+                ? 'bg-rose-950/40 border-rose-800/80 text-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.15)]'
+                : 'bg-emerald-950/40 border-emerald-800/80 text-emerald-300 shadow-[0_0_15px_rgba(52,211,153,0.15)]'
             }`}>
-              <div className="font-bold uppercase tracking-wider text-[10px] mb-1">Automated Hold Preview</div>
-              {selectedLane.hold_reason ?? (selectedLane.status === 'HOLD' ? 'Meter volume exceeds invoiced volume' : 'All volumetric parameters matched. Barrier arm cleared.')}
+              <div className="font-bold uppercase tracking-wider text-[10px] mb-1.5 flex items-center justify-between">
+                <span>Automated Hold Preview</span>
+                <span className={`px-2 py-0.5 rounded font-extrabold text-[10px] ${
+                  selectedLane.status === 'HOLD' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                }`}>
+                  {selectedLane.status === 'HOLD' ? '🔒 EXIT BLOCKED' : '🟢 BARRIER CLEARED'}
+                </span>
+              </div>
+              <p className="font-bold text-sm">
+                {selectedLane.hold_reason}
+              </p>
             </div>
 
             {/* Recommended Action Buttons */}
@@ -512,8 +535,8 @@ export function GantryYardControl() {
                 )}
 
                 {selectedLane.status === 'PASS' && (
-                  <div className="col-span-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-center font-bold">
-                    ✅ Gate Clear — Truck Authorized for Exit
+                  <div className="col-span-2 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-center font-bold font-mono">
+                    ✅ Gate Clear — All volumetric parameters matched. Barrier arm cleared for exit.
                   </div>
                 )}
               </div>
