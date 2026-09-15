@@ -331,6 +331,13 @@ export interface AnomalyFilters {
   officerId?: string;
 }
 
+export async function getReviewQueue(page = 1, pageSize = 20): Promise<AnomalyTableResult> {
+  const url = new URL("/api/reconcile/review-queue", API_URL);
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("page_size", String(pageSize));
+  return unwrap<AnomalyTableResult>(await authFetch(url));
+}
+
 export async function getAnomalies(
     materiality = 100000,
     page = 1,

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { getDefaultDirection, isDirectionAllowed, activeNavItemId, navItems, canAccessModule } from "@/lib/workspace";
+import { getDefaultDirection, isDirectionAllowed, activeNavItemId, navItems, canAccessModule, REVIEW_QUEUE_ITEM } from "@/lib/workspace";
 
 /**
  * Route guard for the whole /dashboard/[direction]/* segment — the route-
@@ -25,7 +25,8 @@ export default function DirectionLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const direction = params.direction;
   const pathname = usePathname();
-  const item = navItems.find((module) => module.id === activeNavItemId(pathname));
+  const routeItems = [...navItems, REVIEW_QUEUE_ITEM];
+  const item = routeItems.find((module) => module.id === activeNavItemId(pathname));
   const moduleAllowed = !!item && isDirectionAllowed(user, direction) && canAccessModule(user, item, direction);
 
   useEffect(() => {

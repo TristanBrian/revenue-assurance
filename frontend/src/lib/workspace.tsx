@@ -205,7 +205,7 @@ export const navItems: NavItem[] = [
 export const REVIEW_QUEUE_ITEM: NavItem = {
   id: "review-queue",
   label: "My Review Queue",
-  anyOf: ["view_anomaly_table"],
+  anyOf: ["view_review_queue"],
   directions: ["inbound"],
   route: (d) => `/dashboard/${d}/review-queue`,
   icon: ICONS.reviewQueue,
