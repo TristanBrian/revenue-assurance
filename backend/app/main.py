@@ -17,7 +17,7 @@ from app.routes import report_verify
 from app.routes import control
 from app.routes import control_plane
 from app.routes import integrations
-# from app.routes import chatbot
+from app.routes import chatbot
 
 from app.config import settings
 from sqlalchemy import text
@@ -116,6 +116,7 @@ app.include_router(report_verify.router, prefix="/api/reports", tags=["Report Ve
 app.include_router(control.router)
 app.include_router(control_plane.router, prefix="/api", tags=["Control Plane"])
 app.include_router(integrations.router)
+app.include_router(chatbot.router, prefix="/api", tags=["Support Chat"])
 
 # ============================================================================
 # ROOT AND HEALTH ENDPOINTS

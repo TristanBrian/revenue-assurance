@@ -252,6 +252,16 @@ export async function acceptTerms(
   return unwrap<AcceptTermsResponse>(res);
 }
 
+export async function askSupport(question: string): Promise<string> {
+  const res = await authFetch(new URL("/api/chatbot", API_URL), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, k: 5 }),
+  });
+  const body = await unwrap<{ Data?: { answer?: string }; data?: { answer?: string } }>(res);
+  return body.Data?.answer ?? body.data?.answer ?? "I could not prepare a response right now.";
+}
+
 export async function getCurrentUser(): Promise<AuthUser> {
   const res = await authFetch(new URL("/api/auth/me", API_URL));
   return unwrap<AuthUser>(res);
