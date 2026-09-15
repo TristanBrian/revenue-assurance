@@ -26,12 +26,6 @@ async def chatbot_query(
     try:
         from app.services.rag.rag_service import ask_question
         result = ask_question(request.question, request.k)
-        return {
-            "Success": 1,
-            "Message": "Success",
-            "Data": result,
-            "Timestamp": "2026-08-22T00:00:00Z"  # you can use datetime.utcnow()
-        }
     except Exception:
         # The local knowledge base/LLM is optional in the demo and may not be
         # available in a production API replica. Keep support useful with a
@@ -41,6 +35,12 @@ async def chatbot_query(
             "answer": "I can help with FlowGuard navigation, reconciliation, anomaly review, reports, and access. For a case-specific decision, open the relevant case and use its evidence panel.",
             "context": [],
         }
+    return {
+        "Success": 1,
+        "Message": "Success",
+        "Data": result,
+        "Timestamp": "2026-08-22T00:00:00Z",
+    }
 
 @router.post("/chatbot/ingest-url")
 async def ingest_document_url(
