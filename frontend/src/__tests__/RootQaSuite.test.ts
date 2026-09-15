@@ -5,12 +5,13 @@ import {
   isDirectionAllowed,
   switchDirectionUrl,
 } from "../lib/workspace";
-import type { AuthUser } from "../types";
+import type { AuthUser } from "../lib/types";
 
 describe("Root QA Integration & Verification Suite", () => {
   const depotSupervisor: AuthUser = {
     id: "usr-supervisor",
     email: "supervisor@kpc.co.ke",
+    full_name: "Depot Supervisor",
     roles: ["depot_supervisor"],
     permissions: ["view_metrics", "view_anomaly_table", "manage_ebilling"],
   };
@@ -18,6 +19,7 @@ describe("Root QA Integration & Verification Suite", () => {
   const revenueAssurance: AuthUser = {
     id: "usr-assurance",
     email: "assurance@kpc.co.ke",
+    full_name: "Revenue Assurance Officer",
     roles: ["revenue_assurance"],
     permissions: ["view_metrics", "view_anomaly_table", "resolve_anomaly", "view_outgoing_data"],
   };
