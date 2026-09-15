@@ -17,11 +17,3 @@ groups:
         annotations:
           summary: Reconova API error rate exceeds 5%
           description: Inspect the Platform Health dashboard and backend logs.
-      - alert: ReconovaReadinessFailure
-        expr: probe_success{job="reconova-readiness"} == 0
-        for: 2m
-        labels:
-          severity: critical
-        annotations:
-          summary: Reconova readiness check is failing
-          description: The API process may be alive but unable to reach its database.
