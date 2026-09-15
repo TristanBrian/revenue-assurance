@@ -51,7 +51,7 @@ export default function OverviewPage() {
   const [qualityScore, setQualityScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showUpload, setShowUpload] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
@@ -146,10 +146,10 @@ export default function OverviewPage() {
 
           <button
             type="button"
-            onClick={() => setShowUpload(prev => !prev)}
+            onClick={() => setIsUploadModalOpen(true)}
             className="rounded-xl border border-primary/40 bg-primary/10 text-primary px-3.5 py-1.5 text-xs font-extrabold hover:bg-primary/20 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
           >
-            <span>📤</span> {showUpload ? "Hide Upload" : "Upload Invoices"}
+            <span>📤</span> Upload Invoices
           </button>
 
           <button
@@ -162,20 +162,6 @@ export default function OverviewPage() {
           </button>
         </div>
       </header>
-
-      {/* Collapsible CSV Upload Panel */}
-      {showUpload && (
-        <div className="p-5 rounded-2xl bg-card border border-primary/30 shadow-xl space-y-3 animate-fadeIn">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-foreground font-['Outfit',sans-serif]">📤 Reconcile Invoices, Waybills & Remittances</h3>
-              <p className="text-xs text-muted-foreground">Upload CSV data files to trigger server-side 3-way reconciliation engine.</p>
-            </div>
-            <button onClick={() => setShowUpload(false)} className="text-xs text-muted-foreground hover:text-foreground font-bold">✕ Close</button>
-          </div>
-          <CsvUploadPanel materiality={materiality} onUploaded={() => { setRefreshKey(k => k + 1); setShowUpload(false); }} />
-        </div>
-      )}
 
       {error && (
         <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg p-4 text-sm text-status-critical font-medium">{error}</div>
@@ -260,6 +246,43 @@ export default function OverviewPage() {
               </section>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Floating CSV Upload Modal Dialog (Does not distort or shift the dashboard layout) */}
+      {isUploadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="relative w-full max-w-2xl bg-card border border-border rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-foreground font-['Outfit',sans-serif]">📤 Reconcile Invoices, Waybills & Remittances</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Upload CSV files to run 3-way server-side reconciliation engine.</p>
+              </div>
+              <button
+                onClick={() => setIsUploadModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-muted hover:bg-muted/80 text-foreground flex items-center justify-center font-bold text-sm transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <CsvUploadPanel
+              materiality={materiality}
+              onUploaded={() => {
+                setRefreshKey((k) => k + 1);
+                setIsUploadModalOpen(false);
+              }}
+            />
+
+            <div className="flex justify-end border-t border-border pt-3">
+              <button
+                onClick={() => setIsUploadModalOpen(false)}
+                className="px-4 py-1.5 rounded-xl bg-muted text-foreground text-xs font-bold hover:bg-muted/80 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
