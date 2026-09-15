@@ -195,7 +195,7 @@ export const REVIEW_QUEUE_ITEM: NavItem = {
   label: "My Review Queue",
   anyOf: ["view_anomaly_table"],
   directions: ["inbound"],
-  route: () => `/dashboard/review-queue`,
+  route: (d) => `/dashboard/${d}/review-queue`,
   icon: ICONS.reviewQueue,
 };
 

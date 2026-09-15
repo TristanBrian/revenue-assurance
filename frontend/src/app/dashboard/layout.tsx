@@ -165,22 +165,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         {canSwitchWorkspace && (
-          <div className={`mb-3 flex items-center p-0.5 rounded-lg bg-sidebar-accent/30 border border-sidebar-border/40 gap-0.5 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
-            {(["inbound", "outbound"] as const).map((d) => (
+          <div className={`mb-3 px-1 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
+            <div className="flex items-center justify-between rounded-xl bg-sidebar-accent/40 p-1 border border-sidebar-border/60">
               <button
-                key={d}
-                aria-pressed={direction === d}
                 type="button"
-                onClick={() => switchWorkspace(d)}
-                className={`flex-1 py-1.5 px-2 rounded-md text-[11px] font-extrabold transition-all cursor-pointer ${
-                  direction === d
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                    : "text-sidebar-muted-foreground/70 hover:text-sidebar-foreground"
+                onClick={() => switchWorkspace("inbound")}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  direction === "inbound"
+                    ? "bg-amber-500/20 text-amber-500 dark:text-amber-400 border border-amber-500/30 shadow-sm"
+                    : "text-sidebar-muted-foreground hover:text-sidebar-foreground"
                 }`}
               >
-                {d === "inbound" ? "🛢️ Oil Revenue" : "Inuka (Outbound)"}
+                <span>🛢️</span>
+                <span>Oil Revenue</span>
               </button>
-            ))}
+
+              <button
+                type="button"
+                onClick={() => switchWorkspace("outbound")}
+                title="Switch to secondary Inuka Outbound workspace"
+                className={`py-1 px-2.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer ${
+                  direction === "outbound"
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground font-bold shadow-sm"
+                    : "text-sidebar-muted-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent/60"
+                }`}
+              >
+                Inuka ⇄
+              </button>
+            </div>
           </div>
         )}
 
