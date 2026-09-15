@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { ApiError, getAuditVerify, type AuditVerifyResult } from "@/lib/api";
+import { useAudit } from "@/context/AuditContext";
 
 const BASESCAN_TX_URL = "https://sepolia.basescan.org/tx/";
 
@@ -45,10 +46,11 @@ function truncateHash(hash: string | null | undefined, lead = 10, tail = 8): str
 }
 
 export default function AuditVerifyPanel() {
-  const [result, setResult] = useState<AuditVerifyResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [checkedAt, setCheckedAt] = useState<Date | null>(null);
+  const { verifyResult: cachedResult, loading: cacheLoading, error: cacheError, refresh } = useAudit();
+  const [result, setResult] = useState<AuditVerifyResult | null>(cachedResult);
+  const [loading, setLoading] = useState(cacheLoading);
+  const [error, setError] = useState<string | null>(cacheError);
+  const [checkedAt, setCheckedAt] = useState<Date | null>(cachedResult ? new Date() : null);
 
   async function runVerify() {
     setLoading(true);
@@ -98,8 +100,13 @@ export default function AuditVerifyPanel() {
   }
 
   useEffect(() => {
-    runVerify();
-  }, []);
+    if (cachedResult) {
+      setResult(cachedResult);
+      setCheckedAt(new Date());
+    } else {
+      runVerify();
+    }
+  }, [cachedResult]);
 
   const local = result?.local_chain;
   const anchor = result?.on_chain_anchor;

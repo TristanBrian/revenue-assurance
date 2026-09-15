@@ -3,6 +3,7 @@ import Script from "next/script";
 import { Inter, Outfit } from "next/font/google";
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { AuditProvider } from "@/context/AuditContext";
 import { DirectionProvider } from "@/context/DirectionContext";
 import { MaterialityProvider } from "@/context/MaterialityContext";
 import { APP_CONFIG } from "@/config/app-config";
@@ -60,7 +61,9 @@ export default function RootLayout({
           <AuthProvider>
             <DirectionProvider>
               <MaterialityProvider>
-                {children}
+                <AuditProvider>
+                  {children}
+                </AuditProvider>
               </MaterialityProvider>
             </DirectionProvider>
           </AuthProvider>
