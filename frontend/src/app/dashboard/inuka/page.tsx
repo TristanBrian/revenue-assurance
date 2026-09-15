@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Superseded by /dashboard/outbound/overview. */
-export default function InukaOverviewRedirect() {
-  redirect("/dashboard/outbound/overview");
+/** Retired while the Inuka workspace is disabled for the Oil-only release. */
+export default function RetiredInukaRoute() {
+  redirect("/dashboard/inbound/overview");
 }

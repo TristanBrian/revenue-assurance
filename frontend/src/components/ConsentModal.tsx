@@ -34,18 +34,18 @@ export default function ConsentModal({ onAccept, forceShow = false }: ConsentMod
           </div>
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-[#f5f2ef] tracking-tight">Confidentiality & Non-Disclosure Notice</h2>
-            <p className="text-xs sm:text-sm font-medium text-[#b2aeac] mt-1">Oil Revenue & Inuka Programme Data Governance Requirement</p>
+            <p className="text-xs sm:text-sm font-medium text-[#b2aeac] mt-1">KPC Oil Revenue Assurance Data Governance Requirement</p>
           </div>
         </div>
 
         <div className="p-5 rounded-2xl bg-[#2a2725] border border-[#33302c] text-sm sm:text-base text-[#f5f2ef] space-y-3.5 leading-relaxed">
           <p className="font-medium">
-            You are accessing two strictly separated assurance domains: confidential KPC Oil revenue records and protected Inuka beneficiary programme records. Access does not authorize cross-domain disclosure.
+            You are accessing confidential KPC Oil revenue and operational records. Access is limited to your assigned role and assurance responsibilities; it does not authorize disclosure outside KPC.
           </p>
           <ul className="list-disc pl-5 space-y-2 text-xs sm:text-sm text-[#b2aeac]">
             <li>Do not disclose unmasked commercial figures to unauthorized third parties.</li>
-            <li>Inuka beneficiary and payment identifiers are masked in normal report views and exports by default.</li>
-            <li>Oil and Inuka records remain separated by role, server-side scope, report filters, and export direction.</li>
+            <li>Commercial, customer, dispatch, invoice, payment, and tax records must be handled as confidential KPC information.</li>
+            <li>Report views and exports are restricted by role, server-side scope, report filters, and approval controls.</li>
             <li>Exported files are cryptographically signed with SHA-256 digests and logged to your user session.</li>
             <li>All activities comply with the Kenya Data Protection Act (KDPA) and KPC Security Guidelines.</li>
           </ul>

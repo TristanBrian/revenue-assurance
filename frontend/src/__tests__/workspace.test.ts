@@ -10,16 +10,16 @@ describe("Workspace permission boundaries", () => {
   });
   it("keeps Inuka accounts out of every oil-only module", () => {
     const inuka = user(["inuka_manager"], ["view_metrics", "view_anomaly_table", "view_outgoing_data", "manage_ebilling"]);
+    expect(getAllowedDirections(inuka)).toEqual([]);
+    expect(canAccessModule(inuka, moduleById("beneficiaries"), "outbound")).toBe(false);
     for (const id of ["operations", "billing", "upload"]) {
-      expect(canAccessModule(inuka, moduleById(id), "outbound")).toBe(false);
       expect(canAccessModule(inuka, moduleById(id), "inbound")).toBe(false);
     }
-    expect(canAccessModule(inuka, moduleById("beneficiaries"), "outbound")).toBe(true);
   });
   it("does not grant billing merely because a manager can view cases", () => {
     const manager = user(["manager"], ["view_anomaly_table", "view_outgoing_data"]);
     expect(canAccessModule(manager, moduleById("billing"), "inbound")).toBe(false);
-    expect(canAccessModule(manager, moduleById("beneficiaries"), "outbound")).toBe(true);
+    expect(canAccessModule(manager, moduleById("beneficiaries"), "outbound")).toBe(false);
   });
   it("keeps depot roles oil-only even with a conflicting outgoing permission", () => {
     expect(getAllowedDirections(user(["depot_supervisor"], ["view_outgoing_data"]))).toEqual(["inbound"]);

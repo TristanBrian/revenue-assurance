@@ -6,7 +6,7 @@ describe("BRAND_CONFIG", () => {
     expect(BRAND_CONFIG.companyName).toBe("Kenya Pipeline Company");
     expect(BRAND_CONFIG.systemName).toBe("Reconova Revenue Assurance");
     expect(BRAND_CONFIG.shortName).toBe("Reconova");
-    expect(BRAND_CONFIG.primaryColor).toBe("#00529B");
+    expect(BRAND_CONFIG.primaryColor).toBe("#b3312c");
     expect(BRAND_CONFIG.logoUrl).toBe("/svg/kpc-logo-transparent.svg");
   });
 });

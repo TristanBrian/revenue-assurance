@@ -24,7 +24,8 @@ const outfit = Outfit({
 
 const THEME_INIT_SCRIPT = `(function(){try{var m=localStorage.getItem("kpc_theme_mode");var mode=(m==="light"||m==="dark"||m==="system")?m:"dark";var dark=mode==="dark"||(mode==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.classList.add("dark");}catch(e){}})();`;
 
-const CHATBASE_INIT_SCRIPT = `(function(){try{if(!window.chatbase||window.chatbase("getState")!=="initialized"){window.chatbase=(...args)=>{if(!window.chatbase.q){window.chatbase.q=[]}window.chatbase.q.push(args)};window.chatbase=new Proxy(window.chatbase,{get(target,prop){if(prop==="q"){return target.q}return(...args)=>target(prop,...args)}})}const onLoad=function(){try{const script=document.createElement("script");script.src="https://www.chatbase.co/embed.min.js";script.id="I_eSFKTVoDdB73xhXWx5F";script.domain="www.chatbase.co";script.async=true;script.onerror=function(){console.warn("Chatbase widget unavailable");};document.body.appendChild(script);}catch(e){console.warn(e);}};if(document.readyState==="complete"){onLoad();}else{window.addEventListener("load",onLoad,{once:true});}}catch(e){console.warn(e);}})();`;
+const CHATBASE_SCRIPT = `(function(){if(!window.chatbase||window.chatbase("getState")!=="initialized"){window.chatbase=(...arguments)=>{if(!window.chatbase.q){window.chatbase.q=[]}window.chatbase.q.push(arguments)};window.chatbase=new Proxy(window.chatbase,{get(target,prop){if(prop==="q"){return target.q}return(...args)=>target(prop,...args)}})}const onLoad=function(){const script=document.createElement("script");script.src="https://www.chatbase.co/embed.min.js";script.id="I_eSFKTVoDdB73xhXWx5F";script.domain="www.chatbase.co";document.body.appendChild(script)};if(document.readyState==="complete"){onLoad()}else{window.addEventListener("load",onLoad)}})();`
+
 
 export const metadata: Metadata = {
   title: `${APP_CONFIG.name} – ${APP_CONFIG.tagline}`,
@@ -52,8 +53,8 @@ export default function RootLayout({
         <Script id="theme-init" strategy="beforeInteractive">
           {THEME_INIT_SCRIPT}
         </Script>
-        <Script id="chatbase-init" strategy="afterInteractive">
-          {CHATBASE_INIT_SCRIPT}
+        <Script id="chatbase-embed" strategy="afterInteractive">
+          {CHATBASE_SCRIPT}
         </Script>
         <ThemeProvider>
           <AuthProvider>

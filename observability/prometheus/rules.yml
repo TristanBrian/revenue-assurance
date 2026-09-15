@@ -1,0 +1,19 @@
+groups:
+  - name: reconova-platform
+    rules:
+      - alert: ReconovaApiUnavailable
+        expr: up{job="reconova-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Reconova API is unavailable
+          description: Prometheus has not scraped the API for one minute.
+      - alert: ReconovaElevatedServerErrors
+        expr: sum(rate(reconova_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(reconova_http_requests_total[5m])), 1) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Reconova API error rate exceeds 5%
+          description: Inspect the Platform Health dashboard and backend logs.

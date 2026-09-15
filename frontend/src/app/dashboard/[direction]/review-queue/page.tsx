@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ApiError, getAnomalies, getInukaCases } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import { ApiError, getInukaCases, getReviewQueue } from "@/lib/api";
 import type { Anomaly, InukaRiskCase } from "@/lib/types";
 import type { WorkspaceDirection } from "@/lib/workspace";
 import InukaCaseModal from "@/components/InukaCaseModal";
@@ -15,12 +16,14 @@ function formatKes(value: number): string {
 export default function DirectionReviewQueuePage() {
   const { direction } = useParams<{ direction: WorkspaceDirection }>();
   const isInbound = direction === "inbound";
+  const { user } = useAuth();
 
   const [oilCases, setOilCases] = useState<Anomaly[]>([]);
   const [inukaCases, setInukaCases] = useState<InukaRiskCase[]>([]);
   const [selectedInukaCase, setSelectedInukaCase] = useState<InukaRiskCase | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [scope, setScope] = useState("Your operational review queue");
 
   useEffect(() => {
     let cancelled = false;
@@ -28,9 +31,12 @@ export default function DirectionReviewQueuePage() {
     setError(null);
 
     if (isInbound) {
-      getAnomalies(100000, 1, 15, { status: "Critical" }, "inbound")
+      getReviewQueue(1, 15)
         .then((res) => {
-          if (!cancelled) setOilCases(res.anomalies);
+          if (!cancelled) {
+            setOilCases(res.anomalies);
+            setScope(res.scope || "Your operational review queue");
+          }
         })
         .catch((err: unknown) => {
           if (!cancelled) setError(err instanceof ApiError ? err.message : "Could not load oil review queue.");
@@ -62,11 +68,11 @@ export default function DirectionReviewQueuePage() {
             {isInbound ? "Oil Revenue Assurance" : "Inuka Programme Assurance"}
           </p>
           <h1 className="mt-1 text-2xl font-black tracking-tight text-foreground font-['Outfit',sans-serif]">
-            {isInbound ? "Oil Revenue Priority Review Queue" : "Inuka Program Review Queue"}
+            {isInbound ? "My Review Queue" : "Inuka Program Review Queue"}
           </h1>
           <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
             {isInbound
-              ? "Triage view for high-priority oil revenue exceptions, waybill volume breaks, and depot gate clearance holds."
+              ? `${scope}. Review high-priority oil revenue exceptions, waybill volume breaks, and depot gate clearance holds.`
               : "Triage view for high-priority stipend cases, beneficiary exceptions, and field officer alerts."}
           </p>
         </div>
@@ -92,12 +98,14 @@ export default function DirectionReviewQueuePage() {
               <h2 className="mt-1.5 text-lg font-bold text-foreground">Critical Volumetric & Invoicing Exceptions</h2>
               <p className="text-xs text-muted-foreground">Waybill, gantry meter, and OMC invoice variance breaks needing immediate review.</p>
             </div>
-            <Link
-              href="/dashboard/inbound/anomalies"
-              className="px-3 py-1.5 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-xl transition-all"
-            >
-              Open Full Anomalies Queue →
-            </Link>
+            {user?.permissions.includes("view_anomaly_table") && (
+              <Link
+                href="/dashboard/inbound/anomalies"
+                className="px-3 py-1.5 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-xl transition-all"
+              >
+                Open Full Anomalies Queue →
+              </Link>
+            )}
           </div>
 
           <div className="divide-y divide-border">
@@ -107,7 +115,7 @@ export default function DirectionReviewQueuePage() {
               oilCases.map((item) => (
                 <Link
                   key={item.dispatch_id}
-                  href="/dashboard/inbound/anomalies"
+                  href={user?.permissions.includes("view_anomaly_table") ? `/dashboard/inbound/anomalies?search=${encodeURIComponent(item.dispatch_id)}` : "#"}
                   className="flex items-center justify-between gap-4 py-3.5 px-2 hover:bg-muted/40 rounded-xl transition-colors"
                 >
                   <div className="min-w-0">

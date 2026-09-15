@@ -22,6 +22,7 @@ PERMISSIONS = [
     ("view_omc_risk_profile", "View the OMC risk profile drill-down"),
     ("view_metrics", "View executive/summary reconciliation metrics"),
     ("view_anomaly_table", "View the full anomaly table"),
+    ("view_review_queue", "View the personal operational review queue"),
     ("resolve_anomaly", "Resolve/review/assign anomalies"),
     ("manage_ebilling", "Trigger/retry e-billing sync, view sync logs and monitoring"),
     ("export_reports", "Export Excel/CSV reports"),
@@ -46,6 +47,7 @@ PERMISSIONS = [
 # | OMC/Beneficiary Risk Profile | N | Y | Y | Y |
 # | Executive Metrics         | Y | Y | Y | Y |
 # | Anomaly Table             | N | Y | Y | Y |
+# | Personal Review Queue     | Y | Y | Y | N |
 # | Resolve/Review/Assign     | N | N | Y | N |
 # | E-Billing Sync            | N | N | Y | N |
 # | Export Reports            | N | Y | Y | Y |
@@ -81,12 +83,14 @@ PERMISSIONS = [
 ROLE_PERMISSIONS = {
     "system_admin": ["manage_users", "manage_permissions"],
     "depot_supervisor": [
+        "view_review_queue",
         "view_live_feed",
         "upload_csv",
         "view_metrics",
         "view_depot_alerts",
     ],
     "manager": [
+        "view_review_queue",
         "view_live_feed",
         "view_heatmap",
         "view_omc_risk_profile",
@@ -98,6 +102,7 @@ ROLE_PERMISSIONS = {
         "view_outgoing_data",
     ],
     "revenue_assurance": [
+        "view_review_queue",
         "view_live_feed",
         "upload_csv",
         "view_heatmap",

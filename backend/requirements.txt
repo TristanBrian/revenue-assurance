@@ -21,6 +21,7 @@ pytest==8.3.3
 pytest-cov==5.0.0
 requests==2.32.3
 httpx==0.28.1
+prometheus-client==0.22.1
 
 # RAG is disabled in app.main; its optional torch/transformer stack is not
 # part of the API runtime. Install separately when enabling the chatbot.

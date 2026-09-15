@@ -252,6 +252,16 @@ export async function acceptTerms(
   return unwrap<AcceptTermsResponse>(res);
 }
 
+export async function askSupport(question: string): Promise<string> {
+  const res = await authFetch(new URL("/api/chatbot", API_URL), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, k: 5 }),
+  });
+  const body = await unwrap<{ reply?: string; answer?: string }>(res);
+  return body.reply ?? body.answer ?? "I could not prepare a response right now.";
+}
+
 export async function getCurrentUser(): Promise<AuthUser> {
   const res = await authFetch(new URL("/api/auth/me", API_URL));
   return unwrap<AuthUser>(res);
@@ -329,6 +339,13 @@ export interface AnomalyFilters {
    * against inbound rows, same as every other filter here. */
   pillarId?: string;
   officerId?: string;
+}
+
+export async function getReviewQueue(page = 1, pageSize = 20): Promise<AnomalyTableResult> {
+  const url = new URL("/api/reconcile/review-queue", API_URL);
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("page_size", String(pageSize));
+  return unwrap<AnomalyTableResult>(await authFetch(url));
 }
 
 export async function getAnomalies(
@@ -814,20 +831,14 @@ export async function explainAnomalyScore(anomalyId: string, direction: Directio
     console.warn(`[explainAnomalyScore] Remote API returned error for ${anomalyId}, using fallback:`, err);
     return {
       anomaly_id: anomalyId,
-      direction: direction,
-      composite_score: 0.88,
-      risk_tier: "HIGH",
-      rule_score: 0.85,
-      xgb_score: 0.92,
-      iforest_score: -0.74,
-      model_weights: { rule: 0.4, xgb: 0.4, iforest: 0.2 },
+      fraud_score: 88,
+      fraud_tier: "Likely Fraud",
       base_value: 0.15,
-      top_shap_contributions: [
-        { feature_name: "volume_variance_liters", feature_value: 6500, shap_value: 0.38, direction: "INCREASES_RISK" },
-        { feature_name: "dwell_time_minutes", feature_value: 68, shap_value: 0.24, direction: "INCREASES_RISK" },
-        { feature_name: "unbilled_tax_kes", feature_value: 945750, shap_value: 0.18, direction: "INCREASES_RISK" },
+      contributors: [
+        { feature: "volume_variance_liters", value: 6500, contribution: 0.38, direction: "toward_fraud" },
+        { feature: "dwell_time_minutes", value: 68, contribution: 0.24, direction: "toward_fraud" },
+        { feature: "unbilled_tax_kes", value: 945750, contribution: 0.18, direction: "toward_fraud" },
       ],
-      summary_text: `Anomaly ${anomalyId} flagged due to unbilled volumetric delta (+6,500 L) and prolonged gantry dwell duration (68 mins).`,
     };
   }
 }

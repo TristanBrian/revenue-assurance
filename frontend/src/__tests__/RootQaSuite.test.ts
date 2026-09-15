@@ -32,10 +32,10 @@ describe("Root QA Integration & Verification Suite", () => {
       expect(getDefaultDirection(depotSupervisor)).toBe("inbound");
     });
 
-    it("allows revenue assurance officers to access both directions", () => {
-      expect(getAllowedDirections(revenueAssurance)).toEqual(["inbound", "outbound"]);
+    it("keeps the Oil-only release scoped to inbound", () => {
+      expect(getAllowedDirections(revenueAssurance)).toEqual(["inbound"]);
       expect(isDirectionAllowed(revenueAssurance, "inbound")).toBe(true);
-      expect(isDirectionAllowed(revenueAssurance, "outbound")).toBe(true);
+      expect(isDirectionAllowed(revenueAssurance, "outbound")).toBe(false);
     });
 
     it("safely generates direction switch URLs", () => {

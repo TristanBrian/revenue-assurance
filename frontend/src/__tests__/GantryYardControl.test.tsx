@@ -31,7 +31,7 @@ describe("GantryYardControl Component (3D Depot Matrix QA Suite)", () => {
 
     const button2D = screen.getByText("2D Matrix");
     fireEvent.click(button2D);
-    expect(button2D.className).toContain("bg-cyan-500");
+    expect(button2D.className).toContain("bg-orange-500");
 
     const button3D = screen.getByText("3D Isometric");
     fireEvent.click(button3D);
