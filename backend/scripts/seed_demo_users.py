@@ -40,6 +40,10 @@ DEMO_USERS = [
     # Outbound (stipend/disbursement) — Stage 2. Read-only, outbound-only —
     # see seed_roles.py's ROLE_PERMISSIONS comment.
     ("inuka_manager@kpc-demo.co.ke", "Demo Inuka Manager", "inuka_manager", None),
+    # Mobile app demo user aliases:
+    ("manager@kpc.co.ke", "KPC Revenue Manager", "manager", None),
+    ("inspector@kpc.co.ke", "Gantry Field Inspector", "depot_supervisor", "Nairobi"),
+    ("field.agent@kpc.co.ke", "Inuka Field Verification Agent", "revenue_assurance", None),
 ]
 
 
