@@ -13,6 +13,7 @@ import ExposureRecoveryChart from "@/components/ExposureRecoveryChart";
 import ManagerAlertsCard from "@/components/ManagerAlertsCard";
 import InukaCaseModal from "@/components/InukaCaseModal";
 import { GantryYardControl } from "@/components/GantryYardControl";
+import CsvUploadPanel from "@/components/CsvUploadPanel";
 
 function formatKes(value: number): string {
   return new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 }).format(value);
@@ -50,6 +51,7 @@ export default function OverviewPage() {
   const [qualityScore, setQualityScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showUpload, setShowUpload] = useState(false);
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
@@ -144,6 +146,14 @@ export default function OverviewPage() {
 
           <button
             type="button"
+            onClick={() => setShowUpload(prev => !prev)}
+            className="rounded-xl border border-primary/40 bg-primary/10 text-primary px-3.5 py-1.5 text-xs font-extrabold hover:bg-primary/20 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+          >
+            <span>📤</span> {showUpload ? "Hide Upload" : "Upload Invoices"}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setRefreshKey((key) => key + 1)}
             disabled={loading}
             className="rounded-xl border border-border bg-card px-3.5 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm cursor-pointer"
@@ -152,6 +162,20 @@ export default function OverviewPage() {
           </button>
         </div>
       </header>
+
+      {/* Collapsible CSV Upload Panel */}
+      {showUpload && (
+        <div className="p-5 rounded-2xl bg-card border border-primary/30 shadow-xl space-y-3 animate-fadeIn">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <div>
+              <h3 className="text-sm font-bold text-foreground font-['Outfit',sans-serif]">📤 Reconcile Invoices, Waybills & Remittances</h3>
+              <p className="text-xs text-muted-foreground">Upload CSV data files to trigger server-side 3-way reconciliation engine.</p>
+            </div>
+            <button onClick={() => setShowUpload(false)} className="text-xs text-muted-foreground hover:text-foreground font-bold">✕ Close</button>
+          </div>
+          <CsvUploadPanel materiality={materiality} onUploaded={() => { setRefreshKey(k => k + 1); setShowUpload(false); }} />
+        </div>
+      )}
 
       {error && (
         <div className="rounded-xl border border-status-critical/30 bg-status-critical-bg p-4 text-sm text-status-critical font-medium">{error}</div>
@@ -165,7 +189,7 @@ export default function OverviewPage() {
 
       {metrics && !loading && !error && (
         <div className="flex flex-col gap-6">
-          {/* Top Executive KPI Row (Clean 4 Cards) */}
+          {/* Top Executive KPI Row */}
           <StatCardGrid direction={direction} data={{ metrics, omcProfiles, caseSummary }} />
 
           {/* Primary Feature: Interactive 3D Control Plane Engine */}
