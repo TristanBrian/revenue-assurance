@@ -99,14 +99,25 @@ async function req<T>(path: string, init: RequestInit = {}, auth = true): Promis
     if (t) h.set("Authorization", "Bearer " + t);
   }
   let r: Response;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
   try {
-    r = await fetch(base + path, { ...init, headers: h });
-  } catch {
-    throw new Error("Cannot reach Reconova at " + base + ". Check the API URL and network.");
+    r = await fetch(base + path, { ...init, headers: h, signal: controller.signal });
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      throw new Error("Connection timed out contacting Reconova at " + base);
+    }
+    throw new Error("Cannot reach Reconova at " + base + ". Check your network connection.");
+  } finally {
+    clearTimeout(timeoutId);
   }
   const b = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(b?.Message ?? "Request failed (" + r.status + ")");
-  return b?.Data as T;
+  if (!r.ok) {
+    const errMsg = b?.detail ?? b?.Message ?? b?.message ?? "Request failed (" + r.status + ")";
+    throw new Error(typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg));
+  }
+  const data = b?.Data ?? b?.data ?? b;
+  return data as T;
 }
 
 export async function login(email: string, password: string) {
