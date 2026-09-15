@@ -5,7 +5,6 @@ import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { DirectionProvider } from "@/context/DirectionContext";
 import { MaterialityProvider } from "@/context/MaterialityContext";
-import KpcSupportWidget from "@/components/KpcSupportWidget";
 import { APP_CONFIG } from "@/config/app-config";
 import "./globals.css";
 
@@ -24,6 +23,8 @@ const outfit = Outfit({
 });
 
 const THEME_INIT_SCRIPT = `(function(){try{var m=localStorage.getItem("kpc_theme_mode");var mode=(m==="light"||m==="dark"||m==="system")?m:"dark";var dark=mode==="dark"||(mode==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(dark)document.documentElement.classList.add("dark");}catch(e){}})();`;
+
+const CHATBASE_SCRIPT = `(function(){if(!window.chatbase||window.chatbase("getState")!=="initialized"){window.chatbase=(...arguments)=>{if(!window.chatbase.q){window.chatbase.q=[]}window.chatbase.q.push(arguments)};window.chatbase=new Proxy(window.chatbase,{get(target,prop){if(prop==="q"){return target.q}return(...args)=>target(prop,...args)}})}const onLoad=function(){const script=document.createElement("script");script.src="https://www.chatbase.co/embed.min.js";script.id="I_eSFKTVoDdB73xhXWx5F";script.domain="www.chatbase.co";document.body.appendChild(script)};if(document.readyState==="complete"){onLoad()}else{window.addEventListener("load",onLoad)}})();`
 
 
 export const metadata: Metadata = {
@@ -52,12 +53,14 @@ export default function RootLayout({
         <Script id="theme-init" strategy="beforeInteractive">
           {THEME_INIT_SCRIPT}
         </Script>
+        <Script id="chatbase-embed" strategy="afterInteractive">
+          {CHATBASE_SCRIPT}
+        </Script>
         <ThemeProvider>
           <AuthProvider>
             <DirectionProvider>
               <MaterialityProvider>
                 {children}
-                <KpcSupportWidget />
               </MaterialityProvider>
             </DirectionProvider>
           </AuthProvider>
