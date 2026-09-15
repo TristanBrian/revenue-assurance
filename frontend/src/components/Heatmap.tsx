@@ -31,33 +31,30 @@ function formatKesFull(value: number): string {
  * Unified beneficiary masking – "bank statement" style.
  * - BEN-0158 → BEN-****0158
  * - Audrey Anderson → BEN-****5837 (consistent hash-based)
+ * - Oil Marketing Companies (e.g., Vivo Energy, TotalEnergies, Rubis) remain unmasked
  */
-function maskBeneficiaryId(id: string | undefined | null): string {
-  if (!id) return "Beneficiary";
+function maskBeneficiaryId(id: string | undefined | null, direction?: WorkspaceDirection): string {
+  if (!id) return "Entity";
+
+  // Inbound (Oil Revenue): Entity names are Oil Marketing Companies (OMCs) — DO NOT MASK!
+  if (direction === "inbound") {
+    return id;
+  }
 
   // If it's already a BEN-XXXX format, mask it
   if (id.startsWith("BEN-")) {
     const clean = id.replace(/^BEN-/, "");
-    // If it already has ****, return as-is
     if (clean.includes('****')) return id;
     return `BEN-****${clean.slice(-4)}`;
   }
 
-  // If it contains a space (likely a person's name) OR is a name pattern
-  if (id.includes(' ') || /^[A-Z][a-z]+\s[A-Z][a-z]+$/.test(id)) {
+  // Outbound (Inuka social welfare): mask individual beneficiary names
+  if (direction === "outbound" && (id.includes(' ') || /^[A-Z][a-z]+\s[A-Z][a-z]+$/.test(id))) {
     const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const suffix = String(hash % 10000).padStart(4, '0');
     return `BEN-****${suffix}`;
   }
 
-  // If it's a long name that's not all caps (likely a person's name without space)
-  if (id.length > 8 && id !== id.toUpperCase() && !id.includes('ENERGY') && !id.includes('OIL')) {
-    const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const suffix = String(hash % 10000).padStart(4, '0');
-    return `BEN-****${suffix}`;
-  }
-
-  // Return unchanged for company names, product names, etc.
   return id;
 }
 
@@ -120,11 +117,11 @@ export default function Heatmap({ direction, config }: HeatmapProps) {
       .map((omc, ri) => {
         const row = heatmap.data[ri] ?? [];
         const value = productIndex === -1 ? row.reduce((sum, v) => sum + v, 0) : (row[productIndex] ?? 0);
-        return { omc: maskBeneficiaryId(omc), originalOmc: omc, value };
+        return { omc: maskBeneficiaryId(omc, direction), originalOmc: omc, value };
       })
       .filter((item) => item.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [heatmap, selectedProduct]);
+  }, [heatmap, selectedProduct, direction]);
 
   const barMax = useMemo(() => barItems.reduce((max, item) => Math.max(max, item.value), 0) || 1, [barItems]);
 
@@ -135,12 +132,12 @@ export default function Heatmap({ direction, config }: HeatmapProps) {
       heatmap.products.forEach((product, ci) => {
         const val = heatmap.data[ri]?.[ci] ?? 0;
         if (val > 0) {
-          items.push({ omc: maskBeneficiaryId(omc), originalOmc: omc, product, value: val });
+          items.push({ omc: maskBeneficiaryId(omc, direction), originalOmc: omc, product, value: val });
         }
       });
     });
     return items.sort((a, b) => b.value - a.value);
-  }, [heatmap]);
+  }, [heatmap, direction]);
 
   // Reset to page 1 whenever the underlying data changes (materiality slider)
   // so the pager never lands past the new last page.
