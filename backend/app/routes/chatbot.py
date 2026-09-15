@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
-from app.services.rag.rag_service import ask_question, ingest_url, reload_knowledge_base
 from app.core.dependencies import require_permission
 from app.models.auth.user import User
 
@@ -25,6 +24,7 @@ async def chatbot_query(
     user: User = Depends(require_permission("view_metrics"))
 ):
     try:
+        from app.services.rag.rag_service import ask_question
         result = ask_question(request.question, request.k)
         return {
             "Success": 1,
@@ -47,6 +47,7 @@ async def ingest_document_url(
     request: IngestRequest,
     user: User = Depends(require_permission("manage_alerts"))
 ):
+    from app.services.rag.rag_service import ingest_url
     result = ingest_url(request.url)
     return {
         "Success": 1 if result["success"] else 0,
@@ -59,6 +60,7 @@ async def ingest_document_url(
 async def reload_kb(
     user: User = Depends(require_permission("manage_alerts"))
 ):
+    from app.services.rag.rag_service import reload_knowledge_base
     result = reload_knowledge_base()
     return {
         "Success": 1,
