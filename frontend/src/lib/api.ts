@@ -258,8 +258,8 @@ export async function askSupport(question: string): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question, k: 5 }),
   });
-  const body = await unwrap<{ Data?: { answer?: string }; data?: { answer?: string } }>(res);
-  return body.Data?.answer ?? body.data?.answer ?? "I could not prepare a response right now.";
+  const body = await unwrap<{ reply?: string; answer?: string }>(res);
+  return body.reply ?? body.answer ?? "I could not prepare a response right now.";
 }
 
 export async function getCurrentUser(): Promise<AuthUser> {
