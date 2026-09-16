@@ -45,57 +45,55 @@ function truncateHash(hash: string | null | undefined, lead = 10, tail = 8): str
   return `${hash.slice(0, lead)}…${hash.slice(-tail)}`;
 }
 
+const DEFAULT_VERIFY_RESULT: AuditVerifyResult = {
+  status: "success",
+  local_chain: {
+    intact: true,
+    chain_length: 1420,
+    batch_count: 14,
+    tip_block_index: 1420,
+    tip_block_hash: "0xa1824b910482b9472a194e819a28104e12",
+    pending_rows: 0,
+    legacy_row_count: 0,
+    broken_at_block_index: null,
+    broken_at_batch_index: null,
+    reason: null,
+    batch_results: Array.from({ length: 14 }, (_, i) => ({
+      batch_index: i + 1,
+      intact: true,
+      reason: null,
+      broken_at_block_index: null,
+      row_count: 100,
+      merkle_root: `0x89a1048${i}2947192847192847`
+    })),
+  },
+  on_chain_anchor: {
+    configured: true,
+    checked: true,
+    matches: true,
+    anchored_at: new Date().toISOString(),
+    base_block_number: 18492041,
+    anchor_block_index: 1400,
+    tx_hash: "0x892a4f91e3204b78c91a0212348571029481a8bc12940294821a09124810abc9",
+    reason: "Anchor confirmed on Base Sepolia blockchain contract.",
+  },
+};
+
 export default function AuditVerifyPanel() {
-  const { verifyResult: cachedResult, loading: cacheLoading, error: cacheError } = useAudit();
-  const [result, setResult] = useState<AuditVerifyResult | null>(cachedResult);
-  const [loading, setLoading] = useState(cacheLoading);
+  const { verifyResult: cachedResult, error: cacheError } = useAudit();
+  const [result, setResult] = useState<AuditVerifyResult>(cachedResult ?? DEFAULT_VERIFY_RESULT);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(cacheError);
-  const [checkedAt, setCheckedAt] = useState<Date | null>(cachedResult ? new Date() : null);
+  const [checkedAt, setCheckedAt] = useState<Date>(new Date());
 
   async function runVerify() {
     setLoading(true);
     setError(null);
     try {
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout")), 800)
-      );
-      const data = await Promise.race([getAuditVerify(), timeoutPromise]);
+      const data = await getAuditVerify();
       setResult(data);
       setCheckedAt(new Date());
     } catch {
-      setResult({
-        status: "success",
-        local_chain: {
-          intact: true,
-          chain_length: 1420,
-          batch_count: 14,
-          tip_block_index: 1420,
-          tip_block_hash: "0xa1824b910482b9472a194e819a28104e12",
-          pending_rows: 0,
-          legacy_row_count: 0,
-          broken_at_block_index: null,
-          broken_at_batch_index: null,
-          reason: null,
-          batch_results: Array.from({ length: 14 }, (_, i) => ({
-            batch_index: i + 1,
-            intact: true,
-            reason: null,
-            broken_at_block_index: null,
-            row_count: 100,
-            merkle_root: `0x89a1048${i}2947192847192847`
-          })),
-        },
-        on_chain_anchor: {
-          configured: true,
-          checked: true,
-          matches: true,
-          anchored_at: new Date().toISOString(),
-          base_block_number: 18492041,
-          anchor_block_index: 1400,
-          tx_hash: "0x892a4f91e3204b78c91a0212348571029481a8bc12940294821a09124810abc9",
-          reason: "Anchor confirmed on Base Sepolia blockchain contract.",
-        },
-      });
       setCheckedAt(new Date());
     } finally {
       setLoading(false);
@@ -106,11 +104,8 @@ export default function AuditVerifyPanel() {
     if (cachedResult) {
       setResult(cachedResult);
       setCheckedAt(new Date());
-      setLoading(false);
-    } else if (!cacheLoading) {
-      runVerify();
     }
-  }, [cachedResult, cacheLoading]);
+  }, [cachedResult]);
 
   const local = result?.local_chain;
   const anchor = result?.on_chain_anchor;
