@@ -56,7 +56,10 @@ export default function AuditVerifyPanel() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getAuditVerify();
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), 800)
+      );
+      const data = await Promise.race([getAuditVerify(), timeoutPromise]);
       setResult(data);
       setCheckedAt(new Date());
     } catch {

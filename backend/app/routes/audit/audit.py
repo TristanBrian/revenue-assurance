@@ -90,7 +90,7 @@ def verify_audit_trail(
         "on_chain_anchor": verify_on_chain_anchor(db),
     }
     _VERIFY_CACHE["data"] = result
-    _VERIFY_CACHE["expires_at"] = now + 30.0
+    _VERIFY_CACHE["expires_at"] = now + 600.0  # 10 minutes cache
     return result
 
 
