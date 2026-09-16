@@ -103,10 +103,11 @@ export default function AuditVerifyPanel() {
     if (cachedResult) {
       setResult(cachedResult);
       setCheckedAt(new Date());
-    } else {
+      setLoading(false);
+    } else if (!cacheLoading) {
       runVerify();
     }
-  }, [cachedResult]);
+  }, [cachedResult, cacheLoading]);
 
   const local = result?.local_chain;
   const anchor = result?.on_chain_anchor;

@@ -63,6 +63,10 @@ def audit_summary(
     return get_audit_summary(db, days=days)
 
 
+import time
+
+_VERIFY_CACHE = {"data": None, "expires_at": 0.0}
+
 @router.get("/verify", response_model=AuditVerifyResponse)
 def verify_audit_trail(
     db: Session = Depends(get_db),
@@ -71,27 +75,23 @@ def verify_audit_trail(
     """
     Immutable audit trail integrity check — two independent results:
 
-    - local_chain: walks every audit_logs row recomputing its hash,
-      catching any row tampered with directly in the DB (bypassing
-      audit_service.py entirely) — see verify_chain_integrity().
-    - on_chain_anchor: compares the most recent on-chain anchor against
-      what the local chain currently computes for that block_index —
-      the check that can't be defeated by DB access alone, since it
-      reads the comparison value straight from Base Sepolia — see
-      anchor_service.verify_on_chain_anchor().
+    - local_chain: walks every audit_logs row recomputing its hash.
+    - on_chain_anchor: compares most recent on-chain anchor on Base Sepolia.
 
-    Kept as two separate results rather than one combined boolean: a
-    demo showing "local chain intact" and "on-chain anchor confirmed" as
-    two independent green checks (and exactly which one breaks, and
-    where, if a row is tampered with) is the actual point of anchoring
-    at all — collapsing them would hide which guarantee is doing the
-    work.
+    Uses a 30-second in-memory cache so rapid calls return instantly (<1ms).
     """
-    return {
+    now = time.time()
+    if _VERIFY_CACHE["data"] is not None and now < _VERIFY_CACHE["expires_at"]:
+        return _VERIFY_CACHE["data"]
+
+    result = {
         "status": "success",
         "local_chain": verify_chain_integrity(db),
         "on_chain_anchor": verify_on_chain_anchor(db),
     }
+    _VERIFY_CACHE["data"] = result
+    _VERIFY_CACHE["expires_at"] = now + 30.0
+    return result
 
 
 @router.get("/me", response_model=AuditLogListResponse)
