@@ -43,7 +43,7 @@ Reconcile fuel revenue for Kenya Pipeline Company (KPC) **and** govern beneficia
 | **Revenue Assurance** (Full Control) | `revenue_assurance@kpc-demo.co.ke` | Gantry Control, E-Billing, Fraud Graph, All Inbound |
 | **Manager** (Dual Domain) | `manager@kpc-demo.co.ke` | Executive KPIs, Heatmap, Risk Profile, Audit Trail |
 | **Depot Supervisor** (Operations) | `depot_supervisor@kpc-demo.co.ke` | Gate Lockout, Live Gantry Matrix, CSV Ingest |
-| **Inuka Manager** (Governance) | `inuka_manager@kpc-demo.co.ke` | Outbound Stipends, Beneficiaries, Ghost Fraud |
+| **Field Officer** (Mobile App) | `field_officer@kpc-demo.co.ke` | Mobile Gantry Scanner, Gate Verification & Field Holds |
 | **System Admin** | `system_admin@kpc-demo.co.ke` | User Management & System Integrity |
 
 > **Note:** Demo credentials are seeded automatically for testing and executive evaluation.
