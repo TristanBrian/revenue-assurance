@@ -82,7 +82,7 @@ export const AuditProvider: React.FC<ProviderProps> = ({ children }) => {
         getAuditSummary(7),
         getAuditVerify(),
       ]);
-      const normalizedLogs = Array.isArray(logsData) ? logsData : (logsData as any)?.logs ?? [];
+      const normalizedLogs = Array.isArray(logsData) ? logsData : (logsData as { logs?: AuditLog[] })?.logs ?? [];
       setLogs(normalizedLogs);
       setSummary(summaryData);
       setVerifyResult(verifyData);

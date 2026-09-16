@@ -54,7 +54,6 @@ export default function OverviewPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const [refreshKey, setRefreshKey] = useState(0);
-  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const canViewMetrics = user?.permissions.includes("view_metrics") ?? false;
   const canReview = user?.permissions.includes("view_anomaly_table") ?? false;
   const canViewOmcRisk = direction === "inbound" && (user?.permissions.includes("view_omc_risk_profile") ?? false);
@@ -88,7 +87,6 @@ export default function OverviewPage() {
         if (riskResult) setOmcProfiles(riskResult as OmcRiskProfileEntry[]);
         if (priorityResult) setPriorityCases((priorityResult as { cases: InukaRiskCase[] }).cases);
         if (summaryResult) setCaseSummary(summaryResult as InukaCaseSummary);
-        setUpdatedAt(new Date());
       })
       .catch((err: unknown) => {
         if (cancelled) return;

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { ApiError, getAuditVerify, type AuditVerifyResult } from "@/lib/api";
+import { getAuditVerify, type AuditVerifyResult } from "@/lib/api";
 import { useAudit } from "@/context/AuditContext";
 
 const BASESCAN_TX_URL = "https://sepolia.basescan.org/tx/";
@@ -46,7 +46,7 @@ function truncateHash(hash: string | null | undefined, lead = 10, tail = 8): str
 }
 
 export default function AuditVerifyPanel() {
-  const { verifyResult: cachedResult, loading: cacheLoading, error: cacheError, refresh } = useAudit();
+  const { verifyResult: cachedResult, loading: cacheLoading, error: cacheError } = useAudit();
   const [result, setResult] = useState<AuditVerifyResult | null>(cachedResult);
   const [loading, setLoading] = useState(cacheLoading);
   const [error, setError] = useState<string | null>(cacheError);
@@ -59,7 +59,7 @@ export default function AuditVerifyPanel() {
       const data = await getAuditVerify();
       setResult(data);
       setCheckedAt(new Date());
-    } catch (err) {
+    } catch {
       setResult({
         status: "success",
         local_chain: {
@@ -110,7 +110,6 @@ export default function AuditVerifyPanel() {
 
   const local = result?.local_chain;
   const anchor = result?.on_chain_anchor;
-  const brokenBatches = local?.batch_results.filter((b) => !b.intact) ?? [];
 
   return (
     <div className="w-full flex flex-col gap-4 bg-card border border-border rounded-xl p-4 shadow-sm">

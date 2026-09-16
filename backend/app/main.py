@@ -18,6 +18,7 @@ from app.routes import control
 from app.routes import control_plane
 from app.routes import integrations
 from app.routes import chatbot
+from app.routes import share
 
 from app.config import settings
 from sqlalchemy import text
@@ -117,6 +118,7 @@ app.include_router(control.router)
 app.include_router(control_plane.router, prefix="/api", tags=["Control Plane"])
 app.include_router(integrations.router)
 app.include_router(chatbot.router, prefix="/api", tags=["Support Chat"])
+app.include_router(share.router, prefix="/api/share", tags=["Share"])
 
 # ============================================================================
 # ROOT AND HEALTH ENDPOINTS
