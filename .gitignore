@@ -35,6 +35,9 @@ backend/.localpg/
 logs/
 *.log
 
+# Local Alertmanager secret (never commit Slack webhook URLs)
+observability/alertmanager/slack_webhook
+
 # Data (Generated CSVs – Keep only templates if needed)
 backend/data/raw/*.csv
 backend/data/clean/*.csv

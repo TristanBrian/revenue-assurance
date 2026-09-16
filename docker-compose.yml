@@ -102,11 +102,21 @@ services:
 
   alertmanager:
     image: prom/alertmanager:v0.28.1
-    command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        if [ -n "$$SLACK_WEBHOOK_URL" ]; then
+          printf %s "$$SLACK_WEBHOOK_URL" > /tmp/slack_webhook;
+          cp /etc/alertmanager/alertmanager.yml /tmp/alertmanager.yml;
+        else
+          cp /etc/alertmanager/alertmanager-no-slack.yml /tmp/alertmanager.yml;
+        fi;
+        exec /bin/alertmanager --config.file=/tmp/alertmanager.yml
     environment:
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
     volumes:
       - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./observability/alertmanager/alertmanager-no-slack.yml:/etc/alertmanager/alertmanager-no-slack.yml:ro
     ports:
       - "9093:9093"
     restart: unless-stopped
