@@ -152,6 +152,7 @@ export default function OverviewPage() {
 
           <button
             type="button"
+            aria-label="Refresh overview"
             onClick={() => setRefreshKey((key) => key + 1)}
             disabled={loading}
             className="rounded-xl border border-border bg-card px-3.5 py-1.5 text-xs font-bold text-foreground hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-1.5 shadow-sm cursor-pointer"
